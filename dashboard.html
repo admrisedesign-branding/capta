@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Capta — painel</title>
+<style>
+  :root{
+    --laranja:#FF6A1A; --tinta:#16181D; --t60:#5b6270; --t40:#8b93a3;
+    --canvas:#F6F7F9; --branco:#fff; --linha:#E8EBF0; --linha2:#F0F2F6;
+    --quente:#F5462D; --quente-bg:#FEECEA;
+    --morno:#E0930F;  --morno-bg:#FCF2DD;
+    --frio:#3E7BFA;   --frio-bg:#E9F0FE;
+    --verde:#16A06A;
+    --raio:0 1px 2px rgba(16,18,29,.04),0 8px 24px -12px rgba(16,18,29,.18);
+    --r:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',-apple-system,'Segoe UI',Arial,sans-serif;background:var(--canvas);color:var(--tinta);-webkit-font-smoothing:antialiased;line-height:1.45}
+  .app{max-width:560px;margin:0 auto;min-height:100dvh;padding-bottom:24px}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;position:sticky;top:0;background:var(--canvas);z-index:20}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:-.02em;font-size:19px}
+  .logo .mark{width:26px;height:26px;border-radius:8px;background:var(--laranja);position:relative;flex:0 0 26px}
+  .logo .mark::before{content:"";position:absolute;width:11px;height:11px;border:2.5px solid #fff;border-radius:50%;left:5px;top:5px}
+  .logo .mark::after{content:"";position:absolute;width:7px;height:2.5px;background:#fff;border-radius:99px;right:4px;bottom:6px;transform:rotate(45deg)}
+  .who{text-align:right;line-height:1.15}
+  .who b{font-size:13px;font-weight:700;display:block;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .who .plan{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--laranja)}
+  .demo-tag{background:#FFF3DD;color:#9a6a00;font-size:11px;font-weight:700;text-align:center;padding:6px;border-radius:10px;margin:0 14px 6px}
+  .tabs{display:flex;gap:4px;padding:2px 14px 12px;overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:0 0 auto;border:0;background:transparent;font-family:inherit;font-size:14px;font-weight:600;color:var(--t60);padding:8px 14px;border-radius:99px;cursor:pointer;white-space:nowrap}
+  .tab.on{background:var(--tinta);color:#fff}
+  main{padding:0 14px}
+  .reveal{animation:fade .35s ease}@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stat{background:var(--branco);border:1px solid var(--linha);border-radius:var(--r);padding:15px 16px;box-shadow:var(--raio)}
+  .stat .lbl{font-size:12px;color:var(--t60);font-weight:600;display:flex;align-items:center;gap:6px}
+  .stat .num{font-size:30px;font-weight:800;letter-spacing:-.03em;margin-top:4px;font-variant-numeric:tabular-nums}
+  .stat .sub{font-size:11.5px;color:var(--t40);font-weight:600;margin-top:2px}
+  .pill{font-size:10px;font-weight:800;padding:2px 7px;border-radius:99px}
+  .pill.q{background:var(--quente-bg);color:var(--quente)}.pill.m{background:var(--morno-bg);color:var(--morno)}.pill.f{background:var(--frio-bg);color:var(--frio)}
+  .sec-h{display:flex;align-items:center;justify-content:space-between;margin:22px 2px 10px}
+  .sec-h h2{font-size:15px;font-weight:800;letter-spacing:-.01em}
+  .lead{display:flex;align-items:center;gap:12px;background:var(--branco);border:1px solid var(--linha);border-radius:var(--r);padding:13px 14px;margin-bottom:9px;box-shadow:var(--raio);cursor:pointer;transition:.1s}
+  .lead:active{transform:scale(.995)}.lead:hover{border-color:#d8dde6}
+  .av{flex:0 0 40px;height:40px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff}
+  .lead .mid{flex:1;min-width:0}
+  .lead .nm{font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lead .meta{font-size:12px;color:var(--t60);display:flex;gap:7px;align-items:center;margin-top:2px;flex-wrap:wrap}
+  .lead .right{flex:0 0 auto;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+  .temp{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:99px}
+  .temp.q{background:var(--quente-bg);color:var(--quente)}.temp.m{background:var(--morno-bg);color:var(--morno)}.temp.f{background:var(--frio-bg);color:var(--frio)}
+  .score{font-size:12px;font-weight:800;color:var(--t40);font-variant-numeric:tabular-nums}
+  .stbadge{font-size:10px;font-weight:700;color:var(--t40)}
+  .chips{display:flex;gap:7px;margin:2px 2px 12px;flex-wrap:wrap}
+  .chip{border:1px solid var(--linha);background:var(--branco);font-family:inherit;font-size:12.5px;font-weight:700;color:var(--t60);padding:7px 13px;border-radius:99px;cursor:pointer}
+  .chip.on{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+  .empty{text-align:center;color:var(--t40);font-size:14px;padding:40px 10px}
+  .scrim{position:fixed;inset:0;background:rgba(16,18,29,.42);opacity:0;pointer-events:none;transition:.2s;z-index:40}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;background:var(--branco);border-radius:22px 22px 0 0;z-index:50;transform:translateY(100%);transition:transform .28s cubic-bezier(.3,.8,.3,1);max-height:88dvh;overflow-y:auto;padding:8px 18px 26px}
+  .drawer.on{transform:none}
+  .grab{width:38px;height:4px;border-radius:99px;background:var(--linha);margin:8px auto 14px}
+  .d-head{display:flex;align-items:center;gap:13px;margin-bottom:16px}
+  .d-head .av{flex:0 0 48px;height:48px;border-radius:13px;font-size:18px}
+  .d-head h3{font-size:18px;font-weight:800}.d-head .meta{font-size:13px;color:var(--t60)}
+  .scorebar{background:var(--canvas);border-radius:13px;padding:14px;margin-bottom:14px}
+  .scorebar .topl{display:flex;justify-content:space-between;align-items:center}
+  .scorebar b{font-size:13px}.scorebar .big{font-size:20px;font-weight:800}
+  .qa .row{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:8px 0;border-bottom:1px solid var(--linha2)}
+  .qa .row:last-child{border:0}.qa .a{font-weight:700;text-align:right}
+  .zap{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#1FA855;color:#fff;border:0;font-family:inherit;font-weight:700;font-size:15px;padding:14px;border-radius:13px;cursor:pointer;text-decoration:none;margin-top:14px}
+  .stbtns{display:flex;gap:7px;margin-top:12px}
+  .stbtns button{flex:1;border:1.5px solid var(--linha);background:#fff;font-family:inherit;font-size:12.5px;font-weight:700;color:var(--t60);padding:9px;border-radius:10px;cursor:pointer}
+  .stbtns button.on{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+  .plancard{background:var(--branco);border:1px solid var(--linha);border-radius:var(--r);padding:18px;box-shadow:var(--raio);margin-bottom:10px}
+  .plancard .row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--linha2);font-size:14px}
+  .plancard .row:last-child{border:0}.plancard .row .v{font-weight:700}
+  .feat{display:flex;gap:9px;font-size:13.5px;margin:8px 0}
+  .feat::before{content:"";flex:0 0 18px;height:18px;border-radius:50%;background:var(--laranja) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E") center/10px no-repeat;margin-top:1px}
+  .link-box{display:flex;gap:8px;margin:10px 0}
+  .link-box input{flex:1;font-family:inherit;font-size:13px;padding:11px;border:1.5px solid var(--linha);border-radius:10px;background:var(--canvas)}
+  .link-box button{border:0;background:var(--laranja);color:#fff;font-family:inherit;font-weight:700;padding:0 16px;border-radius:10px;cursor:pointer}
+  .note{font-size:12.5px;color:var(--t60);text-align:center;margin-top:12px;line-height:1.5}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="logo"><span class="mark"></span>Capta</div>
+    <div class="who"><b id="who-nome">—</b><span class="plan" id="who-plan">—</span></div>
+  </div>
+  <div class="demo-tag" id="demo-tag" style="display:none">Modo demonstração · dados de exemplo</div>
+  <div class="tabs">
+    <button class="tab on" data-t="painel">Painel</button>
+    <button class="tab" data-t="leads">Leads</button>
+    <button class="tab" data-t="form">Seu link</button>
+    <button class="tab" data-t="plano">Plano</button>
+  </div>
+  <main id="view"></main>
+</div>
+<div class="scrim" id="scrim"></div>
+<div class="drawer" id="drawer"><div class="grab"></div><div id="drawer-body"></div></div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const SLUG = params.get('t');
+const TOKEN = params.get('k');
+const LEADS_API = '/api/capta-leads';
+
+const COLORS = ['#FF6A1A','#3E7BFA','#16A06A','#E0930F','#9B5BFF','#F5462D'];
+const ini = n => (n||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+const color = n => COLORS[(n||'A').charCodeAt(0)%COLORS.length];
+const tcss = t => t==='Quente'?'q':t==='Morno'?'m':'f';
+
+let DATA = { tenant:{nome:'—',plano:'pro'}, leads:[] };
+let DEMO = false, filter='all';
+
+const view=document.getElementById('view'), scrim=document.getElementById('scrim'),
+      drawer=document.getElementById('drawer'), dbody=document.getElementById('drawer-body');
+
+document.querySelectorAll('.tab').forEach(t=> t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); render(t.dataset.t);
+});
+scrim.onclick=()=>{scrim.classList.remove('on');drawer.classList.remove('on');};
+
+load();
+
+async function load(){
+  if(SLUG && TOKEN){
+    try{
+      const r = await fetch(`${LEADS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`);
+      if(r.ok){ DATA = await r.json(); }
+      else throw new Error('api '+r.status);
+    }catch(e){ console.warn('caindo p/ demo:', e.message); DEMO=true; DATA=demoData(); }
+  } else { DEMO=true; DATA=demoData(); }
+
+  document.getElementById('who-nome').textContent = DATA.tenant.nome;
+  document.getElementById('who-plan').textContent = 'Plano '+(DATA.tenant.plano||'pro');
+  document.getElementById('demo-tag').style.display = DEMO ? 'block':'none';
+  render('painel');
+}
+
+/* ---------- métricas (calculadas dos leads reais) ---------- */
+function counts(){
+  const now=new Date(), mes=now.getMonth(), ano=now.getFullYear();
+  const isHoje=d=> d.toDateString()===now.toDateString();
+  let q=0,m=0,f=0,mesC=0,hoje=0;
+  DATA.leads.forEach(l=>{
+    if(l.temperatura==='Quente')q++; else if(l.temperatura==='Morno')m++; else f++;
+    const d=new Date(l.criado_em);
+    if(d.getMonth()===mes&&d.getFullYear()===ano)mesC++;
+    if(isHoje(d))hoje++;
+  });
+  return {q,m,f,mes:mesC,hoje,total:DATA.leads.length};
+}
+
+function render(tab){ ({painel:renderPainel,leads:renderLeads,form:renderForm,plano:renderPlano}[tab])(); }
+
+function renderPainel(){
+  const c=counts();
+  view.innerHTML=`<div class="reveal">
+    <div class="grid2">
+      <div class="stat"><div class="lbl">Leads no mês</div><div class="num">${c.mes}</div><div class="sub">${c.total} no total</div></div>
+      <div class="stat"><div class="lbl">Hoje</div><div class="num">${c.hoje}</div><div class="sub">novos contatos</div></div>
+      <div class="stat"><div class="lbl"><span class="pill q">Quente</span></div><div class="num">${c.q}</div><div class="sub">prontos pra fechar</div></div>
+      <div class="stat"><div class="lbl"><span class="pill m">Morno</span></div><div class="num">${c.m}</div><div class="sub">vale follow-up</div></div>
+    </div>
+    <div class="sec-h"><h2>Últimos leads</h2></div>
+    <div id="feed">${DATA.leads.length?DATA.leads.slice(0,6).map((l,i)=>leadCard(l,i)).join(''):emptyState()}</div>
+  </div>`;
+  bindLeads();
+}
+
+function renderLeads(){
+  const c=counts();
+  const f=DATA.leads.filter(l=> filter==='all' || tcss(l.temperatura)===filter);
+  view.innerHTML=`<div class="reveal">
+    <div class="chips">
+      <button class="chip ${filter==='all'?'on':''}" data-f="all">Todos ${c.total}</button>
+      <button class="chip ${filter==='q'?'on':''}" data-f="q">Quentes ${c.q}</button>
+      <button class="chip ${filter==='m'?'on':''}" data-f="m">Mornos ${c.m}</button>
+      <button class="chip ${filter==='f'?'on':''}" data-f="f">Frios ${c.f}</button>
+    </div>
+    <div id="feed">${f.length?f.map(l=>leadCard(l,DATA.leads.indexOf(l))).join(''):emptyState()}</div>
+  </div>`;
+  document.querySelectorAll('.chip').forEach(ch=> ch.onclick=()=>{filter=ch.dataset.f;renderLeads();});
+  bindLeads();
+}
+
+function leadCard(l,i){
+  return `<div class="lead" data-i="${i}">
+    <div class="av" style="background:${color(l.nome)}">${ini(l.nome)}</div>
+    <div class="mid">
+      <div class="nm">${esc(l.nome)}</div>
+      <div class="meta">${l.origem?'<span>'+esc(l.origem)+'</span>·':''}<span>${timeAgo(l.criado_em)}</span>${l.status&&l.status!=='novo'?'·<span class="stbadge">'+esc(l.status)+'</span>':''}</div>
+    </div>
+    <div class="right">
+      <span class="temp ${tcss(l.temperatura)}">${esc(l.temperatura||'—')}</span>
+      <span class="score">${l.score??'–'}/100</span>
+    </div>
+  </div>`;
+}
+function emptyState(){
+  return `<div class="empty">Nenhum lead ainda.<br>Divulgue seu link e eles aparecem aqui — já pontuados.</div>`;
+}
+function bindLeads(){ document.querySelectorAll('.lead').forEach(el=> el.onclick=()=>openLead(+el.dataset.i)); }
+
+/* ---------- ficha do lead ---------- */
+function openLead(i){
+  const l=DATA.leads[i];
+  const respostas=Object.values(l.respostas||{});
+  const msg=encodeURIComponent(`Oi ${(l.nome||'').split(' ')[0]}! Sou da ${DATA.tenant.nome}. Vi seu contato pelo formulário — posso te ajudar?`);
+  const zapNum=(l.contato||'').replace(/\D/g,'');
+  const STATUSES=['novo','contatado','fechado','perdido'];
+  dbody.innerHTML=`
+    <div class="d-head">
+      <div class="av" style="background:${color(l.nome)}">${ini(l.nome)}</div>
+      <div><h3>${esc(l.nome)}</h3><div class="meta">${esc(l.contato||'')} ${l.origem?'· '+esc(l.origem):''}</div></div>
+    </div>
+    <div class="scorebar"><div class="topl"><b>Pontuação</b>
+      <span class="big" style="color:var(--${tcss(l.temperatura)}==='q'?'quente':'')">
+      </span></div></div>
+    <div class="qa">
+      <div style="font-size:13px;font-weight:700;margin-bottom:2px">Respostas no formulário</div>
+      ${respostas.length?respostas.map(r=>`<div class="row"><span style="color:var(--t60)">${esc(r.label)}</span><span class="a">+${r.pontos}</span></div>`).join('')
+        :'<div class="row"><span style="color:var(--t40)">Sem perguntas neste funil</span></div>'}
+    </div>
+    <div class="stbtns">${STATUSES.map(s=>`<button class="${l.status===s?'on':''}" data-s="${s}">${s}</button>`).join('')}</div>
+    <a class="zap" href="https://wa.me/${zapNum}?text=${msg}" target="_blank" rel="noopener">💬 Responder no WhatsApp</a>`;
+  // injeta o score formatado com cor certa
+  dbody.querySelector('.scorebar .topl').innerHTML =
+    `<b>Pontuação</b><span class="big" style="color:var(--${tcss(l.temperatura)==='q'?'quente':tcss(l.temperatura)==='m'?'morno':'frio'})">${l.score??'–'}/100 · ${esc(l.temperatura||'')}</span>`;
+  dbody.querySelectorAll('.stbtns button').forEach(b=> b.onclick=()=>setStatus(l,b.dataset.s));
+  scrim.classList.add('on'); drawer.classList.add('on');
+}
+
+async function setStatus(l,status){
+  l.status=status;
+  dbody.querySelectorAll('.stbtns button').forEach(b=> b.classList.toggle('on', b.dataset.s===status));
+  if(!DEMO){
+    fetch(`${LEADS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({lead_id:l.id,status})}).catch(()=>{});
+  }
+}
+
+/* ---------- seu link ---------- */
+function renderForm(){
+  const link = SLUG ? `${location.origin}/capta.html?t=${SLUG}` : `${location.origin}/capta.html?t=SEU-SLUG`;
+  view.innerHTML=`<div class="reveal">
+    <p class="note" style="margin:4px 0 8px">Este é o link do seu formulário. Coloque ele no lugar do link direto do WhatsApp — toda pessoa passa por aqui antes, e cai pra você já qualificada.</p>
+    <div class="link-box"><input id="lnk" value="${link}" readonly><button id="cpy">Copiar</button></div>
+    <div class="sec-h"><h2>Onde divulgar</h2></div>
+    <div class="plancard">
+      <div class="feat">Link na bio do Instagram</div>
+      <div class="feat">Botão do anúncio (Meta Ads)</div>
+      <div class="feat">Google Meu Negócio</div>
+      <div class="feat">QR Code impresso na recepção</div>
+    </div>
+    <p class="note">Dica: adicione <b>?o=instagram</b> no fim do link pra saber de qual canal veio cada lead.</p>
+  </div>`;
+  document.getElementById('cpy').onclick=()=>{
+    navigator.clipboard?.writeText(link); const b=document.getElementById('cpy'); b.textContent='Copiado'; setTimeout(()=>b.textContent='Copiar',1500);
+  };
+}
+
+/* ---------- plano ---------- */
+function renderPlano(){
+  const next=new Date(); next.setMonth(next.getMonth()+1); next.setDate(5);
+  view.innerHTML=`<div class="reveal">
+    <div class="plancard">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div><div style="font-size:12px;font-weight:800;color:var(--laranja);letter-spacing:.06em;text-transform:uppercase">Seu plano</div>
+        <div style="font-size:22px;font-weight:800;text-transform:capitalize">${esc(DATA.tenant.plano||'pro')} · R$97<span style="font-size:14px;color:var(--t60)">/mês</span></div></div>
+        <span class="pill q" style="font-size:11px">ativo</span></div>
+      <div class="feat">Formulário de qualificação personalizado</div>
+      <div class="feat">Redireciona pro WhatsApp já qualificado</div>
+      <div class="feat">Pontuação automática (Quente/Morno/Frio)</div>
+      <div class="feat">Painel de leads e aviso por e-mail</div>
+    </div>
+    <div class="plancard">
+      <div class="row"><span>Cobrança</span><span style="font-size:12px;font-weight:700;color:var(--frio);background:var(--frio-bg);padding:5px 10px;border-radius:8px">Mercado Pago · recorrente</span></div>
+      <div class="row"><span>Próxima cobrança</span><span class="v">${next.toLocaleDateString('pt-BR')}</span></div>
+      <div class="row"><span>Status</span><span class="v" style="color:var(--verde)">Em dia</span></div>
+    </div>
+    <p class="note">A assinatura é debitada todo mês no cartão via Mercado Pago. O acesso ao painel acompanha o pagamento.</p>
+  </div>`;
+}
+
+/* ---------- utils ---------- */
+function timeAgo(iso){
+  const s=Math.floor((Date.now()-new Date(iso))/1000);
+  if(s<60)return 'agora';if(s<3600)return `há ${Math.floor(s/60)} min`;
+  if(s<86400)return `há ${Math.floor(s/3600)} h`;return `há ${Math.floor(s/86400)} d`;
+}
+function esc(s){return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ---------- dados de demonstração ---------- */
+function demoData(){
+  const ago=min=>new Date(Date.now()-min*60000).toISOString();
+  return {tenant:{nome:'Natação Aquática Manaus',plano:'pro'}, leads:[
+    {id:'1',nome:'Patrícia Lemos',contato:'(92) 9 8123-4501',origem:'instagram',score:92,temperatura:'Quente',status:'novo',criado_em:ago(4),
+     respostas:{a:{label:'Meu filho(a)',pontos:3},b:{label:'Essa semana',pontos:3},c:{label:'Nunca',pontos:2}}},
+    {id:'2',nome:'Diego Albuquerque',contato:'(92) 9 9940-2231',origem:'google',score:67,temperatura:'Morno',status:'contatado',criado_em:ago(22),
+     respostas:{a:{label:'Pra mim',pontos:2},b:{label:'Mês que vem',pontos:1},c:{label:'Sim, com experiência',pontos:1}}},
+    {id:'3',nome:'Sônia Ribeiro',contato:'(92) 9 8855-1190',origem:'instagram',score:88,temperatura:'Quente',status:'novo',criado_em:ago(38),
+     respostas:{a:{label:'Mais de uma pessoa',pontos:3},b:{label:'Essa semana',pontos:3},c:{label:'Nunca',pontos:2}}},
+    {id:'4',nome:'Marcos Tavares',contato:'(92) 9 9012-7740',origem:'site',score:25,temperatura:'Frio',status:'novo',criado_em:ago(140),
+     respostas:{a:{label:'Pra mim',pontos:2},b:{label:'Só pesquisando',pontos:0},c:{label:'Sim, com experiência',pontos:1}}},
+  ]};
+}
+</script>
+</body>
+</html>

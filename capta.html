@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Capta</title>
+<style>
+  :root{
+    --cor:#FF6A1A; --tinta:#16181D; --t60:#5b6270; --t40:#8b93a3;
+    --canvas:#F6F7F9; --linha:#E5E8EE; --branco:#fff; --verde:#1FA855;
+    --r:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',-apple-system,'Segoe UI',Arial,sans-serif;background:var(--canvas);color:var(--tinta);-webkit-font-smoothing:antialiased;line-height:1.45;min-height:100dvh}
+  .wrap{max-width:440px;margin:0 auto;padding:26px 20px 40px;min-height:100dvh;display:flex;flex-direction:column}
+  .eb{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--cor)}
+  h1{font-size:clamp(24px,6.5vw,30px);font-weight:800;letter-spacing:-.02em;line-height:1.12;margin:8px 0 4px}
+  .sub{color:var(--t60);font-size:15px;margin-bottom:20px}
+  .card{background:var(--branco);border:1px solid var(--linha);border-radius:18px;padding:20px;box-shadow:0 8px 30px -16px rgba(16,18,29,.22)}
+  label.f{display:block;margin-bottom:14px}
+  label.f span{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
+  input{width:100%;font-family:inherit;font-size:16px;padding:13px 14px;border:1.5px solid var(--linha);border-radius:11px;background:var(--canvas)}
+  input:focus{outline:none;border-color:var(--cor);background:#fff}
+  .bar{height:5px;background:#EDEFF3;border-radius:99px;overflow:hidden;margin-bottom:16px}
+  .bar>i{display:block;height:100%;width:0;background:var(--cor);transition:width .3s ease}
+  .step{font-size:12px;font-weight:700;color:var(--t40);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+  .q{font-size:20px;font-weight:800;letter-spacing:-.01em;margin-bottom:16px;line-height:1.2}
+  .opt{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:#fff;border:1.5px solid var(--linha);border-radius:13px;padding:14px 15px;margin-bottom:9px;cursor:pointer;font-family:inherit;font-size:15.5px;color:var(--tinta);transition:.12s}
+  .opt:hover{border-color:var(--cor)}
+  .opt:active{transform:scale(.99)}
+  .opt .dot{flex:0 0 19px;height:19px;border:2px solid var(--linha);border-radius:50%}
+  .btn{appearance:none;border:0;cursor:pointer;font-family:inherit;font-weight:700;background:var(--cor);color:#fff;font-size:16px;padding:15px;border-radius:13px;width:100%;margin-top:6px;transition:.12s}
+  .btn:hover{filter:brightness(.94)}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+  .btn-back{background:none;color:var(--t60);font-weight:600;font-size:14px;padding:10px;width:auto;margin-top:10px}
+  .err{color:#D7402B;font-size:13px;font-weight:600;min-height:18px;margin-top:6px}
+  .spacer{flex:1;min-height:20px}
+  .foot{text-align:center;font-size:11px;color:var(--t40);margin-top:24px}
+  .center{margin:auto 0;text-align:center}
+  .spin{width:46px;height:46px;border:5px solid #EDEFF3;border-top-color:var(--cor);border-radius:50%;margin:0 auto 18px;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .zapwrap{margin:auto 0;text-align:center}
+  .zapwrap .check{width:64px;height:64px;border-radius:50%;background:var(--verde);margin:0 auto 18px;display:grid;place-items:center}
+  .zap{display:inline-flex;align-items:center;justify-content:center;gap:9px;background:var(--verde);color:#fff;border:0;font-family:inherit;font-weight:700;font-size:16px;padding:15px 24px;border-radius:13px;text-decoration:none;margin-top:8px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+/* ===================== CONFIG (preencher no deploy) ===================== */
+const SUPABASE_URL  = 'https://SEU-PROJETO.supabase.co';
+const SUPABASE_ANON = 'SUA_ANON_KEY';
+const NOTIFY_API    = '/api/capta-notify';   // avisa o dono (opcional)
+/* ======================================================================= */
+
+const sb  = createClient(SUPABASE_URL, SUPABASE_ANON);
+const app = document.getElementById('app');
+const params = new URLSearchParams(location.search);
+const SLUG = params.get('t');
+const ORIGEM = params.get('o') || null;       // ?o=instagram p/ marcar a origem
+
+const state = { tenant:null, perguntas:[], nome:'', contato:'', ans:{}, idx:0 };
+
+init();
+
+async function init(){
+  if(!SLUG){ return fatal('Link sem identificação do negócio.'); }
+  loading('Carregando…');
+  const { data:t } = await sb.from('capta_tenants')
+    .select('id,nome,whatsapp,msg_template,cor,headline').eq('slug',SLUG).single();
+  if(!t){ return fatal('Negócio não encontrado ou inativo.'); }
+  const { data:qs } = await sb.from('capta_perguntas')
+    .select('id,texto,opcoes').eq('tenant_id',t.id).eq('ativo',true).order('ordem');
+  state.tenant = t; state.perguntas = qs || [];
+  if(t.cor) document.documentElement.style.setProperty('--cor', t.cor);
+  screenStart();
+}
+
+/* ---- abertura: nome + contato ---- */
+function screenStart(){
+  app.innerHTML = `
+    <div>
+      <p class="eb">${esc(state.tenant.nome)}</p>
+      <h1>${esc(state.tenant.headline)}</h1>
+      <p class="sub">Responda rapidinho e a gente já te chama no WhatsApp.</p>
+      <div class="card">
+        <label class="f"><span>Seu nome</span><input id="i-nome" autocomplete="name" placeholder="Como te chamam"></label>
+        <label class="f" style="margin-bottom:4px"><span>Seu WhatsApp</span><input id="i-tel" inputmode="tel" autocomplete="tel" placeholder="(92) 9 ____-____"></label>
+      </div>
+      <div class="err" id="err"></div>
+      <button class="btn" id="go">Começar →</button>
+      <p class="foot">⚡ por Capta</p>
+    </div>`;
+  document.getElementById('go').onclick = ()=>{
+    const nome = v('i-nome'), tel = v('i-tel');
+    if(nome.length<2) return setErr('Digite seu nome.');
+    if(tel.replace(/\D/g,'').length<10) return setErr('Digite um WhatsApp válido com DDD.');
+    state.nome = nome; state.contato = tel; state.idx = 0;
+    state.perguntas.length ? screenQ() : finish();
+  };
+}
+
+/* ---- perguntas do funil (vêm do banco) ---- */
+function screenQ(){
+  const q = state.perguntas[state.idx];
+  const total = state.perguntas.length;
+  const pct = Math.round(state.idx/total*100);
+  app.innerHTML = `
+    <div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <p class="step">Pergunta ${state.idx+1} de ${total}</p>
+      <p class="q">${esc(q.texto)}</p>
+      <div>${q.opcoes.map((o,i)=>`
+        <button class="opt" data-i="${i}"><span class="dot"></span><span>${esc(o.label)}</span></button>`).join('')}</div>
+      ${state.idx>0?'<button class="btn-back" id="back">← Voltar</button>':''}
+    </div>`;
+  document.querySelectorAll('.opt').forEach(b=> b.onclick=()=>{
+    const o = q.opcoes[+b.dataset.i];
+    state.ans[q.id] = { label:o.label, pontos:o.pontos|0 };
+    if(state.idx < total-1){ state.idx++; screenQ(); } else finish();
+  });
+  const back = document.getElementById('back');
+  if(back) back.onclick = ()=>{ state.idx--; screenQ(); };
+}
+
+/* ---- salva + redireciona pro WhatsApp ---- */
+async function finish(){
+  loading('Quase lá…');
+  let leadId=null;
+  try{
+    const { data, error } = await sb.from('capta_leads').insert({
+      tenant_id: state.tenant.id, nome: state.nome, contato: state.contato,
+      respostas: state.ans, origem: ORIGEM
+    }).select('id').single();
+    if(error) throw error;
+    leadId = data.id;
+    // avisa o dono (não bloqueia o redirect)
+    fetch(NOTIFY_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lead_id:leadId})}).catch(()=>{});
+  }catch(e){ console.warn('insert falhou:', e?.message); }
+
+  const msg = state.tenant.msg_template.replace(/\{nome\}/g, state.nome);
+  const url = `https://wa.me/${state.tenant.whatsapp}?text=${encodeURIComponent(msg)}`;
+  screenDone(url);
+  // tenta abrir direto; se o navegador bloquear, fica o botão
+  setTimeout(()=>{ location.href = url; }, 1200);
+}
+
+function screenDone(url){
+  app.innerHTML = `
+    <div class="zapwrap">
+      <div class="check"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <h1 style="font-size:23px">Tudo certo, ${esc(state.nome.split(' ')[0])}!</h1>
+      <p class="sub" style="margin:8px auto 0;max-width:30ch">Estamos te levando pro WhatsApp. Se não abrir sozinho, é só tocar abaixo.</p>
+      <a class="zap" href="${url}">💬 Abrir o WhatsApp</a>
+    </div>`;
+}
+
+/* ---- utils ---- */
+function loading(txt){ app.innerHTML = `<div class="center"><div class="spin"></div><p class="sub" style="margin:0">${txt}</p></div>`; }
+function fatal(txt){ app.innerHTML = `<div class="center"><p class="q">Ops.</p><p class="sub">${txt}</p></div>`; }
+function v(id){ return document.getElementById(id).value.trim(); }
+function setErr(t){ document.getElementById('err').textContent = t; }
+function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+</script>
+</body>
+</html>
