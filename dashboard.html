@@ -119,6 +119,35 @@ main{padding:0 14px}
 .note{font-size:12.5px;color:var(--dr);text-align:center;margin-top:12px;line-height:1.5}
 
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ---- Freemium ---- */
+.pill.free{background:rgba(234,240,255,.1);color:var(--dm)}
+.stat .num .lim{font-size:16px;color:var(--dr);font-weight:700;margin-left:1px}
+.lockstat .num{font-size:24px}
+.temp.lock,.score.lock{background:rgba(234,240,255,.08);color:var(--dr);font-size:11px;padding:3px 9px;border-radius:99px;font-weight:800}
+.lead.locked{cursor:default;opacity:.85}
+.lead.locked .nm,.lead.locked .meta{filter:none}
+.av.lockav{background:rgba(234,240,255,.07);color:var(--dr);font-size:16px}
+.mini-up{border:0;background:var(--or);color:#fff;font-family:inherit;font-weight:800;font-size:11.5px;padding:7px 12px;border-radius:9px;cursor:pointer}
+.upsell{background:linear-gradient(135deg,var(--surface2),var(--surface));border:1px solid var(--or-soft);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:var(--raio)}
+.upsell-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.upsell-top b{font-size:15px;font-weight:800;display:block}
+.upsell-top .usub{font-size:12.5px;color:var(--dm)}
+.ubar{height:7px;background:var(--surface3);border-radius:99px;overflow:hidden;margin-bottom:10px}
+.ubar i{display:block;height:100%;background:linear-gradient(90deg,var(--or),var(--frio));border-radius:99px}
+.ulock{font-size:13px;color:var(--tx);margin:0 0 12px;line-height:1.45}
+.ulock b{color:var(--quente)}
+.btn-up{width:100%;border:0;background:var(--or);color:#fff;font-family:inherit;font-weight:800;font-size:13.5px;padding:11px;border-radius:11px;cursor:pointer;transition:.12s}
+.btn-up:hover{background:var(--or-deep)}
+.btn-up.sm{margin-top:10px;font-size:12.5px;padding:9px}
+.scorebar.locked .big.lock{color:var(--dr);font-size:14px;font-weight:800}
+.plano-eb{font-size:11px;font-weight:800;color:var(--or);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+.feat.sm{font-size:12.5px;margin:6px 0}
+.upcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:10px;box-shadow:var(--raio);position:relative}
+.upcard.featured{border-color:var(--or);box-shadow:0 0 0 1px var(--or),var(--raio)}
+.up-tag{position:absolute;top:-9px;right:14px;background:var(--or);color:#fff;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:3px 9px;border-radius:99px}
+.upcard-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.upcard-h b{font-size:17px;font-weight:800}
+.upcard-h span{font-size:14px;font-weight:700;color:var(--frio)}
 </style>
 </head>
 <body>
@@ -152,8 +181,37 @@ const ini      = n => (n||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpp
 const color    = n => COLORS[(n||'A').charCodeAt(0) % COLORS.length];
 const tcss     = t => t==='Quente'?'q':t==='Morno'?'m':'f';
 
-let DATA = { tenant:{nome:'—',plano:'pro'}, leads:[] };
+let DATA = { tenant:{nome:'—',plano:'free'}, leads:[] };
 let DEMO = false, filter = 'all';
+
+// ---- Freemium -------------------------------------------------
+const FREE_LIMIT = 30;
+const PLAN_PRICE = { free:0, pro:97, business:197, gestao:397 };
+// Cole aqui os links de assinatura do Mercado Pago (pendência 5):
+const CHECKOUT   = { pro:'', business:'', gestao:'' };
+const planoAtual = () => DATA.tenant.plano || 'free';
+const isFree     = () => planoAtual() === 'free';
+const lockedCount = () => DATA.leads.filter(l => l._locked).length;
+
+// marca os leads do mês acima do limite do Free como bloqueados
+function applyPlanLimits(){
+  DATA.leads.forEach(l => l._locked = false);
+  if(!isFree()) return;
+  const now = new Date();
+  const doMes = DATA.leads
+    .filter(l => { const d=new Date(l.criado_em); return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear(); })
+    .sort((a,b) => new Date(a.criado_em) - new Date(b.criado_em));
+  const trava = new Set(doMes.slice(FREE_LIMIT).map(l => l.id));
+  DATA.leads.forEach(l => l._locked = trava.has(l.id));
+}
+
+window.goPlano = () => { const t=document.querySelector('.tab[data-t="plano"]'); if(t) t.click(); };
+window.goPlanoFromDrawer = () => { scrim.classList.remove('on'); drawer.classList.remove('on'); window.goPlano(); };
+window.goCheckout = (key) => {
+  const url = CHECKOUT[key];
+  if(url) location.href = url;
+  else alert('Assinatura do plano '+key+': cole o link do Mercado Pago em CHECKOUT.'+key+' no dashboard.html.');
+};
 
 const view  = document.getElementById('view');
 const scrim = document.getElementById('scrim');
@@ -176,8 +234,10 @@ async function load(){
       else throw new Error('api '+r.status);
     } catch(e){ console.warn('caindo p/ demo:', e.message); DEMO=true; DATA=demoData(); }
   } else { DEMO=true; DATA=demoData(); }
+  const _po = params.get('plano'); if(_po) DATA.tenant.plano = _po;
+  applyPlanLimits();
   document.getElementById('who-nome').textContent = DATA.tenant.nome;
-  document.getElementById('who-plan').textContent = 'Plano '+(DATA.tenant.plano||'pro');
+  document.getElementById('who-plan').textContent = 'Plano '+(DATA.tenant.plano||'free');
   document.getElementById('demo-tag').style.display = DEMO ? 'block' : 'none';
   render('painel');
 }
@@ -197,14 +257,36 @@ function counts(){
 
 function render(tab){ ({painel:renderPainel,leads:renderLeads,form:renderForm,plano:renderPlano}[tab])(); }
 
+function freeBanner(c){
+  const lk = lockedCount();
+  const pct = Math.min(100, Math.round(c.mes / FREE_LIMIT * 100));
+  return `<div class="upsell">
+    <div class="upsell-top">
+      <div><b>Plano Free</b><span class="usub">${c.mes}/${FREE_LIMIT} leads neste mês</span></div>
+      <span class="pill free">Free</span>
+    </div>
+    <div class="ubar"><i style="width:${pct}%"></i></div>
+    ${lk>0
+      ? `<p class="ulock">🔒 <b>${lk} lead${lk>1?'s':''}</b> deste mês ${lk>1?'bloqueados':'bloqueado'}. Faça upgrade pra ver.</p>`
+      : `<p class="usub" style="text-align:left">Temperatura e pontuação ficam liberadas no Pro.</p>`}
+    <button class="btn-up" onclick="goPlano()">Fazer upgrade → R$97/mês</button>
+  </div>`;
+}
+
 function renderPainel(){
   const c = counts();
+  const free = isFree();
+  const tempCards = free
+    ? `<div class="stat lockstat"><div class="lbl"><span class="pill q">Quente</span></div><div class="num">🔒</div><div class="sub">no Pro</div></div>
+       <div class="stat lockstat"><div class="lbl"><span class="pill m">Morno</span></div><div class="num">🔒</div><div class="sub">no Pro</div></div>`
+    : `<div class="stat"><div class="lbl"><span class="pill q">Quente</span></div><div class="num">${c.q}</div><div class="sub">prontos pra fechar</div></div>
+       <div class="stat"><div class="lbl"><span class="pill m">Morno</span></div><div class="num">${c.m}</div><div class="sub">vale follow-up</div></div>`;
   view.innerHTML = `<div class="reveal">
+    ${free ? freeBanner(c) : ''}
     <div class="grid2">
-      <div class="stat"><div class="lbl">Leads no mês</div><div class="num">${c.mes}</div><div class="sub">${c.total} no total</div></div>
+      <div class="stat"><div class="lbl">Leads no mês</div><div class="num">${c.mes}${free?`<span class="lim">/${FREE_LIMIT}</span>`:''}</div><div class="sub">${c.total} no total</div></div>
       <div class="stat"><div class="lbl">Hoje</div><div class="num">${c.hoje}</div><div class="sub">novos contatos</div></div>
-      <div class="stat"><div class="lbl"><span class="pill q">Quente</span></div><div class="num">${c.q}</div><div class="sub">prontos pra fechar</div></div>
-      <div class="stat"><div class="lbl"><span class="pill m">Morno</span></div><div class="num">${c.m}</div><div class="sub">vale follow-up</div></div>
+      ${tempCards}
     </div>
     <div class="sec-h"><h2>Últimos leads</h2></div>
     <div id="feed">${DATA.leads.length ? DATA.leads.slice(0,6).map((l,i)=>leadCard(l,i)).join('') : emptyState()}</div>
@@ -214,36 +296,48 @@ function renderPainel(){
 
 function renderLeads(){
   const c = counts();
-  const f = DATA.leads.filter(l => filter==='all' || tcss(l.temperatura)===filter);
+  const free = isFree();
+  const f = free ? DATA.leads : DATA.leads.filter(l => filter==='all' || tcss(l.temperatura)===filter);
   view.innerHTML = `<div class="reveal">
-    <div class="chips">
+    ${free ? freeBanner(c) : `<div class="chips">
       <button class="chip ${filter==='all'?'on':''}" data-f="all">Todos ${c.total}</button>
       <button class="chip ${filter==='q'?'on':''}" data-f="q">Quentes ${c.q}</button>
       <button class="chip ${filter==='m'?'on':''}" data-f="m">Mornos ${c.m}</button>
       <button class="chip ${filter==='f'?'on':''}" data-f="f">Frios ${c.f}</button>
-    </div>
+    </div>`}
     <div id="feed">${f.length ? f.map(l=>leadCard(l,DATA.leads.indexOf(l))).join('') : emptyState()}</div>
   </div>`;
-  document.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { filter=ch.dataset.f; renderLeads(); });
+  if(!free) document.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { filter=ch.dataset.f; renderLeads(); });
   bindLeads();
 }
 
 function leadCard(l, i){
+  if(l._locked){
+    return `<div class="lead locked">
+      <div class="av lockav">🔒</div>
+      <div class="mid">
+        <div class="nm">Lead bloqueado</div>
+        <div class="meta"><span>${timeAgo(l.criado_em)}</span> · acima do limite Free</div>
+      </div>
+      <div class="right"><button class="mini-up" onclick="goPlano()">Liberar</button></div>
+    </div>`;
+  }
+  const right = isFree()
+    ? `<span class="temp lock">🔒</span><span class="score lock">🔒</span>`
+    : `<span class="temp ${tcss(l.temperatura)}">${esc(l.temperatura||'—')}</span>
+       <span class="score">${l.score??'–'}/100</span>`;
   return `<div class="lead" data-i="${i}">
     <div class="av" style="background:${color(l.nome)}">${ini(l.nome)}</div>
     <div class="mid">
       <div class="nm">${esc(l.nome)}</div>
       <div class="meta">${l.origem?'<span>'+esc(l.origem)+'</span>·':''}<span>${timeAgo(l.criado_em)}</span>${l.status&&l.status!=='novo'?'·<span class="stbadge">'+esc(l.status)+'</span>':''}</div>
     </div>
-    <div class="right">
-      <span class="temp ${tcss(l.temperatura)}">${esc(l.temperatura||'—')}</span>
-      <span class="score">${l.score??'–'}/100</span>
-    </div>
+    <div class="right">${right}</div>
   </div>`;
 }
 
 function emptyState(){ return `<div class="empty">Nenhum lead ainda.<br>Divulgue seu link e eles aparecem aqui — já pontuados.</div>`; }
-function bindLeads(){ document.querySelectorAll('.lead').forEach(el => el.onclick=()=>openLead(+el.dataset.i)); }
+function bindLeads(){ document.querySelectorAll('.lead[data-i]').forEach(el => el.onclick=()=>openLead(+el.dataset.i)); }
 
 function openLead(i){
   const l = DATA.leads[i];
@@ -252,14 +346,20 @@ function openLead(i){
   const zapNum = (l.contato||'').replace(/\D/g,'');
   const STATUSES = ['novo','contatado','fechado','perdido'];
   const corTemp = tcss(l.temperatura)==='q' ? 'var(--quente)' : tcss(l.temperatura)==='m' ? 'var(--morno)' : 'var(--frio)';
+  const scorebar = isFree()
+    ? `<div class="scorebar locked">
+        <div class="topl"><b>Pontuação</b><span class="big lock">🔒 Disponível no Pro</span></div>
+        <button class="btn-up sm" onclick="goPlanoFromDrawer()">Liberar temperatura e score → upgrade</button>
+      </div>`
+    : `<div class="scorebar">
+        <div class="topl"><b>Pontuação</b><span class="big" style="color:${corTemp}">${l.score??'–'}/100 · ${esc(l.temperatura||'')}</span></div>
+      </div>`;
   dbody.innerHTML = `
     <div class="d-head">
       <div class="av" style="background:${color(l.nome)}">${ini(l.nome)}</div>
       <div><h3>${esc(l.nome)}</h3><div class="meta">${esc(l.contato||'')}${l.origem?' · '+esc(l.origem):''}</div></div>
     </div>
-    <div class="scorebar">
-      <div class="topl"><b>Pontuação</b><span class="big" style="color:${corTemp}">${l.score??'–'}/100 · ${esc(l.temperatura||'')}</span></div>
-    </div>
+    ${scorebar}
     <div class="qa">
       <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--dm)">Respostas no formulário</div>
       ${respostas.length
@@ -306,28 +406,61 @@ function renderForm(){
   };
 }
 
+const FEATS = {
+  free:    ['1 formulário de captação','Até 30 leads por mês','Redireciona pro WhatsApp','Marca “por Capta” no rodapé'],
+  pro:     ['Formulários ilimitados','Leads ilimitados','Pontuação automática (Quente/Morno/Frio)','IA monta as perguntas pra você','Sem marca Capta'],
+  business:['Tudo do Pro','Landing page gerada por IA','Remarketing por e-mail (automático)','Relatórios avançados'],
+  gestao:  ['Tudo do Business','A RISE gerencia seus leads ativamente','Follow-up feito pelo nosso time','Acompanhamento estratégico mensal'],
+};
+function upCard(key,nome,preco,feats,featured){
+  return `<div class="upcard${featured?' featured':''}">
+    ${featured?'<span class="up-tag">mais popular</span>':''}
+    <div class="upcard-h"><b>${nome}</b><span>${preco}</span></div>
+    ${feats.slice(0,3).map(f=>`<div class="feat sm">${f}</div>`).join('')}
+    <button class="btn-up" onclick="goCheckout('${key}')">Assinar ${nome}</button>
+  </div>`;
+}
 function renderPlano(){
+  const p = planoAtual();
+  const c = counts();
+  if(p==='free'){
+    view.innerHTML = `<div class="reveal">
+      <div class="plancard">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <div class="plano-eb">Seu plano</div>
+            <div style="font-size:22px;font-weight:800">Free <span style="font-size:15px;color:var(--dm)">R$0</span></div>
+          </div>
+          <span class="pill free">${c.mes}/${FREE_LIMIT} no mês</span>
+        </div>
+        ${FEATS.free.map(f=>`<div class="feat">${f}</div>`).join('')}
+      </div>
+      <div class="sec-h"><h2>Desbloqueie mais</h2></div>
+      ${upCard('pro','Pro','R$97/mês',FEATS.pro,true)}
+      ${upCard('business','Business','R$197/mês',FEATS.business,false)}
+      ${upCard('gestao','Gestão','R$397/mês',FEATS.gestao,false)}
+      <p class="note">O upgrade libera na hora após o pagamento via Mercado Pago.</p>
+    </div>`;
+    return;
+  }
   const next = new Date(); next.setMonth(next.getMonth()+1); next.setDate(5);
   view.innerHTML = `<div class="reveal">
     <div class="plancard">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div>
-          <div style="font-size:11px;font-weight:800;color:var(--or);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">Seu plano</div>
-          <div style="font-size:22px;font-weight:800;text-transform:capitalize">${esc(DATA.tenant.plano||'pro')} <span style="font-size:15px;color:var(--dm)">R$97/mês</span></div>
+          <div class="plano-eb">Seu plano</div>
+          <div style="font-size:22px;font-weight:800;text-transform:capitalize">${esc(p)} <span style="font-size:15px;color:var(--dm)">R$${PLAN_PRICE[p]}/mês</span></div>
         </div>
         <span class="pill" style="background:rgba(59,201,122,.15);color:var(--verde);font-size:11px">ativo</span>
       </div>
-      <div class="feat">Formulário de qualificação personalizado</div>
-      <div class="feat">Redireciona pro WhatsApp já qualificado</div>
-      <div class="feat">Pontuação automática (Quente/Morno/Frio)</div>
-      <div class="feat">Painel de leads e aviso por e-mail</div>
+      ${(FEATS[p]||[]).map(f=>`<div class="feat">${f}</div>`).join('')}
     </div>
     <div class="plancard">
       <div class="row"><span>Cobrança</span><span class="v" style="color:var(--frio)">Mercado Pago · recorrente</span></div>
       <div class="row"><span>Próxima cobrança</span><span class="v">${next.toLocaleDateString('pt-BR')}</span></div>
       <div class="row"><span>Status</span><span class="v" style="color:var(--verde)">Em dia</span></div>
     </div>
-    <p class="note">A assinatura é debitada todo mês no cartão via Mercado Pago. O acesso ao painel acompanha o pagamento.</p>
+    <p class="note">A assinatura é debitada todo mês via Mercado Pago. O acesso ao painel acompanha o pagamento.</p>
   </div>`;
 }
 
