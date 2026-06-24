@@ -88,7 +88,7 @@ async function init(){
   if(!SLUG){ return fatal('Link sem identificação do negócio.'); }
   loading('Carregando…');
   const { data:t } = await sb.from('capta_tenants')
-    .select('id,nome,whatsapp,msg_template,cor,headline').eq('slug',SLUG).single();
+    .select('id,nome,whatsapp,msg_template,cor,headline,plano').eq('slug',SLUG).single();
   if(!t){ return fatal('Negócio não encontrado ou inativo.'); }
   const { data:qs } = await sb.from('capta_perguntas')
     .select('id,texto,opcoes').eq('tenant_id',t.id).eq('ativo',true).order('ordem');
@@ -108,7 +108,7 @@ function screenStart(){
     </div>
     <div class="err" id="err"></div>
     <button class="btn" id="go">Começar →</button>
-    <p class="foot">⚡ por Capta</p>`;
+    ${state.tenant.plano==='free' ? '<p class="foot">⚡ por Capta</p>' : ''}`;
   document.getElementById('go').onclick = () => {
     const nome = v('i-nome'), tel = v('i-tel');
     if(nome.length < 2) return setErr('Digite seu nome.');
