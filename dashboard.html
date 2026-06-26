@@ -148,6 +148,30 @@ main{padding:0 14px}
 .upcard-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
 .upcard-h b{font-size:17px;font-weight:800}
 .upcard-h span{font-size:14px;font-weight:700;color:var(--frio)}
+/* ---- Perguntas IA ---- */
+.ia-box{margin:14px 0}
+.ia-card{background:linear-gradient(135deg,var(--surface2),var(--surface));border:1px solid var(--or-soft);border-radius:var(--r);padding:16px;box-shadow:var(--raio)}
+.ia-card.locked{opacity:.96}
+.ia-card.center{text-align:center;display:flex;flex-direction:column;align-items:center}
+.ia-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ia-h b{font-size:15px;font-weight:800}
+.ia-tag{background:var(--or-soft);color:var(--or);font-size:11px;font-weight:800;padding:2px 9px;border-radius:99px}
+.ia-sub{font-size:12.8px;color:var(--dm);line-height:1.5;margin:0 0 12px}
+.ia-f{display:block;margin-bottom:10px}
+.ia-f span{display:block;font-size:12px;font-weight:700;color:var(--dm);margin-bottom:4px}
+.ia-f input{width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--tx);font-family:inherit;font-size:14px;padding:11px 12px}
+.ia-f input:focus{outline:none;border-color:var(--or)}
+.ia-err{color:var(--quente);font-size:12.5px;min-height:16px;margin-bottom:6px}
+.ia-q{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:12px;margin-bottom:8px}
+.ia-qt{font-size:13.5px;font-weight:700;margin-bottom:8px}
+.ia-opt{display:flex;justify-content:space-between;align-items:center;font-size:12.8px;color:var(--dm);padding:4px 0;border-top:1px solid var(--line2)}
+.ia-pt{font-weight:800;color:var(--verde);font-size:12px}
+.ia-btns{display:flex;gap:9px;margin-top:4px}
+.ia-btns .btn-up{flex:1}
+.btn-ghost{border:1.5px solid var(--line);background:transparent;color:var(--dm);font-family:inherit;font-weight:700;font-size:13px;padding:11px 14px;border-radius:11px;cursor:pointer}
+.ia-check{width:42px;height:42px;border-radius:50%;background:rgba(59,201,122,.15);color:var(--verde);font-size:22px;font-weight:800;display:grid;place-items:center;margin-bottom:8px}
+.ia-spin{width:30px;height:30px;border-radius:50%;border:3px solid var(--or-soft);border-top-color:var(--or);animation:iaspin .8s linear infinite;margin:6px auto 0}
+@keyframes iaspin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -390,6 +414,7 @@ function renderForm(){
   view.innerHTML = `<div class="reveal">
     <p class="note" style="margin:4px 0 12px">Este é o link do seu formulário. Coloque ele onde você colocaria o link direto do WhatsApp — cada pessoa passa por aqui antes, e chega qualificada.</p>
     <div class="link-box"><input id="lnk" value="${link}" readonly><button id="cpy">Copiar</button></div>
+    ${isFree() ? iaLockedCard() : '<div id="ia-box" class="ia-box"></div>'}
     <div class="sec-h"><h2>Onde divulgar</h2></div>
     <div class="plancard">
       <div class="feat">Link na bio do Instagram</div>
@@ -404,6 +429,108 @@ function renderForm(){
     const b = document.getElementById('cpy');
     b.textContent = 'Copiado ✓'; setTimeout(()=>b.textContent='Copiar', 1500);
   };
+  if(!isFree()) renderIA('inicio');
+}
+
+// ---- Perguntas inteligentes (IA · Pro) ----------------------
+const IA_API = '/api/capta-perguntas-ia';
+let IA = { perguntas: [] };
+
+function iaLockedCard(){
+  return `<div class="ia-card locked">
+    <div class="ia-h"><b>✨ Perguntas inteligentes</b><span class="pill free">Pro</span></div>
+    <p class="ia-sub">Deixe a IA montar as perguntas de qualificação do seu formulário a partir do seu nicho e Instagram — os leads já chegam pontuados.</p>
+    <button class="btn-up" onclick="goPlano()">Desbloquear no Pro → R$97/mês</button>
+  </div>`;
+}
+
+window.renderIA = function(etapa, extra){
+  const box = document.getElementById('ia-box');
+  if(!box) return;
+  if(etapa==='inicio'){
+    box.innerHTML = `<div class="ia-card">
+      <div class="ia-h"><b>✨ Perguntas inteligentes</b><span class="ia-tag">IA</span></div>
+      <p class="ia-sub">A IA monta as perguntas de qualificação do seu formulário. Leva uns segundos.</p>
+      <button class="btn-up" onclick="renderIA('form')">Gerar perguntas com IA</button>
+    </div>`;
+  } else if(etapa==='form'){
+    box.innerHTML = `<div class="ia-card">
+      <div class="ia-h"><b>Sobre o seu negócio</b></div>
+      <label class="ia-f"><span>Nicho / o que você vende</span><input id="ia-nicho" placeholder="Ex: escola de natação infantil"></label>
+      <label class="ia-f"><span>Instagram (opcional)</span><input id="ia-insta" placeholder="@seunegocio"></label>
+      <label class="ia-f"><span>Site (opcional)</span><input id="ia-site" placeholder="https://..."></label>
+      <div class="ia-err" id="ia-err"></div>
+      <button class="btn-up" onclick="iaGerar()">Gerar com IA ✨</button>
+    </div>`;
+  } else if(etapa==='loading'){
+    box.innerHTML = `<div class="ia-card center"><div class="ia-spin"></div><p class="ia-sub" style="margin:10px 0 0">A IA está montando seu formulário…</p></div>`;
+  } else if(etapa==='review'){
+    const qs = IA.perguntas;
+    box.innerHTML = `<div class="ia-card">
+      <div class="ia-h"><b>Prévia das perguntas</b><span class="ia-tag">${qs.length}</span></div>
+      <p class="ia-sub">Revise e salve. Isso substitui as perguntas atuais do formulário.</p>
+      ${qs.map((q,i)=>`<div class="ia-q">
+        <div class="ia-qt">${i+1}. ${esc(q.texto)}</div>
+        ${q.opcoes.map(o=>`<div class="ia-opt"><span>${esc(o.label)}</span><span class="ia-pt">+${o.pontos}</span></div>`).join('')}
+      </div>`).join('')}
+      <div class="ia-err" id="ia-err"></div>
+      <div class="ia-btns">
+        <button class="btn-ghost" onclick="renderIA('form')">↺ Refazer</button>
+        <button class="btn-up" onclick="iaSalvar()">Salvar no formulário</button>
+      </div>
+    </div>`;
+  } else if(etapa==='done'){
+    box.innerHTML = `<div class="ia-card center">
+      <div class="ia-check">✓</div>
+      <b style="font-size:16px">Formulário atualizado!</b>
+      <p class="ia-sub" style="margin:6px 0 12px">As novas perguntas já valem no seu link.</p>
+      <button class="btn-ghost" onclick="renderIA('inicio')">Gerar de novo</button>
+    </div>`;
+  } else if(etapa==='erro'){
+    box.innerHTML = `<div class="ia-card">
+      <div class="ia-h"><b>Ops</b></div>
+      <p class="ia-sub">${esc(extra||'Algo deu errado.')}</p>
+      <button class="btn-up" onclick="renderIA('form')">Tentar de novo</button>
+    </div>`;
+  }
+};
+
+window.iaGerar = async () => {
+  const nicho = document.getElementById('ia-nicho')?.value.trim();
+  const instagram = document.getElementById('ia-insta')?.value.trim();
+  const site = document.getElementById('ia-site')?.value.trim();
+  if(!nicho){ const e=document.getElementById('ia-err'); if(e) e.textContent='Conta pra IA o que você vende.'; return; }
+  renderIA('loading');
+  if(DEMO){ await new Promise(r=>setTimeout(r,900)); IA.perguntas = demoPerguntas(nicho); return renderIA('review'); }
+  try{
+    const r = await fetch(IA_API, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'gerar', slug:SLUG, token:TOKEN, contexto:{ nicho, instagram, site } }) });
+    const data = await r.json();
+    if(!r.ok) return renderIA('erro', data.error);
+    IA.perguntas = data.perguntas || [];
+    renderIA(IA.perguntas.length ? 'review' : 'erro', 'A IA não retornou perguntas. Tente de novo.');
+  }catch(e){ renderIA('erro', e.message); }
+};
+
+window.iaSalvar = async () => {
+  if(DEMO){ return renderIA('done'); }
+  const err = document.getElementById('ia-err');
+  try{
+    const r = await fetch(IA_API, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'salvar', slug:SLUG, token:TOKEN, perguntas: IA.perguntas }) });
+    const data = await r.json();
+    if(!r.ok){ if(err) err.textContent = data.error||'Erro ao salvar.'; return; }
+    renderIA('done');
+  }catch(e){ if(err) err.textContent = e.message; }
+};
+
+function demoPerguntas(nicho){
+  return [
+    { texto:`O que te levou a procurar ${nicho||'a gente'}?`, opcoes:[{label:'Quero começar agora',pontos:3},{label:'Pesquisando preços',pontos:1},{label:'Só curiosidade',pontos:0}] },
+    { texto:'Pra quem é?', opcoes:[{label:'Pro meu filho(a)',pontos:3},{label:'Pra mim',pontos:2},{label:'Pra outra pessoa',pontos:1}] },
+    { texto:'Quando pretende começar?', opcoes:[{label:'Essa semana',pontos:3},{label:'Esse mês',pontos:2},{label:'Sem pressa',pontos:0}] },
+    { texto:'Já tem experiência com isso?', opcoes:[{label:'Nunca fiz',pontos:2},{label:'Já fiz antes',pontos:1}] },
+  ];
 }
 
 const FEATS = {
