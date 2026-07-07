@@ -26,7 +26,7 @@ async function sb(path, opts = {}) {
   return r.status === 204 ? null : r.json();
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST.' });
   if (!SERVICE_KEY || !ANTHROPIC_KEY)
     return res.status(500).json({ error: 'Faltam variáveis de ambiente no Vercel (ANTHROPIC_API_KEY / SUPABASE_SERVICE_ROLE_KEY).' });
