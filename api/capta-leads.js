@@ -24,7 +24,7 @@ async function sb(path, opts = {}) {
   return r.status === 204 ? null : r.json();
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (!SERVICE_KEY) return res.status(500).json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY no Vercel.' });
 
   const slug  = req.query.t;

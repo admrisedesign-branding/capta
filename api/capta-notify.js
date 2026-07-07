@@ -23,7 +23,7 @@ async function sb(path) {
   return r.json();
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
   if (!SERVICE_KEY) return res.status(200).json({ ok: false, skip: 'sem SUPABASE_SERVICE_ROLE_KEY' });
 
