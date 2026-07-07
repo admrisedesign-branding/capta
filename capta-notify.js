@@ -1,53 +1,62 @@
-// /api/capta-notify.js — avisa o dono do negócio quando chega um lead novo.
-// Chamada pelo formulário após o insert. Usa service_role (ignora RLS).
+// /api/capta-notify.js — Vercel Serverless Function (Node 18+)
+// POST body { lead_id }  -> envia e-mail pro dono do negócio avisando do novo lead (via Resend)
+// É "fire-and-forget": o capta.html não espera a resposta. Se faltar chave, apenas não envia
+// (nunca bloqueia a captura do lead).
+//
+// Variáveis de ambiente no Vercel:
+//   SUPABASE_SERVICE_ROLE_KEY  (secreta)  -> obrigatória p/ ler o lead/tenant
+//   RESEND_API_KEY             (secreta)  -> sua chave do Resend (opcional; sem ela, não envia)
+//   CAPTA_FROM_EMAIL           (opcional) -> remetente verificado no Resend (ex: "Capta <capta@riseagencia.com>")
+//   SUPABASE_URL               (opcional, default abaixo)
 
-import { createClient } from '@supabase/supabase-js';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const RESEND_KEY   = process.env.RESEND_API_KEY;
+const FROM         = process.env.CAPTA_FROM_EMAIL || 'Capta <onboarding@resend.dev>';
+const PAINEL_BASE  = 'https://capta.riseagencia.com';
 
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE);
-
-export default async function handler(req, res){
-  if(req.method !== 'POST') return res.status(405).json({error:'method'});
-  const { lead_id } = req.body || {};
-  if(!lead_id) return res.status(400).json({error:'lead_id obrigatório'});
-
-  const { data: lead } = await sb.from('capta_leads').select('*').eq('id', lead_id).single();
-  if(!lead) return res.status(404).json({error:'lead não encontrado'});
-
-  const { data: t } = await sb.from('capta_tenants')
-    .select('nome,owner_email,dashboard_token,slug').eq('id', lead.tenant_id).single();
-  if(!t?.owner_email) return res.status(200).json({ok:true, no_email:true});
-
-  const respostas = Object.values(lead.respostas||{})
-    .map(r => `<li style="margin:3px 0">${esc(r.label)}</li>`).join('');
-  const corTemp = lead.temperatura==='Quente' ? '#F5462D' : lead.temperatura==='Morno' ? '#E0930F' : '#3E7BFA';
-  const painel = `${baseUrl(req)}/dashboard.html?t=${t.slug}&k=${t.dashboard_token}`;
-
-  const r = await fetch('https://api.resend.com/emails', {
-    method:'POST',
-    headers:{ 'Authorization':`Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type':'application/json' },
-    body: JSON.stringify({
-      from: process.env.RESEND_FROM || 'Capta <leads@riseagencia.com>',
-      to: [t.owner_email],
-      subject: `🔥 Lead ${lead.temperatura} — ${lead.nome} (${lead.score}/100)`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:460px;margin:0 auto;color:#16181D">
-        <p style="font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#FF6A1A">${esc(t.nome)}</p>
-        <h2 style="margin:6px 0 2px">${esc(lead.nome)}</h2>
-        <p style="margin:0 0 12px;color:#5b6270">${esc(lead.contato||'')} ·
-          <b style="color:${corTemp}">${lead.temperatura} · ${lead.score}/100</b></p>
-        <p style="font-size:13px;font-weight:700;margin-bottom:4px">Respostas:</p>
-        <ul style="font-size:14px;color:#5b6270;padding-left:18px;margin:0 0 16px">${respostas}</ul>
-        <a href="https://wa.me/${onlyDigits(lead.contato)}" style="background:#1FA855;color:#fff;text-decoration:none;font-weight:700;padding:11px 18px;border-radius:9px;display:inline-block;margin-right:8px">Chamar no WhatsApp</a>
-        <a href="${painel}" style="color:#FF6A1A;text-decoration:none;font-weight:700;display:inline-block;padding:11px 0">Ver no painel →</a>
-      </div>`
-    })
+async function sb(path) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
   });
-  if(!r.ok) return res.status(502).json({error:'falha no envio', detail: await r.text()});
-  return res.status(200).json({ ok:true });
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
+  return r.json();
 }
 
-function baseUrl(req){
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  return `${proto}://${req.headers.host}`;
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
+  if (!SERVICE_KEY) return res.status(200).json({ ok: false, skip: 'sem SUPABASE_SERVICE_ROLE_KEY' });
+
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
+  const { lead_id } = body || {};
+  if (!lead_id) return res.status(400).json({ error: 'lead_id obrigatório.' });
+
+  try {
+    const leads = await sb(`capta_leads?id=eq.${encodeURIComponent(lead_id)}&select=nome,contato,origem,temperatura,score,tenant_id`);
+    const lead = leads && leads[0];
+    if (!lead) return res.status(404).json({ error: 'lead não encontrado.' });
+
+    const tenants = await sb(`capta_tenants?id=eq.${lead.tenant_id}&select=nome,owner_email,slug,dashboard_token`);
+    const tenant = tenants && tenants[0];
+    if (!tenant || !tenant.owner_email) return res.status(200).json({ ok: false, skip: 'tenant sem owner_email' });
+    if (!RESEND_KEY) return res.status(200).json({ ok: false, skip: 'sem RESEND_API_KEY' });
+
+    const painel = `${PAINEL_BASE}/dashboard.html?t=${tenant.slug}&k=${tenant.dashboard_token}`;
+    const html = `<div style="font-family:system-ui,sans-serif;max-width:480px">
+      <h2 style="margin:0 0 4px">Novo lead${lead.temperatura ? ' · ' + lead.temperatura : ''} 🎯</h2>
+      <p style="font-size:16px;margin:8px 0"><b>${lead.nome || '—'}</b><br>${lead.contato || ''}${lead.origem ? ' · ' + lead.origem : ''}</p>
+      ${lead.score != null ? `<p style="margin:4px 0;color:#555">Pontuação: ${lead.score}/100</p>` : ''}
+      <p style="margin:18px 0"><a href="${painel}" style="background:#2E5BFF;color:#fff;text-decoration:none;padding:11px 18px;border-radius:10px;font-weight:700">Ver no painel →</a></p>
+      <p style="font-size:12px;color:#999">Enviado pelo Capta</p>
+    </div>`;
+
+    const rr = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: FROM, to: tenant.owner_email, subject: `Novo lead — ${tenant.nome}`, html }),
+    });
+    if (!rr.ok) return res.status(502).json({ error: 'Resend: ' + (await rr.text()).slice(0, 200) });
+    return res.status(200).json({ ok: true });
+  } catch (e) { return res.status(500).json({ error: e.message }); }
 }
-const onlyDigits = s => (s||'').replace(/\D/g,'');
-const esc = s => (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
