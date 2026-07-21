@@ -91,6 +91,17 @@ h1{font-size:22px;font-weight:800;margin-bottom:4px}
     <button class="btn btn-primary" onclick="location.reload()">Já confirmei — entrar</button>
   </div>
 
+  <!-- ONBOARDING (novo usuário) -->
+  <div id="onboarding-view" class="hide">
+    <h1>Bem-vinda(o) ao Capta! 🎉</h1>
+    <p class="sub">Vamos criar seu painel gratuito. Leva 20 segundos.</p>
+    <div class="field"><label>Nome do seu negócio</label><input id="ob-nome" placeholder="Ex: Clínica Bella"></div>
+    <div class="field"><label>WhatsApp que recebe os leads</label><input id="ob-wa" inputmode="tel" placeholder="55 92 9 9999-9999"></div>
+    <div class="err" id="ob-err"></div>
+    <button class="btn btn-primary" id="ob-go" onclick="onboard()">Criar meu painel grátis →</button>
+    <p class="foot">Plano Free · sem cartão · faça upgrade quando quiser</p>
+  </div>
+
   <!-- SEM ACESSO -->
   <div id="noaccess-view" class="hide">
     <h1>Conta criada ✓</h1>
@@ -108,7 +119,7 @@ const sb = createClient(SB_URL, SB_KEY);
 
 let MODE = 'in';
 const $ = id => document.getElementById(id);
-const show = v => { ['auth-view','loading-view','confirm-view','noaccess-view'].forEach(x=>$(x).classList.toggle('hide', x!==v)); };
+const show = v => { ['auth-view','loading-view','confirm-view','onboarding-view','noaccess-view'].forEach(x=>$(x).classList.toggle('hide', x!==v)); };
 
 window.setMode = m => {
   MODE = m;
@@ -157,10 +168,28 @@ async function route(){
     const r = await fetch('/api/capta-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ access_token: session.access_token }) });
     const d = await r.json();
     if(d.role==='admin' || d.role==='client'){ location.replace(d.url); return; }
+    if(d.role==='new'){ show('onboarding-view'); return; }
     $('na-email').textContent = session.user.email || '';
     show('noaccess-view');
   }catch(e){ $('err').textContent='Erro ao entrar.'; show('auth-view'); }
 }
+
+window.onboard = async () => {
+  const nome = $('ob-nome').value.trim();
+  const wa = $('ob-wa').value.replace(/\D/g,'');
+  if(nome.length < 2){ $('ob-err').textContent = 'Digite o nome do seu negócio.'; return; }
+  if(wa.length < 10){ $('ob-err').textContent = 'Digite um WhatsApp válido com DDD (ex: 5592999990000).'; return; }
+  $('ob-go').disabled = true; $('ob-go').textContent = 'Criando seu painel…'; $('ob-err').textContent='';
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const r = await fetch('/api/capta-auth', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ access_token: session.access_token, action:'onboard', nome, whatsapp: wa }) });
+    const d = await r.json();
+    if(d.url){ location.replace(d.url); return; }
+    $('ob-err').textContent = d.error || 'Não foi possível criar. Tente de novo.';
+    $('ob-go').disabled=false; $('ob-go').textContent='Criar meu painel grátis →';
+  }catch(e){ $('ob-err').textContent='Erro inesperado. Tente de novo.'; $('ob-go').disabled=false; $('ob-go').textContent='Criar meu painel grátis →'; }
+};
 
 window.sair = async () => { await sb.auth.signOut(); location.reload(); };
 

@@ -357,6 +357,39 @@ async function load(){
   document.getElementById('acct').textContent = ini(DATA.tenant.nome);
   document.getElementById('demo-tag').style.display = DEMO ? '' : 'none';
   render('painel');
+  if(params.get('tour')==='1') setTimeout(startTour, 500);
+}
+
+/* ===== Tour de boas-vindas (primeira entrada) ===== */
+function startTour(){
+  const steps = [
+    { emoji:'🎉', ttl:'Bem-vinda(o) ao Capta!', txt:'Este é o seu painel. Aqui você acompanha, em tempo real, todo mundo que preenche seu formulário — já separado por interesse.' },
+    { emoji:'📋', ttl:'Crie seus formulários', txt:'Na aba <b>Formulários</b> você monta perguntas e ganha um link pra divulgar. Cada pessoa que responde vira um lead qualificado aqui.' },
+    { emoji:'🔥', ttl:'Leads quentes primeiro', txt:'O Capta pontua cada lead e marca como <b>Quente</b>, <b>Morno</b> ou <b>Frio</b> — você fala primeiro com quem tem mais chance de fechar.' },
+    { emoji:'🔒', ttl:'Você está no plano Free', txt:'Os <b>cadeados</b> e selos <b>PRO</b> mostram o que abre no upgrade: mais leads, qualificação por IA e formulários ilimitados. Faça upgrade quando quiser.' },
+  ];
+  let i = 0;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(20,26,46,.55);backdrop-filter:blur(3px);display:grid;place-items:center;padding:20px';
+  ov.innerHTML = `<div id="tour-card" style="background:var(--card,#fff);border-radius:20px;max-width:400px;width:100%;padding:28px 26px;box-shadow:0 24px 70px rgba(20,26,46,.4);text-align:center"></div>`;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  function paint(){
+    const s = steps[i];
+    ov.querySelector('#tour-card').innerHTML = `
+      <div style="font-size:40px;margin-bottom:10px">${s.emoji}</div>
+      <div style="font-size:20px;font-weight:800;margin-bottom:8px;color:var(--ink,#141A2E)">${s.ttl}</div>
+      <p style="font-size:14px;line-height:1.6;color:var(--muted,#697089);margin-bottom:20px">${s.txt}</p>
+      <div style="display:flex;justify-content:center;gap:6px;margin-bottom:18px">
+        ${steps.map((_,k)=>`<span style="width:7px;height:7px;border-radius:50%;background:${k===i?'var(--brand,#2E5BFF)':'var(--line,#E9ECF3)'}"></span>`).join('')}
+      </div>
+      <button id="tour-next" style="width:100%;border:0;background:var(--brand,#2E5BFF);color:#fff;font-family:inherit;font-weight:700;font-size:15px;padding:13px;border-radius:12px;cursor:pointer">${i<steps.length-1?'Próximo →':'Começar a usar 🚀'}</button>
+      ${i<steps.length-1?'<button id="tour-skip" style="margin-top:10px;border:0;background:transparent;color:var(--faint,#9AA1B4);font-family:inherit;font-size:13px;cursor:pointer">Pular tour</button>':''}
+    `;
+    ov.querySelector('#tour-next').onclick = () => { if(i<steps.length-1){ i++; paint(); } else close(); };
+    const sk = ov.querySelector('#tour-skip'); if(sk) sk.onclick = close;
+  }
+  paint();
 }
 
 function counts(){
