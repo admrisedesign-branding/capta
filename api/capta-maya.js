@@ -24,7 +24,8 @@ async function sb(path, opts = {}) {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
   });
   if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
-  return r.status === 204 ? null : r.json();
+  const _t = await r.text();
+  return _t ? JSON.parse(_t) : null;
 }
 
 module.exports = async function handler(req, res) {
