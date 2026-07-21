@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Entrar · Capta</title>
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2E5BFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Capta">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#2E5BFF; --brand-deep:#1E44D6; --brand-2:#5B8DEF; --brand-soft:rgba(46,91,255,.10);
+  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8; --tx:#141A2E; --dm:#697089; --dr:#9AA1B4;
+  --quente:#E03127; --verde:#16A34A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased;min-height:100vh;display:grid;place-items:center;padding:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:0 1px 2px rgba(20,26,46,.04),0 12px 40px rgba(20,26,46,.07);padding:34px 30px;width:100%;max-width:410px}
+.brand{display:flex;align-items:center;gap:10px;font-size:21px;font-weight:800;letter-spacing:-.02em;margin-bottom:20px}
+.brand-c{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;display:grid;place-items:center;font-weight:800;font-size:19px;box-shadow:0 5px 14px var(--brand-soft)}
+h1{font-size:22px;font-weight:800;margin-bottom:4px}
+.sub{font-size:13.5px;color:var(--dm);margin-bottom:22px}
+.tabs{display:flex;background:var(--line-2);border-radius:12px;padding:4px;margin-bottom:20px}
+.tab{flex:1;border:0;background:transparent;color:var(--dm);font-family:inherit;font-size:14px;font-weight:700;padding:9px;border-radius:9px;cursor:pointer;transition:.15s}
+.tab.on{background:var(--card);color:var(--brand);box-shadow:0 1px 3px rgba(20,26,46,.08)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--dm);margin-bottom:6px}
+.field input{width:100%;background:var(--card);border:1px solid var(--line);border-radius:11px;color:var(--tx);font-size:15px;padding:12px 13px;font-family:inherit}
+.field input:focus{outline:none;border-color:var(--brand)}
+.btn{width:100%;border:0;font-family:inherit;font-weight:700;font-size:15px;padding:13px;border-radius:12px;cursor:pointer;transition:.15s}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-primary:hover{background:var(--brand-deep)}
+.btn-primary:disabled{opacity:.6;cursor:default}
+.divider{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--dr);font-size:12.5px}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.btn-google{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--card);border:1px solid var(--line);color:var(--tx);font-family:inherit;font-weight:700;font-size:14.5px;padding:12px;border-radius:12px;cursor:pointer;transition:.15s}
+.btn-google:hover{border-color:var(--brand-2);background:#fbfcfe}
+.btn-google svg{width:19px;height:19px}
+.err{color:var(--quente);font-size:13px;min-height:18px;margin:6px 0 2px}
+.ok{color:var(--verde);font-size:13px;margin:6px 0 2px}
+.foot{font-size:12px;color:var(--dr);text-align:center;margin-top:18px}
+.foot a{color:var(--brand);text-decoration:none;font-weight:600}
+.center{text-align:center}
+.spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:sp 1s linear infinite;margin:8px auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.hide{display:none}
+.noacc{background:var(--line-2);border-radius:12px;padding:16px;font-size:13.5px;color:var(--dm);line-height:1.6;margin-top:6px}
+.noacc b{color:var(--tx)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><span class="brand-c">C</span>capta</div>
+
+  <!-- LOGIN/CADASTRO -->
+  <div id="auth-view">
+    <h1 id="ttl">Entrar</h1>
+    <p class="sub" id="sub">Acesse o painel do seu negócio</p>
+    <div class="tabs">
+      <button class="tab on" id="tab-in" onclick="setMode('in')">Entrar</button>
+      <button class="tab" id="tab-up" onclick="setMode('up')">Criar conta</button>
+    </div>
+    <div class="field"><label>E-mail</label><input type="email" id="email" placeholder="voce@email.com" autocomplete="email"></div>
+    <div class="field"><label>Senha</label><input type="password" id="senha" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="err" id="err"></div>
+    <button class="btn btn-primary" id="go" onclick="submit()">Entrar</button>
+    <div class="divider">ou</div>
+    <button class="btn-google" onclick="google()">
+      <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Continuar com Google
+    </button>
+    <p class="foot" id="foot">Ainda não tem conta? <a onclick="setMode('up')">Criar agora</a></p>
+  </div>
+
+  <!-- CARREGANDO -->
+  <div id="loading-view" class="hide center">
+    <div class="spin"></div>
+    <p class="sub" id="loading-txt" style="margin:8px 0 0">Entrando…</p>
+  </div>
+
+  <!-- CONFIRMAR E-MAIL -->
+  <div id="confirm-view" class="hide center">
+    <h1>Quase lá!</h1>
+    <p class="sub">Enviamos um link de confirmação pro seu e-mail. Confirme e volte aqui pra entrar.</p>
+    <button class="btn btn-primary" onclick="location.reload()">Já confirmei — entrar</button>
+  </div>
+
+  <!-- SEM ACESSO -->
+  <div id="noaccess-view" class="hide">
+    <h1>Conta criada ✓</h1>
+    <p class="sub">Mas esse e-mail ainda não está vinculado a um painel.</p>
+    <div class="noacc">Entramos com <b id="na-email"></b>, mas ele não corresponde a nenhum cliente ou admin. Fale com a RISE pra liberar seu acesso — ou entre com o e-mail cadastrado no seu negócio.</div>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="sair()">Sair e tentar outro e-mail</button>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const SB_URL = 'https://wpoeigoledhzyvomudgf.supabase.co';
+const SB_KEY = 'sb_publishable_S4eWNjOtaiXTo5sr9Hek0A_42NzE4jf';
+const sb = createClient(SB_URL, SB_KEY);
+
+let MODE = 'in';
+const $ = id => document.getElementById(id);
+const show = v => { ['auth-view','loading-view','confirm-view','noaccess-view'].forEach(x=>$(x).classList.toggle('hide', x!==v)); };
+
+window.setMode = m => {
+  MODE = m;
+  $('tab-in').classList.toggle('on', m==='in');
+  $('tab-up').classList.toggle('on', m==='up');
+  $('ttl').textContent = m==='in' ? 'Entrar' : 'Criar conta';
+  $('sub').textContent = m==='in' ? 'Acesse o painel do seu negócio' : 'Crie sua conta pra acessar o painel';
+  $('go').textContent  = m==='in' ? 'Entrar' : 'Criar conta';
+  $('senha').setAttribute('autocomplete', m==='in' ? 'current-password' : 'new-password');
+  $('foot').innerHTML = m==='in' ? 'Ainda não tem conta? <a onclick="setMode(\'up\')">Criar agora</a>' : 'Já tem conta? <a onclick="setMode(\'in\')">Entrar</a>';
+  $('err').textContent = '';
+};
+
+window.submit = async () => {
+  const email = $('email').value.trim();
+  const senha = $('senha').value;
+  if(!email || !senha){ $('err').textContent = 'Preencha e-mail e senha.'; return; }
+  if(senha.length < 6){ $('err').textContent = 'A senha precisa ter ao menos 6 caracteres.'; return; }
+  $('go').disabled = true; $('go').textContent = MODE==='in'?'Entrando…':'Criando…'; $('err').textContent='';
+  try{
+    if(MODE==='in'){
+      const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+      if(error){ $('err').textContent = traduz(error.message); reset(); return; }
+      route();
+    } else {
+      const { data, error } = await sb.auth.signUp({ email, password: senha });
+      if(error){ $('err').textContent = traduz(error.message); reset(); return; }
+      if(data.session){ route(); }         // confirmação de e-mail desligada -> entra direto
+      else { show('confirm-view'); }        // confirmação ligada -> avisa
+    }
+  }catch(e){ $('err').textContent = 'Erro inesperado. Tente de novo.'; reset(); }
+};
+function reset(){ $('go').disabled=false; $('go').textContent = MODE==='in'?'Entrar':'Criar conta'; }
+
+window.google = async () => {
+  $('err').textContent='';
+  const { error } = await sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin + '/login.html' } });
+  if(error){ $('err').textContent = 'Não foi possível abrir o Google. Tente de novo.'; }
+};
+
+async function route(){
+  show('loading-view');
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ show('auth-view'); return; }
+  try{
+    const r = await fetch('/api/capta-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ access_token: session.access_token }) });
+    const d = await r.json();
+    if(d.role==='admin' || d.role==='client'){ location.replace(d.url); return; }
+    $('na-email').textContent = session.user.email || '';
+    show('noaccess-view');
+  }catch(e){ $('err').textContent='Erro ao entrar.'; show('auth-view'); }
+}
+
+window.sair = async () => { await sb.auth.signOut(); location.reload(); };
+
+function traduz(m){
+  m = (m||'').toLowerCase();
+  if(m.includes('invalid login')) return 'E-mail ou senha incorretos.';
+  if(m.includes('already registered')||m.includes('already exists')) return 'Esse e-mail já tem conta. Clique em "Entrar".';
+  if(m.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
+  if(m.includes('password')) return 'Senha inválida (mínimo 6 caracteres).';
+  return 'Não foi possível. Verifique os dados e tente de novo.';
+}
+
+// ao abrir: se já tem sessão (inclusive volta do Google), roteia
+(async () => {
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session) route(); else show('auth-view');
+})();
+</script>
+</body>
+</html>
