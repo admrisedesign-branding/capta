@@ -15,7 +15,7 @@
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const LIMITES = { free: 1, pro: 5, business: 15, gestao: 1000000000 };
+const LIMITES = { free: 1, pro: 1000000000, business: 15, gestao: 1000000000 };
 
 async function sb(path, opts = {}) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
