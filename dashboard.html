@@ -182,6 +182,9 @@ h2{font-size:16px;font-weight:700}
 .site-promo-t{font-size:16px;margin-bottom:5px}
 .site-promo-p{font-size:13px;color:rgba(255,255,255,.82);line-height:1.6;margin-bottom:12px}
 .site-promo .btn-up{width:auto;background:#fff;color:var(--brand);margin-top:0}
+.zap-mini{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:9px;background:rgba(37,211,102,.12);text-decoration:none;font-size:16px;line-height:1;transition:.14s;flex:0 0 auto}
+.zap-mini:hover{background:rgba(37,211,102,.22);transform:scale(1.06)}
+.ltable td:last-child{text-align:right;width:52px}
 .btn-up:hover{background:var(--brand-deep)}.btn-up.sm{font-size:12.5px;padding:9px}
 .pill{font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px}
 .pill.free{background:var(--gray-bg);color:var(--muted)}
@@ -553,9 +556,17 @@ function leadsList(leads){
   const rows = leads.map(l=>leadRow(l, DATA.leads.indexOf(l))).join('');
   const cards = leads.map(l=>leadCard(l, DATA.leads.indexOf(l))).join('');
   return `<div class="ltable-wrap"><table class="ltable">
-    <thead><tr><th>Lead</th><th>Origem</th><th>Quando</th><th>Temperatura</th><th>Score</th><th>Status</th></tr></thead>
+    <thead><tr><th>Lead</th><th>Origem</th><th>Quando</th><th>Temperatura</th><th>Score</th><th>Status</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table></div>
     <div class="lcards">${cards}</div>`;
+}
+function zapHref(l){
+  let n = (l.contato||'').replace(/\D/g,'');
+  if(!n) return '';
+  if(n.length<=11 && !n.startsWith('55')) n = '55'+n;
+  const primeiro = (l.nome||'').split(' ')[0];
+  const msg = encodeURIComponent(`Oi ${primeiro}! Sou da ${DATA.tenant.nome}. Vi seu contato pelo formulário — posso te ajudar?`);
+  return `https://wa.me/${n}?text=${msg}`;
 }
 
 function leadRow(l,i){
@@ -565,6 +576,7 @@ function leadRow(l,i){
   }
   const temp = free ? `<span class="tbadge lock">🔒</span>` : `<span class="tbadge ${tcss(l.temperatura)}">${esc(l.temperatura||'—')}</span>`;
   const score = free ? `<span class="lockmini">🔒</span>` : `${l.score??'–'}`;
+  const zap = zapHref(l);
   return `<tr data-i="${i}">
     <td><div class="cell-lead"><span class="av sm" style="background:${color(l.nome)}">${ini(l.nome)}</span><div><div class="nm">${esc(l.nome)}</div><div class="sub">${esc(l.contato||'')}</div></div></div></td>
     <td>${l.origem?esc(l.origem):'—'}</td>
@@ -572,6 +584,7 @@ function leadRow(l,i){
     <td>${temp}</td>
     <td class="score-cell">${score}</td>
     <td><span class="status ${l.status||'novo'}">${l.status||'novo'}</span></td>
+    <td>${zap?`<a class="zap-mini" href="${zap}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Chamar no WhatsApp">💬</a>`:''}</td>
   </tr>`;
 }
 
@@ -586,13 +599,14 @@ function leadCard(l, i){
   const right = isFree()
     ? `<span class="temp lock">🔒</span><span class="score lock">🔒</span>`
     : `<span class="temp ${tcss(l.temperatura)}">${esc(l.temperatura||'—')}</span><span class="score">${l.score??'–'}/100</span>`;
+  const zap = zapHref(l);
   return `<div class="lead" data-i="${i}">
     <div class="av" style="background:${color(l.nome)}">${ini(l.nome)}</div>
     <div class="mid">
       <div class="nm">${esc(l.nome)}</div>
       <div class="meta">${l.origem?'<span>'+esc(l.origem)+'</span>·':''}<span>${timeAgo(l.criado_em)}</span>${l.status&&l.status!=='novo'?'·<span class="stbadge">'+esc(l.status)+'</span>':''}</div>
     </div>
-    <div class="right">${right}</div>
+    <div class="right">${right}${zap?`<a class="zap-mini" href="${zap}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Chamar no WhatsApp">💬</a>`:''}</div>
   </div>`;
 }
 
