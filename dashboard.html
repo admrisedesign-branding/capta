@@ -689,13 +689,33 @@ const FEATS = {
   essencial:['Formulário de captura inteligente','Leads organizados num painel','Link pronto pra bio, anúncio e WhatsApp','Você faz a gestão'],
   pro:['Tudo do Essencial, e mais:','Qualificação automática (Quente/Morno/Frio)','Painel com priorização dos leads','Resposta automática imediata ao lead'],
   business:['Tudo do Pro','Landing page gerada por IA','Remarketing por e-mail (automático)','Relatórios avançados'],
-  gestao:['Tudo do Pro, e mais:','Integração com seu CRM','Suporte dedicado da RISE','Acompanhamento e ajustes de remarketing'],
+  gestao:['Tudo do Pro, e mais:','A RISE gerencia seus leads no CRM Capta','Resposta rápida + follow-up automático (supervisionados)','Relatório e reunião de estratégia todo mês'],
 };
 function upCard(key,nome,preco,feats,featured){
   return `<div class="upcard${featured?' featured':''}">${featured?'<span class="up-tag">mais popular</span>':''}
     <div class="upcard-h"><b>${nome}</b><span>${preco}</span></div>
     ${feats.slice(0,3).map(f=>`<div class="feat sm">${f}</div>`).join('')}
-    <button class="btn-up" onclick="goCheckout('${key}')">Assinar ${nome}</button></div>`;
+    ${key==='gestao'
+      ? `<button class="btn-up" onclick="falarRise('gestao')">Falar com a RISE</button>`
+      : `<button class="btn-up" onclick="goCheckout('${key}')">Assinar ${nome}</button>`}</div>`;
+}
+
+// Contato da RISE (cole seu link, ex: https://wa.me/5592XXXXXXXXX). Vazio = mostra aviso.
+const CONTATO_RISE = 'https://wa.me/5592991755756';
+function falarRise(ctx){
+  const msg = encodeURIComponent(ctx==='site'
+    ? 'Oi! Quero um site conectado ao meu Capta.'
+    : 'Oi! Quero saber mais sobre o plano Gestão do Capta.');
+  const url = CONTATO_RISE ? (CONTATO_RISE.includes('?') ? CONTATO_RISE+'&text='+msg : CONTATO_RISE+'?text='+msg) : '';
+  if(url) window.open(url,'_blank');
+  else alert('Configure o link de contato da RISE em CONTATO_RISE no dashboard.html (ex: https://wa.me/5592XXXXXXXXX).');
+}
+function siteCard(){
+  return `<div class="upcard" style="margin-top:14px;border:1px dashed var(--brand);background:linear-gradient(135deg,rgba(46,91,255,.06),rgba(91,141,239,.04))">
+    <div class="upcard-h"><b>Quer um site pra sua empresa? 🚀</b></div>
+    <div class="feat sm">Um site profissional que já nasce <b>conectado ao seu CRM Capta</b> — cada lead cai direto aqui, qualificado.</div>
+    <div class="feat sm">Criado pela RISE, sob medida pro seu negócio.</div>
+    <button class="btn-up" onclick="falarRise('site')">Quero meu site → Falar com a RISE</button></div>`;
 }
 function renderPlano(){
   const p = planoAtual(), c = counts();
@@ -713,6 +733,7 @@ function renderPlano(){
       ${upCard('pro','Pro','R$167/mês',FEATS.pro,true)}
       ${upCard('gestao','Gestão','R$397/mês',FEATS.gestao,false)}
       <p class="note">O upgrade libera na hora após o pagamento via Mercado Pago.</p>
+      ${siteCard()}
     </div>`;
     return;
   }
@@ -731,6 +752,7 @@ function renderPlano(){
       <div class="row"><span>Status</span><span class="v" style="color:var(--verde)">Em dia</span></div>
     </div>
     <p class="note">A assinatura é debitada todo mês via Mercado Pago. O acesso ao painel acompanha o pagamento.</p>
+    ${p!=='gestao'?siteCard():''}
   </div>`;
 }
 
