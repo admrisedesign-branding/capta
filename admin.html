@@ -263,6 +263,8 @@ const sb = createClient(SB_URL, SB_KEY);
 
 // ---- STATE ----
 let S = { tenants:[], leads:[], tab:'painel', lf:{ tenant:'all', temp:'all' } };
+let CONFIG = { maya:false };
+let AF = { tenant:null, data:null, editFormId:null, editPerguntas:[] };
 const TITLES = { painel:'Painel', clientes:'Clientes', leads:'Leads' };
 
 // ---- UTILS ----
@@ -306,7 +308,7 @@ function onLogin(user){
 window.logout = async () => { await sb.auth.signOut(); location.reload(); };
 
 // ---- DATA ----
-async function loadAll(){ await Promise.all([loadTenants(),loadLeads()]); render(); }
+async function loadAll(){ try{ const rc=await fetch('/api/capta-config'); if(rc.ok) CONFIG=await rc.json(); }catch(e){} await Promise.all([loadTenants(),loadLeads()]); render(); }
 async function loadTenants(){
   const { data } = await sb.from('capta_tenants').select('*').order('criado_em',{ascending:false});
   S.tenants = data||[];
@@ -391,7 +393,7 @@ function clientCard(t){
     </div>
     <div class="client-actions">
       <button class="btn btn-ghost btn-sm" onclick="abrirLinks('${t.id}')">🔗 Links</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirPerguntas('${t.id}')">❓ Perguntas</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirFormularios('${t.id}')">📋 Formulários</button>
       <button class="btn btn-ghost btn-sm" onclick="filtrarLeads('${t.id}')">👁 Leads (${lt.length})</button>
       <button class="btn btn-ghost btn-sm" onclick="abrirEditar('${t.id}')">✏ Editar</button>
     </div>
@@ -675,6 +677,163 @@ window.salvarCliente = async id => {
   closeDrawer();
   if(!id){ const novo=S.tenants.find(t=>t.slug===slug); if(novo) setTimeout(()=>window.abrirLinks(novo.id),300); }
   else { render(); }
+};
+
+/* ================= FORMULÁRIOS POR CLIENTE (Fase 5) ================= */
+const FAPI = '/api/capta-forms', MAPI = '/api/capta-maya';
+const afQS = t => `?t=${encodeURIComponent(t.slug)}&k=${encodeURIComponent(t.dashboard_token)}`;
+
+window.abrirFormularios = async (tid) => {
+  const t = S.tenants.find(x=>x.id===tid); if(!t) return;
+  AF = { tenant:t, data:null, editFormId:null, editPerguntas:[] };
+  openDrawer(`<div class="drawer-head"><h2>Formulários — ${esc(t.nome)}</h2><button class="drawer-close" onclick="closeDrawer()">✕</button></div><div id="af-body"><p style="color:var(--dr);font-size:14px">Carregando…</p></div>`);
+  await afLoad(); afList();
+};
+async function afLoad(){
+  try{ const r = await fetch(FAPI+afQS(AF.tenant)); AF.data = r.ok ? await r.json() : {forms:[],limite:1,plano:AF.tenant.plano}; }
+  catch(e){ AF.data = {forms:[],limite:1,plano:AF.tenant.plano}; }
+}
+function afList(){
+  const F=AF.data, forms=F.forms||[], limite=F.limite!=null?F.limite:1, usados=forms.length, cheio=usados>=limite;
+  const limTxt = limite>=1000000000?`${usados} formulário${usados!==1?'s':''}`:`${usados} de ${limite}`;
+  document.getElementById('af-body').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-size:13px;color:var(--dm)">${limTxt}</span>
+      ${cheio?`<span style="font-size:12px;color:var(--dr)">limite do plano ${esc(F.plano||'')}</span>`:`<button class="btn btn-primary btn-sm" onclick="afNovo()">+ Novo</button>`}
+    </div>
+    ${forms.length?forms.map(afCard).join(''):'<div class="empty">Nenhum formulário ainda. Crie o primeiro.</div>'}`;
+}
+function afCard(f){
+  const link=`${location.origin}/capta.html?t=${AF.tenant.slug}&f=${f.pubid}`;
+  const nq=(f.perguntas||[]).length;
+  return `<div class="q-item" style="padding:14px">
+    <div style="font-weight:700;font-size:14.5px">${esc(f.nome)}${f.ativo?'':' <span style="color:var(--dr);font-size:11px">(inativo)</span>'}</div>
+    ${f.proposito?`<div style="font-size:12px;color:var(--dm);margin-top:2px">${esc(f.proposito)}</div>`:''}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:9px 0">
+      <span class="plan-badge plan-pro">${nq} perg.</span>
+      <span class="plan-badge plan-free">${f.leads||0} leads</span>
+      ${f.pede_email?'<span class="plan-badge plan-gestao">e-mail</span>':''}
+    </div>
+    <div class="link-box" style="margin-bottom:8px"><input value="${link}" readonly><button onclick="cp('${link}',this)">Copiar</button></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="afPerguntas('${f.id}')">❓ Perguntas (${nq})</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="afEditar('${f.id}')">✏ Editar</button>
+    </div>
+  </div>`;
+}
+window.afNovo = () => {
+  document.getElementById('af-body').innerHTML = `
+    <button class="btn btn-ghost btn-sm" onclick="afList()" style="margin-bottom:14px">← Voltar</button>
+    <div class="field"><label>Nome do formulário *</label><input id="afn-nome" placeholder="Ex: Consulta gratuita"></div>
+    <div class="field"><label>Propósito (opcional)</label><input id="afn-prop" placeholder="Ex: anúncio do Instagram"></div>
+    <label style="display:flex;align-items:center;gap:9px;margin-bottom:14px;font-size:14px;color:var(--dm)"><input type="checkbox" id="afn-email"> Pedir e-mail neste formulário</label>
+    <div class="err" id="afn-err"></div>
+    <button class="btn btn-primary btn-full" onclick="afCriar()">Criar formulário</button>`;
+};
+window.afCriar = async () => {
+  const nome=document.getElementById('afn-nome').value.trim();
+  if(!nome){document.getElementById('afn-err').textContent='Dá um nome pro formulário.';return;}
+  const proposito=document.getElementById('afn-prop').value.trim(), pede_email=document.getElementById('afn-email').checked;
+  try{
+    const r=await fetch(FAPI+afQS(AF.tenant),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',nome,proposito,pede_email})});
+    const d=await r.json();
+    if(!r.ok){document.getElementById('afn-err').textContent=d.error==='limite'?`Plano permite ${d.limite} formulário(s).`:(d.error||'Erro');return;}
+    await afLoad(); if(d.form) afPerguntasFor(d.form.id); else afList();
+  }catch(e){document.getElementById('afn-err').textContent=e.message;}
+};
+window.afEditar = (id) => {
+  const f=(AF.data.forms||[]).find(x=>x.id===id); if(!f)return;
+  document.getElementById('af-body').innerHTML = `
+    <button class="btn btn-ghost btn-sm" onclick="afList()" style="margin-bottom:14px">← Voltar</button>
+    <div class="field"><label>Nome</label><input id="afe-nome" value="${esc(f.nome)}"></div>
+    <div class="field"><label>Propósito</label><input id="afe-prop" value="${esc(f.proposito||'')}"></div>
+    <label style="display:flex;align-items:center;gap:9px;margin-bottom:8px;font-size:14px;color:var(--dm)"><input type="checkbox" id="afe-email" ${f.pede_email?'checked':''}> Pedir e-mail</label>
+    <label style="display:flex;align-items:center;gap:9px;margin-bottom:14px;font-size:14px;color:var(--dm)"><input type="checkbox" id="afe-ativo" ${f.ativo?'checked':''}> Formulário ativo</label>
+    <div class="err" id="afe-err"></div>
+    <button class="btn btn-primary btn-full" onclick="afSalvar('${id}')">Salvar</button>
+    <button class="btn btn-danger btn-full" style="margin-top:8px" onclick="afApagar('${id}')">Apagar formulário</button>`;
+};
+window.afSalvar = async (id) => {
+  const nome=document.getElementById('afe-nome').value.trim(), proposito=document.getElementById('afe-prop').value.trim();
+  const pede_email=document.getElementById('afe-email').checked, ativo=document.getElementById('afe-ativo').checked;
+  try{ await fetch(FAPI+afQS(AF.tenant),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',id,nome,proposito,pede_email,ativo})}); await afLoad(); afList(); }
+  catch(e){document.getElementById('afe-err').textContent=e.message;}
+};
+window.afApagar = async (id) => {
+  if(!confirm('Apagar este formulário e suas perguntas?'))return;
+  try{ await fetch(FAPI+afQS(AF.tenant),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',id})}); await afLoad(); afList(); }catch(e){alert(e.message);}
+};
+window.afPerguntas = (id) => afPerguntasFor(id);
+function afPerguntasFor(id){
+  const f=(AF.data.forms||[]).find(x=>x.id===id); if(!f)return;
+  AF.editFormId=id;
+  AF.editPerguntas=(f.perguntas||[]).map(p=>({texto:p.texto,opcoes:(p.opcoes||[]).map(o=>({label:o.label,pontos:o.pontos}))}));
+  afPaintEditor(f);
+}
+function afPaintEditor(f){
+  const maya = CONFIG.maya
+    ? `<button class="btn btn-primary btn-full" style="margin-bottom:12px" onclick="afMayaStart()">✨ Gerar com IA (Maya)</button>`
+    : `<button class="btn btn-ghost btn-full" style="margin-bottom:12px;opacity:.55;cursor:not-allowed" disabled>✨ Gerar com IA (em breve)</button>`;
+  document.getElementById('af-body').innerHTML = `
+    <button class="btn btn-ghost btn-sm" onclick="afList()" style="margin-bottom:14px">← Voltar aos formulários</button>
+    <div style="font-weight:700;font-size:15px;margin-bottom:3px">Perguntas · ${esc(f.nome)}</div>
+    <p style="font-size:12px;color:var(--dm);margin-bottom:12px">Cada opção vale pontos (0–3). Mais pontos = mais quente.</p>
+    ${maya}
+    <div id="af-maya"></div>
+    <div id="af-qlist">${afEditorList()}</div>
+    <hr>
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px">+ Adicionar pergunta (manual)</div>
+    <div class="field"><label>Pergunta</label><input id="afq-txt" placeholder="Ex: Quando quer começar?"></div>
+    <div class="field"><label>Opções — uma por linha, pontos após "|"</label><textarea id="afq-ops" rows="3" placeholder="Essa semana | 3&#10;Esse mês | 1&#10;Só pesquisando | 0"></textarea></div>
+    <div class="err" id="afq-err"></div>
+    <button class="btn btn-ghost btn-full" onclick="afAddPergunta()">Adicionar pergunta</button>
+    <button class="btn btn-primary btn-full" style="margin-top:8px" onclick="afSalvarPerguntas()">Salvar formulário (${AF.editPerguntas.length})</button>`;
+}
+function afEditorList(){
+  if(!AF.editPerguntas.length) return '<div class="empty" style="padding:16px">Nenhuma pergunta ainda. Adicione manual ou gere com a Maya.</div>';
+  return AF.editPerguntas.map((q,i)=>`<div class="q-item">
+    <div class="q-item-head"><span class="q-num">${i+1}</span><span class="q-txt">${esc(q.texto)}</span><button class="btn btn-danger btn-sm" onclick="afDelPergunta(${i})">✕</button></div>
+    ${(q.opcoes||[]).map(o=>`<div class="opt-item"><span>${esc(o.label)}</span><span class="opt-pts">+${o.pontos}</span></div>`).join('')}
+  </div>`).join('');
+}
+function afRepaint(){ const f=(AF.data.forms||[]).find(x=>x.id===AF.editFormId)||{nome:''}; afPaintEditor(f); }
+window.afAddPergunta = () => {
+  const txt=document.getElementById('afq-txt').value.trim(), raw=document.getElementById('afq-ops').value.trim();
+  if(!txt){document.getElementById('afq-err').textContent='Escreve a pergunta.';return;}
+  const opcoes=raw.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const p=l.split('|');return{label:(p[0]||'').trim(),pontos:parseInt((p[1]||'0').trim())||0};}).filter(o=>o.label);
+  if(opcoes.length<2){document.getElementById('afq-err').textContent='Coloca pelo menos 2 opções.';return;}
+  AF.editPerguntas.push({texto:txt,opcoes}); afRepaint();
+};
+window.afDelPergunta = (i) => { AF.editPerguntas.splice(i,1); afRepaint(); };
+window.afSalvarPerguntas = async () => {
+  try{
+    const r=await fetch(FAPI+afQS(AF.tenant),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'salvar_perguntas',id:AF.editFormId,perguntas:AF.editPerguntas})});
+    const d=await r.json(); if(!r.ok){document.getElementById('afq-err').textContent=d.error||'Erro ao salvar';return;}
+    await afLoad(); afList();
+  }catch(e){document.getElementById('afq-err').textContent=e.message;}
+};
+window.afMayaStart = () => {
+  document.getElementById('af-maya').innerHTML = `<div class="q-item" style="padding:14px;margin-bottom:12px">
+    <div style="font-weight:700;margin-bottom:6px">✨ Maya</div>
+    <p style="font-size:12.5px;color:var(--dm);margin-bottom:10px">Conta o que o negócio faz — a Maya monta as perguntas.</p>
+    <div class="field"><label>Nicho / o que vende</label><input id="afm-nicho" placeholder="Ex: escola de natação infantil"></div>
+    <div class="field"><label>Instagram (opcional)</label><input id="afm-insta" placeholder="@negocio"></div>
+    <div class="err" id="afm-err"></div>
+    <button class="btn btn-primary btn-full" onclick="afMayaGerar()">Gerar perguntas ✨</button>
+  </div>`;
+};
+window.afMayaGerar = async () => {
+  const nicho=document.getElementById('afm-nicho').value.trim();
+  if(!nicho){document.getElementById('afm-err').textContent='Conta o que o negócio faz.';return;}
+  const instagram=document.getElementById('afm-insta').value.trim();
+  document.getElementById('af-maya').innerHTML='<div class="q-item" style="padding:16px;text-align:center;margin-bottom:12px"><p style="color:var(--dm);font-size:13px">Maya está montando as perguntas…</p></div>';
+  try{
+    const f=(AF.data.forms||[]).find(x=>x.id===AF.editFormId);
+    const r=await fetch(MAPI,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'gerar',slug:AF.tenant.slug,token:AF.tenant.dashboard_token,contexto:{nicho,instagram,pede_email:!!(f&&f.pede_email)}})});
+    const d=await r.json();
+    if(!r.ok){document.getElementById('af-maya').innerHTML=`<div class="q-item" style="padding:14px;margin-bottom:12px"><p style="color:var(--dm);font-size:13px">${esc(d.error||'Erro')}</p><button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="afMayaStart()">Tentar de novo</button></div>`;return;}
+    (d.perguntas||[]).forEach(q=>AF.editPerguntas.push({texto:q.texto,opcoes:q.opcoes})); afRepaint();
+  }catch(e){document.getElementById('af-maya').innerHTML=`<div class="q-item" style="padding:14px"><p style="color:var(--dm);font-size:13px">${esc(e.message)}</p></div>`;}
 };
 
 window.S = S;
