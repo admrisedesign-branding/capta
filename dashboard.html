@@ -166,6 +166,22 @@ h2{font-size:16px;font-weight:700}
 .upcard-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
 .upcard-h b{font-size:18px;font-weight:800}.upcard-h span{font-size:14px;font-weight:700;color:var(--brand)}
 .btn-up{width:100%;border:0;background:var(--brand);color:#fff;font-weight:700;font-size:13.5px;padding:11px;border-radius:11px;transition:.14s;margin-top:6px}
+.start-card{background:linear-gradient(135deg,rgba(46,91,255,.07),rgba(91,141,239,.04));border:1px solid var(--brand-soft);border-radius:16px;padding:20px 22px;margin-bottom:18px}
+.start-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.start-badge{background:var(--brand);color:#fff;font-size:11px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
+.start-h h3{font-size:18px;font-weight:800;margin:0}
+.start-sub{font-size:13.5px;color:var(--muted);line-height:1.6;margin-bottom:14px}
+.start-steps{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.start-step{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:600;color:var(--ink)}
+.start-step .stn{flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--line-2);color:var(--muted)}
+.start-step .stn.done{background:rgba(22,163,74,.14);color:#16A34A}
+.start-btns{display:flex;gap:10px;flex-wrap:wrap}
+.start-btns .btn-up{width:auto;flex:1;min-width:180px;margin-top:0}
+.start-btns .btn-ghost{width:auto;flex:1;min-width:160px}
+.site-promo{background:linear-gradient(135deg,#141A2E,#243056);color:#fff;border-radius:16px;padding:18px 22px;margin-bottom:18px}
+.site-promo-t{font-size:16px;margin-bottom:5px}
+.site-promo-p{font-size:13px;color:rgba(255,255,255,.82);line-height:1.6;margin-bottom:12px}
+.site-promo .btn-up{width:auto;background:#fff;color:var(--brand);margin-top:0}
 .btn-up:hover{background:var(--brand-deep)}.btn-up.sm{font-size:12.5px;padding:9px}
 .pill{font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px}
 .pill.free{background:var(--gray-bg);color:var(--muted)}
@@ -243,7 +259,7 @@ h2{font-size:16px;font-weight:700}
       <button class="nav-item on" data-t="painel"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Painel</button>
       <button class="nav-item" data-t="leads"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>Leads</button>
       <button class="nav-item" data-t="forms"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Formulários</button>
-      <button class="nav-item" data-t="form"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg>Seu link</button>
+      <button class="nav-item" data-t="form"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>Divulgar</button>
       <button class="nav-item" data-t="plano"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4z"/></svg>Plano</button>
     </nav>
     <div class="side-foot"><div class="who"><b id="who-nome">—</b><span id="who-plan">—</span></div></div>
@@ -460,7 +476,10 @@ function tempCard(c){
 function renderPainel(){
   const c = counts();
   const free = isFree();
+  const semLeads = (c.total||0) === 0;
   view.innerHTML = `<div class="reveal">
+    ${semLeads ? startCard() : ''}
+    ${(!free && !semLeads) ? sitePromo() : ''}
     ${free ? freeBanner(c) : ''}
     <div class="metrics">
       ${metric(IC.users,'','Leads no mês', `${c.mes}${free?`<span class="lim">/${FREE_LIMIT}</span>`:''}`, `${c.total} no total`)}
@@ -474,6 +493,42 @@ function renderPainel(){
     ${leadsList(DATA.leads.slice(0,6))}
   </div>`;
   bindLeads();
+}
+
+// Card de primeiros passos — aparece enquanto não há nenhum lead
+function startCard(){
+  return `<div class="start-card">
+    <div class="start-h"><span class="start-badge">Comece aqui</span><h3>Seu formulário já está pronto ✅</h3></div>
+    <p class="start-sub">Agora falta o principal: <b>divulgar seu link</b>. Cole na bio do Instagram, no anúncio ou mande no story — cada pessoa que responder vira um lead qualificado aqui.</p>
+    <div class="start-steps">
+      <div class="start-step"><span class="stn done">✓</span> Formulário criado e qualificando</div>
+      <div class="start-step"><span class="stn">2</span> Copie seu link e divulgue</div>
+      <div class="start-step"><span class="stn">3</span> Os leads aparecem no painel</div>
+    </div>
+    <div class="start-btns">
+      <button class="btn-up" onclick="copiarLinkPrincipal(this)">📋 Copiar meu link</button>
+      <button class="btn-ghost" onclick="goTab('form')">Ver opções de divulgação</button>
+    </div>
+  </div>`;
+}
+async function copiarLinkPrincipal(btn){
+  let link = '';
+  try{
+    if(!FORMS) await loadForms();
+    const f = (FORMS&&FORMS.forms||[]).find(x=>x.ativo) || (FORMS&&FORMS.forms||[])[0];
+    if(f) link = `${location.origin}/capta.html?t=${encodeURIComponent(SLUG)}&f=${encodeURIComponent(f.pubid)}`;
+  }catch(e){}
+  if(!link) link = `${location.origin}/capta.html?t=${encodeURIComponent(SLUG)}`;
+  try{ await navigator.clipboard.writeText(link); if(btn){ const o=btn.textContent; btn.textContent='✓ Link copiado!'; setTimeout(()=>btn.textContent=o,1800); } }
+  catch(e){ prompt('Copie seu link:', link); }
+}
+// Upsell do site — só pra quem já paga (Pro), no Painel
+function sitePromo(){
+  return `<div class="site-promo">
+    <div class="site-promo-t"><b>🚀 Quer um site que capta sozinho?</b></div>
+    <p class="site-promo-p">A RISE cria um site profissional pro seu negócio, com formulário inteligente <b>já conectado ao seu Capta</b> — todo lead cai aqui, qualificado.</p>
+    <button class="btn-up" onclick="falarRise('site')">Quero meu site → Falar com a RISE</button>
+  </div>`;
 }
 
 function renderLeads(){
