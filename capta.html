@@ -79,8 +79,9 @@ const sb     = createClient(SUPABASE_URL, SUPABASE_ANON);
 const app    = document.getElementById('app');
 const params = new URLSearchParams(location.search);
 const SLUG   = params.get('t');
+const FORMID = params.get('f') || null;
 const ORIGEM = params.get('o') || null;
-const state  = { tenant:null, perguntas:[], nome:'', contato:'', ans:{}, idx:0 };
+const state  = { tenant:null, form:null, perguntas:[], nome:'', contato:'', email:'', ans:{}, idx:0 };
 
 init();
 
@@ -90,9 +91,29 @@ async function init(){
   const { data:t } = await sb.from('capta_tenants')
     .select('id,nome,whatsapp,msg_template,cor,headline,plano').eq('slug',SLUG).single();
   if(!t){ return fatal('Negócio não encontrado ou inativo.'); }
-  const { data:qs } = await sb.from('capta_perguntas')
-    .select('id,texto,opcoes').eq('tenant_id',t.id).eq('ativo',true).order('ordem');
-  state.tenant = t; state.perguntas = qs || [];
+  // resolve o formulário (multi-formulário): ?f=pubid, senão o principal (mais antigo ativo)
+  let form = null;
+  try {
+    if(FORMID){
+      const { data } = await sb.from('capta_formularios')
+        .select('id,pede_email').eq('tenant_id',t.id).eq('pubid',FORMID).eq('ativo',true).limit(1);
+      form = data && data[0];
+    }
+    if(!form){
+      const { data } = await sb.from('capta_formularios')
+        .select('id,pede_email').eq('tenant_id',t.id).eq('ativo',true).order('criado_em',{ascending:true}).limit(1);
+      form = data && data[0];
+    }
+  } catch(e){ /* sem tabela de formulários: segue no modo antigo por tenant */ }
+  let qs;
+  if(form){
+    ({ data:qs } = await sb.from('capta_perguntas')
+      .select('id,texto,opcoes').eq('formulario_id',form.id).eq('ativo',true).order('ordem'));
+  } else {
+    ({ data:qs } = await sb.from('capta_perguntas')
+      .select('id,texto,opcoes').eq('tenant_id',t.id).eq('ativo',true).order('ordem'));
+  }
+  state.tenant = t; state.form = form; state.perguntas = qs || [];
   if(t.cor) document.documentElement.style.setProperty('--or', t.cor);
   screenStart();
 }
@@ -104,7 +125,8 @@ function screenStart(){
     <p class="sub">Responda rapidinho e a gente já te chama no WhatsApp.</p>
     <div class="card">
       <label class="f"><span>Seu nome</span><input id="i-nome" autocomplete="name" placeholder="Como te chamam"></label>
-      <label class="f" style="margin-bottom:4px"><span>Seu WhatsApp</span><input id="i-tel" inputmode="tel" autocomplete="tel" placeholder="(92) 9 ____-____"></label>
+      <label class="f"${state.form&&state.form.pede_email?'':' style="margin-bottom:4px"'}><span>Seu WhatsApp</span><input id="i-tel" inputmode="tel" autocomplete="tel" placeholder="(92) 9 ____-____"></label>
+      ${state.form&&state.form.pede_email ? '<label class="f" style="margin-bottom:4px"><span>Seu e-mail</span><input id="i-email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com"></label>' : ''}
     </div>
     <div class="err" id="err"></div>
     <button class="btn" id="go">Começar →</button>
@@ -113,6 +135,11 @@ function screenStart(){
     const nome = v('i-nome'), tel = v('i-tel');
     if(nome.length < 2) return setErr('Digite seu nome.');
     if(tel.replace(/\D/g,'').length < 10) return setErr('Digite um WhatsApp válido com DDD.');
+    if(state.form && state.form.pede_email){
+      const em = v('i-email');
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return setErr('Digite um e-mail válido.');
+      state.email = em;
+    }
     state.nome = nome; state.contato = tel; state.idx = 0;
     state.perguntas.length ? screenQ() : finish();
   };
@@ -147,8 +174,10 @@ async function finish(){
   try{
     const { data, error } = await sb.from('capta_leads').insert({
       tenant_id: state.tenant.id,
+      formulario_id: state.form ? state.form.id : null,
       nome: state.nome,
       contato: state.contato,
+      email: state.email || null,
       respostas: state.ans,
       origem: ORIGEM
     }).select('id').single();
