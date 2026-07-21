@@ -896,6 +896,7 @@ function paintEditor(f){
     <h3 style="font-size:18px;font-weight:800;margin-bottom:3px">Perguntas · ${esc(f.nome)}</h3>
     <p style="font-size:12.5px;color:var(--muted);margin-bottom:14px">Cada opção vale pontos (0–3). Mais pontos = mais quente.</p>
     ${maya}
+    <button class="btn-ghost" style="width:100%;margin:0 0 12px" onclick="usarPerguntasProntas()">📋 Usar perguntas prontas <span style="opacity:.6;font-weight:500">— qualificam qualquer lead</span></button>
     <div id="ed-maya"></div>
     <div id="ed-list">${editorList()}</div>
     <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
@@ -915,6 +916,16 @@ function editorList(){
   </div>`).join('');
 }
 function repaintEditor(){ const f=(FORMS.forms||[]).find(x=>x.id===EDIT.formId)||{nome:''}; paintEditor(f); }
+window.usarPerguntasProntas = () => {
+  const modelo = [
+    {texto:'O que você procura agora?', opcoes:[{label:'Quero contratar / comprar',pontos:3},{label:'Quero um orçamento',pontos:2},{label:'Só tirando dúvidas',pontos:1}]},
+    {texto:'Pra quando você precisa?', opcoes:[{label:'Essa semana',pontos:3},{label:'Esse mês',pontos:2},{label:'Sem pressa, pesquisando',pontos:0}]},
+    {texto:'Já tem um valor em mente?', opcoes:[{label:'Sim, quero fechar',pontos:3},{label:'Quero entender preços',pontos:1},{label:'Ainda não pensei',pontos:0}]},
+  ];
+  const existentes = new Set(EDIT.perguntas.map(q=>q.texto));
+  modelo.forEach(m=>{ if(!existentes.has(m.texto)) EDIT.perguntas.push(m); });
+  repaintEditor();
+};
 window.addPergunta = () => {
   const txt=document.getElementById('np-txt').value.trim();
   const raw=document.getElementById('np-ops').value.trim();
