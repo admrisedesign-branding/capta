@@ -191,6 +191,17 @@ h2{font-size:16px;font-weight:700}
 .qr-info{flex:1;min-width:210px}
 .qr-info b{font-size:15px}
 .qr-info p{font-size:13px;color:var(--muted);line-height:1.55;margin:5px 0 12px}
+.lead-tools{display:flex;gap:9px;margin-bottom:12px;flex-wrap:wrap}
+.lead-search{flex:1;min-width:180px;background:var(--card);border:1px solid var(--line);border-radius:11px;color:var(--ink);font-family:inherit;font-size:14px;padding:10px 13px}
+.lead-search:focus{outline:none;border-color:var(--brand)}
+.lead-status{background:var(--card);border:1px solid var(--line);border-radius:11px;color:var(--ink);font-family:inherit;font-size:13.5px;padding:10px 12px;cursor:pointer}
+.btn-export{background:var(--card);border:1px solid var(--line);border-radius:11px;color:var(--ink);font-family:inherit;font-weight:600;font-size:13.5px;padding:10px 14px;cursor:pointer;transition:.14s}
+.btn-export:hover{background:var(--line-2);border-color:var(--brand);color:var(--brand)}
+.lead-count{font-size:12.5px;color:var(--muted);margin-top:12px;text-align:center}
+.lead-toast{position:fixed;left:50%;top:18px;transform:translateX(-50%) translateY(-16px);z-index:9997;background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;box-shadow:0 12px 34px rgba(0,0,0,.28);cursor:pointer;opacity:0;transition:.35s;display:flex;align-items:center;gap:8px;max-width:90%}
+.lead-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.lead-toast .lt-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:ltpulse 1.6s infinite}
+@keyframes ltpulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
 .btn-up:hover{background:var(--brand-deep)}.btn-up.sm{font-size:12.5px;padding:9px}
 .pill{font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px}
 .pill.free{background:var(--gray-bg);color:var(--muted)}
@@ -2615,7 +2626,7 @@ const IC = {
 };
 
 let DATA = { tenant:{nome:'—',plano:'free'}, leads:[] };
-let DEMO = false, filter = 'all';
+let DEMO = false, filter = 'all', statusFilter = 'all', leadSearch = '', activeTab = 'painel';
 
 const FREE_LIMIT = 30;
 const PLAN_PRICE = { free:0, pro:97, business:197, gestao:397 };
@@ -2689,6 +2700,41 @@ async function load(){
   render('painel');
   if(params.get('tour')==='1') setTimeout(startTour, 500);
   if(params.get('pago')==='1') avisoPagamento();
+  startLeadPolling();
+}
+
+// ---- Atualização automática + aviso de lead novo ----
+let _leadIds = null, _pollTimer = null;
+function startLeadPolling(){
+  if(DEMO || !SLUG || !TOKEN) return;
+  _leadIds = new Set((DATA.leads||[]).map(l=>l.id));
+  if(_pollTimer) clearInterval(_pollTimer);
+  _pollTimer = setInterval(async () => {
+    if(document.hidden) return;               // pausa quando a aba não está visível
+    try{
+      const r = await fetch(`${LEADS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`);
+      if(!r.ok) return;
+      const fresh = await r.json();
+      const novos = (fresh.leads||[]).filter(l => !_leadIds.has(l.id));
+      DATA = fresh;
+      (fresh.leads||[]).forEach(l => _leadIds.add(l.id));
+      if(novos.length){
+        if(activeTab==='leads') applyLeadFilters();
+        else if(activeTab==='painel') render('painel');
+        const nome = (novos[0].nome||'alguém').split(' ')[0];
+        leadToast(nome + (novos.length>1 ? ` +${novos.length-1}` : ''));
+      }
+    }catch(e){}
+  }, 30000);
+}
+function leadToast(nome){
+  const box = document.createElement('div');
+  box.className = 'lead-toast';
+  box.innerHTML = `<span class="lt-dot"></span>🎯 Novo lead: <b>${esc(nome)}</b>`;
+  box.onclick = () => { goTab('leads'); box.remove(); };
+  document.body.appendChild(box);
+  requestAnimationFrame(()=>box.classList.add('show'));
+  setTimeout(()=>{ box.classList.remove('show'); setTimeout(()=>box.remove(),400); }, 6000);
 }
 
 function avisoPagamento(){
@@ -2753,7 +2799,7 @@ function counts(){
   return {q,m,f,mes:mesC,hoje,total:DATA.leads.length,fechados:DATA.leads.filter(l=>l.status==='fechado').length};
 }
 
-function render(tab){ ({painel:renderPainel,leads:renderLeads,forms:renderForms,form:renderForm,plano:renderPlano}[tab])(); }
+function render(tab){ activeTab=tab; ({painel:renderPainel,leads:renderLeads,forms:renderForms,form:renderForm,plano:renderPlano}[tab])(); }
 
 function freeBanner(c){
   const lk = lockedCount();
@@ -2866,18 +2912,63 @@ function sitePromo(){
 function renderLeads(){
   const c = counts();
   const free = isFree();
-  const f = free ? DATA.leads : DATA.leads.filter(l => filter==='all' || tcss(l.temperatura)===filter);
+  const f = currentFilteredLeads();
   view.innerHTML = `<div class="reveal">
-    ${free ? freeBanner(c) : `<div class="chips">
-      <button class="chip ${filter==='all'?'on':''}" data-f="all">Todos ${c.total}</button>
-      <button class="chip ${filter==='q'?'on':''}" data-f="q">Quentes ${c.q}</button>
-      <button class="chip ${filter==='m'?'on':''}" data-f="m">Mornos ${c.m}</button>
-      <button class="chip ${filter==='f'?'on':''}" data-f="f">Frios ${c.f}</button>
-    </div>`}
-    ${leadsList(f)}
+    ${free ? freeBanner(c) : `
+      <div class="lead-tools">
+        <input id="lead-q" class="lead-search" placeholder="Buscar por nome ou telefone…" value="${esc(leadSearch)}">
+        <select id="lead-status" class="lead-status">
+          ${[['all','Todos os status'],['novo','Novos'],['contatado','Contatados'],['fechado','Fechados'],['perdido','Perdidos']].map(([v,t])=>`<option value="${v}" ${statusFilter===v?'selected':''}>${t}</option>`).join('')}
+        </select>
+        <button class="btn-export" id="lead-export" title="Exportar pra planilha">⬇ Exportar</button>
+      </div>
+      <div class="chips">
+        <button class="chip ${filter==='all'?'on':''}" data-f="all">Todos ${c.total}</button>
+        <button class="chip ${filter==='q'?'on':''}" data-f="q">Quentes ${c.q}</button>
+        <button class="chip ${filter==='m'?'on':''}" data-f="m">Mornos ${c.m}</button>
+        <button class="chip ${filter==='f'?'on':''}" data-f="f">Frios ${c.f}</button>
+      </div>`}
+    <div id="leads-list-wrap">${leadsList(f)}${free?'':countLine(f)}</div>
   </div>`;
-  if(!free) document.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { filter=ch.dataset.f; renderLeads(); });
+  if(!free){
+    document.querySelectorAll('.chip[data-f]').forEach(ch => ch.onclick = () => { filter=ch.dataset.f; renderLeads(); });
+    const q=document.getElementById('lead-q'); if(q){ q.oninput=()=>{ leadSearch=q.value; applyLeadFilters(); }; }
+    const st=document.getElementById('lead-status'); if(st){ st.onchange=()=>{ statusFilter=st.value; applyLeadFilters(); }; }
+    const ex=document.getElementById('lead-export'); if(ex){ ex.onclick=exportLeadsCSV; }
+  }
   bindLeads();
+}
+function currentFilteredLeads(){
+  let f = DATA.leads||[];
+  if(isFree()) return f;
+  if(filter!=='all') f = f.filter(l => tcss(l.temperatura)===filter);
+  if(statusFilter!=='all') f = f.filter(l => (l.status||'novo')===statusFilter);
+  const q = leadSearch.trim().toLowerCase();
+  if(q) f = f.filter(l => (l.nome||'').toLowerCase().includes(q) || (l.contato||'').toLowerCase().includes(q));
+  return f;
+}
+function countLine(f){
+  const filtrando = leadSearch.trim() || statusFilter!=='all' || filter!=='all';
+  return `<div class="lead-count">${f.length} lead${f.length!==1?'s':''} ${filtrando?'no filtro':'no total'}</div>`;
+}
+function applyLeadFilters(){
+  const f = currentFilteredLeads();
+  const wrap = document.getElementById('leads-list-wrap');
+  if(wrap){ wrap.innerHTML = leadsList(f) + countLine(f); }
+  bindLeads();
+}
+function exportLeadsCSV(){
+  const rows = currentFilteredLeads();
+  if(!rows.length){ alert('Nenhum lead pra exportar neste filtro.'); return; }
+  const head = ['Nome','Contato','E-mail','Origem','Temperatura','Score','Status','Data'];
+  const q = v => { v=(v==null?'':String(v)); return /[";\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  const lines = [head.join(';')];
+  rows.forEach(l=>{ lines.push([l.nome,l.contato,l.email,l.origem,l.temperatura,(l.score??''),(l.status||'novo'),(l.criado_em?new Date(l.criado_em).toLocaleString('pt-BR'):'')].map(q).join(';')); });
+  const csv = '\ufeff' + lines.join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `leads-${(DATA.tenant&&DATA.tenant.slug)||'capta'}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 
 function leadsList(leads){
