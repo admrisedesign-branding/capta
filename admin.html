@@ -100,6 +100,13 @@ input,select,textarea{font-family:inherit}
 .plan-gestao{background:var(--verde-bg);color:var(--verde)}
 .ativo-dot{width:8px;height:8px;border-radius:50%;background:var(--verde);display:inline-block;margin-right:3px}
 .ativo-dot.off{background:var(--dr)}
+.new-badge{background:var(--verde);color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;padding:2px 7px;border-radius:999px;letter-spacing:.02em}
+.meta2{font-size:12px;color:var(--muted);margin-top:4px}
+.signup-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:11px 0;border-top:1px solid var(--line)}
+.signup-row:first-of-type{border-top:0}
+.signup-main{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;flex:1;min-width:170px}
+.signup-sub{font-size:12px;color:var(--muted);flex-basis:100%;order:3}
+.signup-act{display:flex;gap:6px}
 .client-actions{display:flex;gap:8px;flex-wrap:wrap}
 
 /* ---------- Buttons ---------- */
@@ -333,6 +340,34 @@ document.getElementById('scrim').onclick = closeDrawer;
 
 function render(){ ({painel:rPainel,clientes:rClientes,leads:rLeads}[S.tab])(); }
 
+// Cadastros recentes (últimos 7 dias) — visibilidade dos novos self-service + trava anti-spam
+function recentSignupsCard(){
+  const lim = Date.now() - 7*864e5;
+  const novos = S.tenants.filter(t => new Date(t.criado_em).getTime() >= lim);
+  if(!novos.length) return '';
+  return `<div class="rev-card">
+    <h3>Cadastros recentes · últimos 7 dias (${novos.length})</h3>
+    ${novos.slice(0,15).map(t=>`<div class="signup-row">
+      <div class="signup-main">${esc(t.nome)} <span class="plan-badge plan-${t.plano}">${t.plano}</span>${(Date.now()-new Date(t.criado_em)<2*864e5)?'<span class="new-badge">novo</span>':''}${t.ativo?'':' <span style="color:var(--dr);font-size:12px">(inativo)</span>'}</div>
+      <div class="signup-act">
+        <button class="btn btn-ghost btn-sm" onclick="filtrarLeads('${t.id}')">Ver</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleAtivo('${t.id}',${t.ativo?'false':'true'})">${t.ativo?'🚫 Desativar':'✅ Reativar'}</button>
+      </div>
+      <div class="signup-sub">${t.owner_email?esc(t.owner_email):'sem e-mail'} · cadastro ${ago(t.criado_em)}</div>
+    </div>`).join('')}
+  </div>`;
+}
+window.toggleAtivo = async (id, novo) => {
+  const ativo = (novo===true || novo==='true');
+  if(!ativo && !confirm('Desativar este cadastro? Ele deixa de contar como cliente ativo. Você pode reativar depois.')) return;
+  try{
+    const { error } = await sb.from('capta_tenants').update({ ativo }).eq('id', id);
+    if(error){ alert('Não foi possível atualizar: '+error.message); return; }
+    const t = S.tenants.find(x=>x.id===id); if(t) t.ativo = ativo;
+    render();
+  }catch(e){ alert('Erro ao atualizar o cadastro.'); }
+};
+
 // ---- PAINEL ----
 function rPainel(){
   const now=new Date(), mes=now.getMonth(), ano=now.getFullYear();
@@ -359,6 +394,7 @@ function rPainel(){
       <div class="rev-row"><span>Gestão · ${byP.gestao} cliente${byP.gestao!==1?'s':''} × R$397</span><span class="v">R$${num(byP.gestao*397)}</span></div>
       <div class="rev-total"><span>Total mensal</span><span class="total">R$${num(receita)}</span></div>
     </div>
+    ${recentSignupsCard()}
     <div class="sec-h"><h2>Últimos leads</h2></div>
     ${leadsList(S.leads.slice(0,6),true)}
   </div>`;
@@ -378,6 +414,7 @@ function clientCard(t){
   const lt=S.leads.filter(l=>l.tenant_id===t.id);
   const now=new Date();
   const lm=lt.filter(l=>{const d=new Date(l.criado_em);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
+  const novo=(Date.now()-new Date(t.criado_em))<7*864e5;
   return `<div class="client-card">
     <div class="client-top">
       <div class="client-av">${ini(t.nome)}</div>
@@ -385,10 +422,12 @@ function clientCard(t){
         <h3>${esc(t.nome)}</h3>
         <div class="meta">
           <span class="plan-badge plan-${t.plano}">${t.plano}</span>
+          ${novo?'<span class="new-badge">novo</span>':''}
           <span>/${esc(t.slug)}</span>
           <span><span class="ativo-dot ${t.ativo?'':'off'}"></span>${t.ativo?'ativo':'inativo'}</span>
           <span>· ${lm.length} leads/mês · ${lt.length} total</span>
         </div>
+        <div class="meta2">${t.owner_email?esc(t.owner_email)+' · ':''}cadastro ${ago(t.criado_em)}</div>
       </div>
     </div>
     <div class="client-actions">
@@ -396,6 +435,7 @@ function clientCard(t){
       <button class="btn btn-ghost btn-sm" onclick="abrirFormularios('${t.id}')">📋 Formulários</button>
       <button class="btn btn-ghost btn-sm" onclick="filtrarLeads('${t.id}')">👁 Leads (${lt.length})</button>
       <button class="btn btn-ghost btn-sm" onclick="abrirEditar('${t.id}')">✏ Editar</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleAtivo('${t.id}',${t.ativo?'false':'true'})">${t.ativo?'🚫 Desativar':'✅ Reativar'}</button>
     </div>
   </div>`;
 }
