@@ -292,8 +292,8 @@ let DATA = { tenant:{nome:'—',plano:'free'}, leads:[] };
 let DEMO = false, filter = 'all';
 
 const FREE_LIMIT = 30;
-const PLAN_PRICE = { free:0, pro:97, business:197, gestao:397 };
-const CHECKOUT   = { pro:'', business:'', gestao:'' };
+const PLAN_PRICE = { free:0, essencial:97, pro:167, business:197, gestao:397 };
+const CHECKOUT   = { essencial:'', pro:'', gestao:'' };
 const planoAtual = () => DATA.tenant.plano || 'free';
 const isFree     = () => planoAtual() === 'free';
 const lockedCount = () => DATA.leads.filter(l => l._locked).length;
@@ -616,7 +616,7 @@ function iaLockedCard(){
   return `<div class="ia-card locked">
     <div class="ia-h"><b>✨ Perguntas inteligentes</b><span class="pill free">Pro</span></div>
     <p class="ia-sub">Deixe a IA montar as perguntas de qualificação do seu formulário a partir do seu nicho e Instagram — os leads já chegam pontuados.</p>
-    <button class="btn-up" onclick="goPlano()">Desbloquear no Pro → R$97/mês</button>
+    <button class="btn-up" onclick="goPlano()">Desbloquear no Pro → R$167/mês</button>
   </div>`;
 }
 window.renderIA = function(etapa, extra){
@@ -686,9 +686,10 @@ function demoPerguntas(nicho){
 
 const FEATS = {
   free:['1 formulário de captação','Até 30 leads por mês','Redireciona pro WhatsApp','Marca “por Capta” no rodapé'],
-  pro:['Formulários ilimitados','Leads ilimitados','Pontuação automática (Quente/Morno/Frio)','IA monta as perguntas pra você','Sem marca Capta'],
+  essencial:['Formulário de captura inteligente','Leads organizados num painel','Link pronto pra bio, anúncio e WhatsApp','Você faz a gestão'],
+  pro:['Tudo do Essencial, e mais:','Qualificação automática (Quente/Morno/Frio)','Painel com priorização dos leads','Resposta automática imediata ao lead'],
   business:['Tudo do Pro','Landing page gerada por IA','Remarketing por e-mail (automático)','Relatórios avançados'],
-  gestao:['Tudo do Business','A RISE gerencia seus leads ativamente','Follow-up feito pelo nosso time','Acompanhamento estratégico mensal'],
+  gestao:['Tudo do Pro, e mais:','Integração com seu CRM','Suporte dedicado da RISE','Acompanhamento e ajustes de remarketing'],
 };
 function upCard(key,nome,preco,feats,featured){
   return `<div class="upcard${featured?' featured':''}">${featured?'<span class="up-tag">mais popular</span>':''}
@@ -708,8 +709,8 @@ function renderPlano(){
         ${FEATS.free.map(f=>`<div class="feat">${f}</div>`).join('')}
       </div>
       <div class="sec-h"><h2>Desbloqueie mais</h2></div>
-      ${upCard('pro','Pro','R$97/mês',FEATS.pro,true)}
-      ${upCard('business','Business','R$197/mês',FEATS.business,false)}
+      ${upCard('essencial','Essencial','R$97/mês',FEATS.essencial,false)}
+      ${upCard('pro','Pro','R$167/mês',FEATS.pro,true)}
       ${upCard('gestao','Gestão','R$397/mês',FEATS.gestao,false)}
       <p class="note">O upgrade libera na hora após o pagamento via Mercado Pago.</p>
     </div>`;
