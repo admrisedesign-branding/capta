@@ -242,6 +242,7 @@ h2{font-size:16px;font-weight:700}
       <span class="nav-lbl">Menu</span>
       <button class="nav-item on" data-t="painel"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Painel</button>
       <button class="nav-item" data-t="leads"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>Leads</button>
+      <button class="nav-item" data-t="forms"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Formulários</button>
       <button class="nav-item" data-t="form"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg>Seu link</button>
       <button class="nav-item" data-t="plano"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4z"/></svg>Plano</button>
     </nav>
@@ -274,7 +275,12 @@ const COLORS   = ['#2E5BFF','#16A34A','#E0930F','#9B5BFF','#E03127','#5B8DEF'];
 const ini      = n => (n||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 const color    = n => COLORS[(n||'A').charCodeAt(0) % COLORS.length];
 const tcss     = t => t==='Quente'?'q':t==='Morno'?'m':'f';
-const TITLES   = { painel:'Painel', leads:'Leads', form:'Seu link', plano:'Plano' };
+const TITLES   = { painel:'Painel', leads:'Leads', forms:'Formulários', form:'Seu link', plano:'Plano' };
+const FORMS_API  = '/api/capta-forms';
+const CONFIG_API = '/api/capta-config';
+const MAYA_API   = '/api/capta-maya';
+let CONFIG = { maya:false };
+let FORMS  = null;
 const IC = {
   users:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
   bolt:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>',
@@ -343,6 +349,7 @@ async function load(){
     } catch(e){ console.warn('caindo p/ demo:', e.message); DEMO=true; DATA=demoData(); }
   } else { DEMO=true; DATA=demoData(); }
   const _po = params.get('plano'); if(_po) DATA.tenant.plano = _po;
+  try { const rc = await fetch(CONFIG_API); if(rc.ok) CONFIG = await rc.json(); } catch(e){}
   applyPlanLimits();
   document.getElementById('store').textContent = DATA.tenant.nome;
   document.getElementById('who-nome').textContent = DATA.tenant.nome;
@@ -365,7 +372,7 @@ function counts(){
   return {q,m,f,mes:mesC,hoje,total:DATA.leads.length,fechados:DATA.leads.filter(l=>l.status==='fechado').length};
 }
 
-function render(tab){ ({painel:renderPainel,leads:renderLeads,form:renderForm,plano:renderPlano}[tab])(); }
+function render(tab){ ({painel:renderPainel,leads:renderLeads,forms:renderForms,form:renderForm,plano:renderPlano}[tab])(); }
 
 function freeBanner(c){
   const lk = lockedCount();
@@ -710,6 +717,205 @@ function demoData(){
     origem:O[i%3], score:94-i*6, temperatura:T[i%3], status:S[i%6],
     criado_em:ago(6+i*280), respostas:{a:{label:'Pro meu filho(a)',pontos:3},b:{label:'Essa semana',pontos:3}} }));
   return { tenant:{ nome:'Natação Aquática Manaus', plano:'pro' }, leads };
+}
+
+/* ================= FORMULÁRIOS (Fase 4) ================= */
+const FLIM = { free:1, pro:5, business:15, gestao:1000000000 };
+let EDIT = { formId:null, perguntas:[] };
+
+function showDrawer(html){ dbody.innerHTML = html; scrim.classList.add('on'); drawer.classList.add('on'); }
+function hideDrawer(){ scrim.classList.remove('on'); drawer.classList.remove('on'); }
+window.copyLink = (btn,link) => { navigator.clipboard?.writeText(link); btn.textContent='Copiado ✓'; setTimeout(()=>btn.textContent='Copiar',1500); };
+
+async function loadForms(){
+  if(DEMO || !SLUG || !TOKEN){ FORMS = demoForms(); return; }
+  try{
+    const r = await fetch(`${FORMS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`);
+    FORMS = r.ok ? await r.json() : demoForms();
+  }catch(e){ FORMS = demoForms(); }
+}
+async function renderForms(){
+  view.innerHTML = `<div class="reveal"><div class="empty">Carregando formulários…</div></div>`;
+  if(FORMS===null) await loadForms();
+  paintForms();
+}
+function paintForms(){
+  const F = FORMS || { forms:[], limite:FLIM[planoAtual()]||1 };
+  const forms = F.forms||[];
+  const limite = F.limite!=null ? F.limite : (FLIM[planoAtual()]||1);
+  const usados = forms.length;
+  const cheio = usados >= limite;
+  const limTxt = limite>=1000000000 ? `${usados} formulário${usados!==1?'s':''}` : `${usados} de ${limite}`;
+  view.innerHTML = `<div class="reveal">
+    <div class="sec-h">
+      <h2>Seus formulários <span style="color:var(--faint);font-weight:600;font-size:13px">· ${limTxt}</span></h2>
+      ${cheio
+        ? `<button class="btn-ghost" style="width:auto" onclick="goPlano()">Limite do plano · upgrade</button>`
+        : `<button class="btn-up" style="width:auto;margin:0;padding:9px 16px;font-size:13px" onclick="novoForm()">+ Novo formulário</button>`}
+    </div>
+    ${forms.length ? forms.map(formCard).join('') : '<div class="empty">Você ainda não tem formulários.<br>Crie o primeiro e comece a captar leads qualificados.</div>'}
+    ${cheio && !DEMO ? '<p class="note" style="margin-top:6px">Você atingiu o limite de formulários do seu plano. Faça upgrade pra criar mais.</p>' : ''}
+  </div>`;
+}
+function formCard(f){
+  const link = `${location.origin}/capta.html?t=${SLUG||'SEU-SLUG'}&f=${f.pubid}`;
+  const nq = (f.perguntas||[]).length;
+  return `<div class="plancard">
+    <div style="margin-bottom:10px">
+      <div style="font-size:16px;font-weight:700">${esc(f.nome)}${f.ativo?'':' <span style="font-size:11px;color:var(--faint);font-weight:600">(inativo)</span>'}</div>
+      ${f.proposito?`<div style="font-size:12.5px;color:var(--muted);margin-top:2px">${esc(f.proposito)}</div>`:''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <span class="pill" style="background:var(--brand-soft);color:var(--brand)">${nq} pergunta${nq!==1?'s':''}</span>
+        <span class="pill" style="background:var(--line-2);color:var(--muted)">${f.leads||0} leads</span>
+        ${f.pede_email?'<span class="pill" style="background:var(--verde-bg);color:var(--verde)">pede e-mail</span>':''}
+      </div>
+    </div>
+    <div class="link-box"><input value="${link}" readonly><button onclick="copyLink(this,'${link}')">Copiar</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-ghost" style="flex:1;min-width:130px" onclick="editarPerguntas('${f.id}')">❓ Perguntas (${nq})</button>
+      <button class="btn-ghost" style="flex:1;min-width:130px" onclick="editarForm('${f.id}')">✏ Editar</button>
+    </div>
+  </div>`;
+}
+
+/* ---- criar / editar formulário ---- */
+window.novoForm = () => {
+  showDrawer(`
+    <h3 style="font-size:18px;font-weight:800;margin-bottom:14px">Novo formulário</h3>
+    <label class="ia-f"><span>Nome</span><input id="nf-nome" placeholder="Ex: Consulta gratuita"></label>
+    <label class="ia-f"><span>Propósito (opcional)</span><input id="nf-prop" placeholder="Ex: captar interessados do anúncio"></label>
+    <label style="display:flex;align-items:center;gap:9px;margin:4px 0 14px;font-size:14px;color:var(--muted)"><input type="checkbox" id="nf-email"> Pedir e-mail neste formulário</label>
+    <div class="ia-err" id="nf-err"></div>
+    <button class="btn-up" style="width:100%" onclick="criarForm()">Criar formulário</button>`);
+};
+window.criarForm = async () => {
+  const nome=document.getElementById('nf-nome').value.trim();
+  if(!nome){ document.getElementById('nf-err').textContent='Dá um nome pro formulário.'; return; }
+  const proposito=document.getElementById('nf-prop').value.trim();
+  const pede_email=document.getElementById('nf-email').checked;
+  if(DEMO){ FORMS.forms.push({id:'d'+Date.now(),nome,proposito,pubid:'demo'+Math.random().toString(16).slice(2,8),pede_email,ativo:true,leads:0,perguntas:[]}); hideDrawer(); paintForms(); return; }
+  try{
+    const r=await fetch(`${FORMS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',nome,proposito,pede_email})});
+    const d=await r.json();
+    if(!r.ok){ document.getElementById('nf-err').textContent = d.error==='limite'?`Seu plano permite ${d.limite} formulário(s).`:(d.error||'Erro ao criar'); return; }
+    FORMS=null; await loadForms(); hideDrawer(); paintForms();
+    if(d.form) editarPerguntas(d.form.id);
+  }catch(e){ document.getElementById('nf-err').textContent=e.message; }
+};
+window.editarForm = (id) => {
+  const f=(FORMS.forms||[]).find(x=>x.id===id); if(!f)return;
+  showDrawer(`
+    <h3 style="font-size:18px;font-weight:800;margin-bottom:14px">Editar formulário</h3>
+    <label class="ia-f"><span>Nome</span><input id="ef-nome" value="${esc(f.nome)}"></label>
+    <label class="ia-f"><span>Propósito</span><input id="ef-prop" value="${esc(f.proposito||'')}"></label>
+    <label style="display:flex;align-items:center;gap:9px;margin:4px 0;font-size:14px;color:var(--muted)"><input type="checkbox" id="ef-email" ${f.pede_email?'checked':''}> Pedir e-mail</label>
+    <label style="display:flex;align-items:center;gap:9px;margin:4px 0 14px;font-size:14px;color:var(--muted)"><input type="checkbox" id="ef-ativo" ${f.ativo?'checked':''}> Formulário ativo</label>
+    <div class="ia-err" id="ef-err"></div>
+    <button class="btn-up" style="width:100%" onclick="salvarForm('${id}')">Salvar</button>
+    <button class="btn-ghost" style="width:100%;margin-top:8px" onclick="apagarForm('${id}')">Apagar formulário</button>`);
+};
+window.salvarForm = async (id) => {
+  const nome=document.getElementById('ef-nome').value.trim();
+  const proposito=document.getElementById('ef-prop').value.trim();
+  const pede_email=document.getElementById('ef-email').checked;
+  const ativo=document.getElementById('ef-ativo').checked;
+  if(DEMO){ Object.assign(FORMS.forms.find(x=>x.id===id),{nome,proposito,pede_email,ativo}); hideDrawer(); paintForms(); return; }
+  try{ await fetch(`${FORMS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',id,nome,proposito,pede_email,ativo})}); FORMS=null; await loadForms(); hideDrawer(); paintForms(); }catch(e){ document.getElementById('ef-err').textContent=e.message; }
+};
+window.apagarForm = async (id) => {
+  if(!confirm('Apagar este formulário e suas perguntas?'))return;
+  if(DEMO){ FORMS.forms=FORMS.forms.filter(x=>x.id!==id); hideDrawer(); paintForms(); return; }
+  try{ await fetch(`${FORMS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',id})}); FORMS=null; await loadForms(); hideDrawer(); paintForms(); }catch(e){ alert(e.message); }
+};
+
+/* ---- editor de perguntas (manual + Maya) ---- */
+window.editarPerguntas = (id) => {
+  const f=(FORMS.forms||[]).find(x=>x.id===id); if(!f)return;
+  EDIT = { formId:id, perguntas:(f.perguntas||[]).map(p=>({texto:p.texto,opcoes:(p.opcoes||[]).map(o=>({label:o.label,pontos:o.pontos}))})) };
+  paintEditor(f);
+};
+function paintEditor(f){
+  const maya = CONFIG.maya
+    ? `<button class="btn-up" style="width:100%;margin:0 0 12px" onclick="mayaStart()">✨ Gerar com IA (Maya)</button>`
+    : `<button class="btn-ghost" style="width:100%;margin:0 0 12px;opacity:.55;cursor:not-allowed" disabled>✨ Gerar com IA (em breve)</button>`;
+  showDrawer(`
+    <h3 style="font-size:18px;font-weight:800;margin-bottom:3px">Perguntas · ${esc(f.nome)}</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-bottom:14px">Cada opção vale pontos (0–3). Mais pontos = mais quente.</p>
+    ${maya}
+    <div id="ed-maya"></div>
+    <div id="ed-list">${editorList()}</div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px">+ Adicionar pergunta (manual)</div>
+    <label class="ia-f"><span>Pergunta</span><input id="np-txt" placeholder="Ex: Quando quer começar?"></label>
+    <label class="ia-f"><span>Opções — uma por linha, com pontos após "|"</span>
+      <textarea id="np-ops" rows="3" style="width:100%;background:var(--card);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-family:inherit;font-size:14px;padding:11px 12px" placeholder="Essa semana | 3&#10;Esse mês | 1&#10;Só pesquisando | 0"></textarea></label>
+    <div class="ia-err" id="ed-err"></div>
+    <button class="btn-ghost" style="width:100%" onclick="addPergunta()">Adicionar pergunta</button>
+    <button class="btn-up" style="width:100%;margin-top:8px" onclick="salvarPerguntas()">Salvar formulário (${EDIT.perguntas.length} pergunta${EDIT.perguntas.length!==1?'s':''})</button>`);
+}
+function editorList(){
+  if(!EDIT.perguntas.length) return '<div class="empty" style="padding:18px">Nenhuma pergunta ainda. Adicione manual ou gere com a Maya.</div>';
+  return EDIT.perguntas.map((q,i)=>`<div class="ia-q">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div class="ia-qt">${i+1}. ${esc(q.texto)}</div><button class="btn-ghost" style="padding:3px 9px;font-size:12px" onclick="delPergunta(${i})">✕</button></div>
+    ${(q.opcoes||[]).map(o=>`<div class="ia-opt"><span>${esc(o.label)}</span><span class="ia-pt">+${o.pontos}</span></div>`).join('')}
+  </div>`).join('');
+}
+function repaintEditor(){ const f=(FORMS.forms||[]).find(x=>x.id===EDIT.formId)||{nome:''}; paintEditor(f); }
+window.addPergunta = () => {
+  const txt=document.getElementById('np-txt').value.trim();
+  const raw=document.getElementById('np-ops').value.trim();
+  if(!txt){ document.getElementById('ed-err').textContent='Escreve a pergunta.'; return; }
+  const opcoes = raw.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{ const p=l.split('|'); return {label:(p[0]||'').trim(), pontos:parseInt((p[1]||'0').trim())||0}; }).filter(o=>o.label);
+  if(opcoes.length<2){ document.getElementById('ed-err').textContent='Coloca pelo menos 2 opções.'; return; }
+  EDIT.perguntas.push({texto:txt,opcoes}); repaintEditor();
+};
+window.delPergunta = (i) => { EDIT.perguntas.splice(i,1); repaintEditor(); };
+window.salvarPerguntas = async () => {
+  if(DEMO){ const f=FORMS.forms.find(x=>x.id===EDIT.formId); f.perguntas=EDIT.perguntas.map((q,i)=>({id:'d'+i,ordem:i+1,texto:q.texto,opcoes:q.opcoes})); hideDrawer(); paintForms(); return; }
+  try{
+    const r=await fetch(`${FORMS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'salvar_perguntas',id:EDIT.formId,perguntas:EDIT.perguntas})});
+    const d=await r.json(); if(!r.ok){ document.getElementById('ed-err').textContent=d.error||'Erro ao salvar'; return; }
+    FORMS=null; await loadForms(); hideDrawer(); paintForms();
+  }catch(e){ document.getElementById('ed-err').textContent=e.message; }
+};
+
+/* ---- Maya ---- */
+window.mayaStart = () => {
+  document.getElementById('ed-maya').innerHTML = `<div class="ia-card" style="margin-bottom:12px">
+    <div class="ia-h"><b>✨ Maya</b><span class="ia-tag">IA</span></div>
+    <p class="ia-sub">Conta o que o negócio faz — a Maya monta as perguntas com os pontos.</p>
+    <label class="ia-f"><span>Nicho / o que vende</span><input id="my-nicho" placeholder="Ex: escola de natação infantil"></label>
+    <label class="ia-f"><span>Instagram (opcional)</span><input id="my-insta" placeholder="@negocio"></label>
+    <div class="ia-err" id="my-err"></div>
+    <button class="btn-up" style="width:100%" onclick="mayaGerar()">Gerar perguntas ✨</button>
+  </div>`;
+};
+window.mayaGerar = async () => {
+  const nicho=document.getElementById('my-nicho').value.trim();
+  if(!nicho){ document.getElementById('my-err').textContent='Conta o que o negócio faz.'; return; }
+  const instagram=document.getElementById('my-insta').value.trim();
+  document.getElementById('ed-maya').innerHTML='<div class="ia-card center" style="margin-bottom:12px"><div class="ia-spin"></div><p class="ia-sub" style="margin-top:8px">Maya está montando as perguntas…</p></div>';
+  try{
+    const f=(FORMS.forms||[]).find(x=>x.id===EDIT.formId);
+    const r=await fetch(MAYA_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'gerar',slug:SLUG,token:TOKEN,contexto:{nicho,instagram,pede_email:!!(f&&f.pede_email)}})});
+    const d=await r.json();
+    if(!r.ok){ document.getElementById('ed-maya').innerHTML=`<div class="ia-card" style="margin-bottom:12px"><p class="ia-sub">${esc(d.error||'Erro')}</p><button class="btn-up" style="width:100%" onclick="mayaStart()">Tentar de novo</button></div>`; return; }
+    (d.perguntas||[]).forEach(q=>EDIT.perguntas.push({texto:q.texto,opcoes:q.opcoes}));
+    repaintEditor();
+  }catch(e){ document.getElementById('ed-maya').innerHTML=`<div class="ia-card"><p class="ia-sub">${esc(e.message)}</p></div>`; }
+};
+
+function demoForms(){
+  const plano=planoAtual(), limite=FLIM[plano]||1;
+  return { plano, limite, usados:2, forms:[
+    { id:'d1', nome:'Formulário principal', proposito:'Captação geral', pubid:'main0001', pede_email:false, ativo:true, leads:8, perguntas:[
+      {id:'q1',texto:'Quando você quer começar?',opcoes:[{label:'Essa semana',pontos:3},{label:'Esse mês',pontos:1},{label:'Só pesquisando',pontos:0}]},
+      {id:'q2',texto:'A aula é pra você?',opcoes:[{label:'Sim, pra mim',pontos:2},{label:'Pra outra pessoa',pontos:1}]}
+    ]},
+    { id:'d2', nome:'Campanha Instagram', proposito:'Anúncio de verão', pubid:'insta002', pede_email:true, ativo:true, leads:3, perguntas:[
+      {id:'q3',texto:'Qual seu objetivo?',opcoes:[{label:'Emagrecer',pontos:3},{label:'Condicionamento',pontos:2},{label:'Curiosidade',pontos:0}]}
+    ]}
+  ]};
 }
 </script>
 </body>
