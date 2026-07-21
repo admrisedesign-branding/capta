@@ -23,7 +23,8 @@ async function sb(path, opts = {}) {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
   });
   if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
-  return r.status === 204 ? null : r.json();
+  const _t = await r.text();
+  return _t ? JSON.parse(_t) : null;
 }
 const rid = () => { let s = ''; for (let i = 0; i < 8; i++) s += Math.floor(Math.random() * 16).toString(16); return s; };
 
