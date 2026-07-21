@@ -84,8 +84,20 @@ module.exports = async function handler(req, res) {
       const t = criado && criado[0];
       if (t) {
         try {
-          await sbRest('capta_formularios', { method: 'POST', headers: { Prefer: 'return=minimal' },
+          const forms = await sbRest('capta_formularios', { method: 'POST', headers: { Prefer: 'return=representation' },
             body: JSON.stringify({ tenant_id: t.id, nome: 'Formulário principal', proposito: 'Captação geral', pubid: rid(8), pede_email: false, ativo: true }) });
+          const form = forms && forms[0];
+          if (form) {
+            const perguntas = [
+              { tenant_id: t.id, formulario_id: form.id, ordem: 1, ativo: true, texto: 'O que você procura agora?',
+                opcoes: [{label:'Quero contratar / comprar',pontos:3},{label:'Quero um orçamento',pontos:2},{label:'Só tirando dúvidas',pontos:1}] },
+              { tenant_id: t.id, formulario_id: form.id, ordem: 2, ativo: true, texto: 'Pra quando você precisa?',
+                opcoes: [{label:'Essa semana',pontos:3},{label:'Esse mês',pontos:2},{label:'Sem pressa, pesquisando',pontos:0}] },
+              { tenant_id: t.id, formulario_id: form.id, ordem: 3, ativo: true, texto: 'Já tem um valor em mente?',
+                opcoes: [{label:'Sim, quero fechar',pontos:3},{label:'Quero entender preços',pontos:1},{label:'Ainda não pensei',pontos:0}] },
+            ];
+            await sbRest('capta_perguntas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(perguntas) });
+          }
         } catch (e) {}
       }
       return res.status(200).json({ role: 'client', url: `/dashboard.html?t=${encodeURIComponent(slug)}&k=${encodeURIComponent(dashboard_token)}&tour=1` });
