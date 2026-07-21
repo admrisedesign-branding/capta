@@ -331,10 +331,14 @@ function applyPlanLimits(){
 window.goTab = (name) => { const el=document.querySelector('.nav-item[data-t="'+name+'"]'); if(el) el.click(); };
 window.goPlano = () => window.goTab('plano');
 window.goPlanoFromDrawer = () => { scrim.classList.remove('on'); drawer.classList.remove('on'); window.goPlano(); };
-window.goCheckout = (key) => {
-  const url = CHECKOUT[key];
-  if(url) location.href = url;
-  else alert('Assinatura do plano '+key+': cole o link do Mercado Pago em CHECKOUT.'+key+' no dashboard.html.');
+window.goCheckout = async (key) => {
+  if(DEMO){ alert('No app real, aqui abre o pagamento do Mercado Pago (assinatura mensal).'); return; }
+  try{
+    const r = await fetch('/api/capta-mp-create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ slug:SLUG, token:TOKEN, plano:key }) });
+    const d = await r.json();
+    if(d.url){ location.href = d.url; return; }
+    alert(d.error || 'Não foi possível abrir o pagamento agora. Tente de novo em instantes.');
+  }catch(e){ alert('Erro ao abrir o pagamento. Tente de novo.'); }
 };
 
 const view  = document.getElementById('view');
@@ -377,6 +381,24 @@ async function load(){
   document.getElementById('demo-tag').style.display = DEMO ? '' : 'none';
   render('painel');
   if(params.get('tour')==='1') setTimeout(startTour, 500);
+  if(params.get('pago')==='1') avisoPagamento();
+}
+
+function avisoPagamento(){
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:50%;top:20px;transform:translateX(-50%);z-index:9998;background:#16A34A;color:#fff;padding:13px 20px;border-radius:12px;font-weight:700;font-size:14px;box-shadow:0 10px 30px rgba(22,163,74,.35);max-width:92%;text-align:center';
+  box.textContent = '✓ Pagamento recebido! Seu Pro está sendo liberado…';
+  document.body.appendChild(box);
+  // o webhook do MP leva alguns segundos; recarrega os dados pra pegar o plano novo
+  let tentativas = 0;
+  const timer = setInterval(async () => {
+    tentativas++;
+    try{
+      const r = await fetch(`${LEADS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`);
+      if(r.ok){ DATA = await r.json(); if(!isFree()){ box.textContent = '🎉 Plano Pro liberado!'; render('painel'); clearInterval(timer); setTimeout(()=>box.remove(), 3500); return; } }
+    }catch(e){}
+    if(tentativas >= 6){ box.textContent = '✓ Recebido! Se o Pro não aparecer em 1 min, recarregue a página.'; clearInterval(timer); setTimeout(()=>box.remove(), 6000); }
+  }, 5000);
 }
 
 /* ===== Tour de boas-vindas (primeira entrada) ===== */
