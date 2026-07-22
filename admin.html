@@ -822,6 +822,10 @@ async function afLoad(){
 }
 function afList(){
   const F=AF.data, forms=F.forms||[], limite=F.limite!=null?F.limite:1, usados=forms.length, cheio=usados>=limite;
+  // O link sem &f= abre o primeiro formulário ativo COM perguntas — é o que
+  // o cliente divulga. Marcar isso evita que um formulário de teste confunda.
+  const principal = forms.find(f => f.ativo && (f.perguntas||[]).length > 0);
+  AF.principalId = principal ? principal.id : null;
   const limTxt = limite>=1000000000?`${usados} formulário${usados!==1?'s':''}`:`${usados} de ${limite}`;
   document.getElementById('af-body').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -833,14 +837,19 @@ function afList(){
 function afCard(f){
   const link=`${location.origin}/capta.html?t=${AF.tenant.slug}&f=${f.pubid}`;
   const nq=(f.perguntas||[]).length;
-  return `<div class="q-item" style="padding:14px">
+  const ehPrincipal = AF.principalId === f.id;
+  const vazio = f.ativo && nq===0;
+  return `<div class="q-item" style="padding:14px${ehPrincipal?';border-color:var(--or)':''}">
     <div style="font-weight:700;font-size:14.5px">${esc(f.nome)}${f.ativo?'':' <span style="color:var(--dr);font-size:11px">(inativo)</span>'}</div>
     ${f.proposito?`<div style="font-size:12px;color:var(--dm);margin-top:2px">${esc(f.proposito)}</div>`:''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin:9px 0">
+      ${ehPrincipal?'<span class="plan-badge plan-gestao">\u2605 principal</span>':''}
       <span class="plan-badge plan-pro">${nq} perg.</span>
       <span class="plan-badge plan-free">${f.leads||0} leads</span>
       ${f.pede_email?'<span class="plan-badge plan-gestao">e-mail</span>':''}
     </div>
+    ${ehPrincipal?'<p class="note" style="margin:-2px 0 8px">É este que abre no link curto do cliente (sem &f=).</p>':''}
+    ${vazio?'<p class="note" style="margin:-2px 0 8px;color:#c2410c"><b>Sem perguntas.</b> Adicione perguntas ou desative — assim ele nunca é escolhido como principal.</p>':''}
     <div class="link-box" style="margin-bottom:8px"><input value="${link}" readonly><button onclick="cp('${link}',this)">Copiar</button></div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-ghost btn-sm" style="flex:1" onclick="afPerguntas('${f.id}')">❓ Perguntas (${nq})</button>
