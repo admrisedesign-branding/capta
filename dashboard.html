@@ -3019,12 +3019,38 @@ function leadsList(leads){
     <tbody>${rows}</tbody></table></div>
     <div class="lcards">${cards}</div>`;
 }
+/* Mensagem de resposta adaptada ao lead: muda o canal citado e o tom
+   conforme a temperatura. Vale para qualquer funil — nao assume as
+   perguntas de um cliente especifico. */
+function zapMsg(l){
+  const primeiro = (l.nome||'').trim().split(/\s+/)[0] || '';
+  const negocio  = (DATA.tenant && DATA.tenant.nome) || 'nós';
+  const o = (l.origem||'').toLowerCase();
+  const canal = o.includes('instagram') ? 'pelo Instagram'
+              : o.includes('google')    ? 'pelo Google'
+              : o.includes('site')      ? 'pelo site'
+              : o.includes('whatsapp')  ? 'pelo WhatsApp'
+              : 'pelo formulário';
+  const rs = Object.keys(l.respostas||{})
+    .map(k => (l.respostas[k]||{}).label)
+    .filter(Boolean);
+  const assunto = rs.length ? ' sobre ' + String(rs[0]).toLowerCase() : '';
+  const saud = primeiro ? `Oi ${primeiro}!` : 'Oi!';
+  const tenho = rs.length ? 'Já tenho suas respostas aqui, então consigo' : 'Consigo';
+  const t = (l.temperatura||'').toLowerCase();
+  if(t.includes('quente'))
+    return `${saud} Aqui é da ${negocio}. Recebi seu contato ${canal}${assunto} e vi que é urgente. Consigo te atender com prioridade — posso te ligar agora?`;
+  if(t.includes('morno'))
+    return `${saud} Aqui é da ${negocio}. Recebi seu contato ${canal}${assunto}. ${tenho} te passar o orçamento hoje. Qual o melhor horário pra falar?`;
+  return `${saud} Aqui é da ${negocio}. Recebi seu contato ${canal}${assunto}. Se quiser, te mando uma estimativa sem compromisso — é só me dizer o que precisa.`;
+}
+
 function zapHref(l){
   let n = (l.contato||'').replace(/\D/g,'');
   if(!n) return '';
   if(n.length<=11 && !n.startsWith('55')) n = '55'+n;
   const primeiro = (l.nome||'').split(' ')[0];
-  const msg = encodeURIComponent(`Oi ${primeiro}! Sou da ${DATA.tenant.nome}. Vi seu contato pelo formulário — posso te ajudar?`);
+  const msg = encodeURIComponent(zapMsg(l));
   return `https://wa.me/${n}?text=${msg}`;
 }
 
@@ -3075,7 +3101,7 @@ function bindLeads(){ document.querySelectorAll('tr[data-i], .lead[data-i]').for
 function openLead(i){
   const l = DATA.leads[i];
   const respostas = Object.values(l.respostas||{});
-  const msg = encodeURIComponent(`Oi ${(l.nome||'').split(' ')[0]}! Sou da ${DATA.tenant.nome}. Vi seu contato pelo formulário — posso te ajudar?`);
+  const msg = encodeURIComponent(zapMsg(l));
   const zapNum = (l.contato||'').replace(/\D/g,'');
   const STATUSES = ['novo','contatado','fechado','perdido'];
   const corTemp = tcss(l.temperatura)==='q' ? 'var(--quente)' : tcss(l.temperatura)==='m' ? 'var(--morno)' : 'var(--frio)';
