@@ -68,20 +68,23 @@ module.exports = async function handler(req, res) {
       return res.status(403).json({ error: 'Token inválido.' });
     }
 
-    // 2) formulário principal (mais antigo ativo)
+    // 2) perguntas cadastradas — servem para pontuar E para escolher o formulário
+    const perg = await sb(
+      `capta_perguntas?tenant_id=eq.${t.id}&ativo=is.true&select=id,texto,ordem,formulario_id&order=ordem.asc`
+    );
+
+    // 3) formulário principal: o mais antigo ativo QUE TENHA PERGUNTAS.
+    //    Um formulário vazio no mesmo cliente não pode capturar os leads.
     let formId = null;
     try {
       const forms = await sb(
-        `capta_formularios?tenant_id=eq.${t.id}&ativo=is.true&select=id&order=criado_em.asc&limit=1`
+        `capta_formularios?tenant_id=eq.${t.id}&ativo=is.true&select=id&order=criado_em.asc`
       );
-      if (forms && forms[0]) formId = forms[0].id;
+      const lista = forms || [];
+      const comPerguntas = new Set((perg || []).map(p => p.formulario_id).filter(Boolean));
+      const escolhido = lista.find(f => comPerguntas.has(f.id)) || lista[0];
+      if (escolhido) formId = escolhido.id;
     } catch { /* sem formulário cadastrado: segue sem vincular */ }
-
-    // 3) casa cada resposta com a pergunta cadastrada (pelo texto; se não
-    //    achar, cai pela ordem). O gatilho soma os pontos de qualquer jeito.
-    const perg = await sb(
-      `capta_perguntas?tenant_id=eq.${t.id}&select=id,texto,ordem&order=ordem.asc`
-    );
     const byTexto = new Map((perg || []).map(p => [norm(p.texto), p.id]));
 
     const lista = Array.isArray(respostas) ? respostas.slice(0, 20) : [];
