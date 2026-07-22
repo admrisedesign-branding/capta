@@ -523,13 +523,14 @@ window.abrirLinks = id => {
   const t=S.tenants.find(x=>x.id===id); if(!t)return;
   const fl=`${BASE}/capta.html?t=${t.slug}`;
   const dl=`${BASE}/dashboard.html?t=${t.slug}&k=${t.dashboard_token}`;
-  const integSec = t.integracao==='iframe'
+  const apiSec = (t.integracao==='api'||t.integracao==='ambos') ? snippetApiSec(t) : '';
+  const integSec = apiSec + (t.integracao==='api' ? '' : (t.integracao==='iframe'||t.integracao==='ambos')
     ? `<p style="font-size:13px;font-weight:700;color:var(--dm);margin:18px 0 6px">📲 Código pro site — porteiro de WhatsApp</p>
        <textarea id="capta-snip" readonly style="width:100%;box-sizing:border-box;height:150px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--tx);font-family:ui-monospace,monospace;font-size:11px;padding:10px;resize:vertical"></textarea>
        <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="cpArea('capta-snip',this)">Copiar código</button>
        <p class="note" style="margin-top:8px">Cole antes de <b>&lt;/body&gt;</b> no site do cliente. O botão verde do WhatsApp abre o formulário do Capta em modal — só libera o WhatsApp depois que a pessoa responde.</p>`
     : `<p style="font-size:13px;font-weight:700;color:var(--dm);margin:18px 0 6px">📲 Integração no site</p>
-       <p class="note">No site, aponte o botão/ícone de WhatsApp para o <b>link do formulário</b> acima. A pessoa responde e cai no WhatsApp já qualificada (porteiro).</p>`;
+       <p class="note">No site, aponte o botão/ícone de WhatsApp para o <b>link do formulário</b> acima. A pessoa responde e cai no WhatsApp já qualificada (porteiro).</p>`);
   openDrawer(`
     <div class="drawer-head"><h2>Links — ${esc(t.nome)}</h2><button class="drawer-close" onclick="closeDrawer()">✕</button></div>
     <p style="font-size:13.5px;color:var(--dm);margin-bottom:18px">Copie e entregue esses links pro cliente.</p>
@@ -548,8 +549,45 @@ window.abrirLinks = id => {
 window.cp = (txt,btn) => { navigator.clipboard?.writeText(txt); btn.textContent='Copiado ✓'; setTimeout(()=>btn.textContent='Copiar',1500); };
 window.cpArea = (id,btn) => { const el=document.getElementById(id); el.select(); navigator.clipboard?.writeText(el.value); btn.textContent='Copiado ✓'; setTimeout(()=>btn.textContent='Copiar código',1500); };
 
+function snippetApiSec(t){
+  const url = BASE+'/api/capta-ingest';
+  const tok = t.ingest_token || '';
+  const code = [
+'// Envie isto quando o visitante concluir o formulário do site:',
+'fetch("'+url+'", {',
+'  method: "POST",',
+'  keepalive: true,',
+'  headers: { "Content-Type": "application/json" },',
+'  body: JSON.stringify({',
+'    slug:  "'+t.slug+'",',
+'    token: "'+(tok||'COLE_O_TOKEN_AQUI')+'",',
+'    nome:    nome,        // texto',
+'    contato: whatsapp,    // só números, com DDD',
+'    origem:  "site",',
+'    respostas: [          // uma linha por pergunta pontuada',
+'      { texto: "Qual a urgência?", label: "Resolver este mês", pontos: 15 }',
+'    ],',
+'    extra: { bairro: bairro }   // vira anotação no lead',
+'  })',
+'});'].join('\n');
+  const aviso = tok
+    ? ''
+    : '<p class="note" style="color:#c2410c"><b>Token ainda não gerado.</b> Rode <b>sql-capta-ingest.sql</b> no Supabase e recarregue esta página.</p>';
+  return `<p style="font-size:13px;font-weight:700;color:var(--dm);margin:18px 0 6px">🔌 Form externo (API) — o site grava direto no Capta</p>
+    ${aviso}
+    <p style="font-size:13px;font-weight:700;color:var(--dm);margin-bottom:6px">Endpoint</p>
+    <div class="link-box"><input value="${url}" readonly><button onclick="cp('${url}',this)">Copiar</button></div>
+    <p style="font-size:13px;font-weight:700;color:var(--dm);margin:14px 0 6px">Token de ingestão</p>
+    <div class="link-box"><input value="${esc(tok)}" readonly><button onclick="cp('${esc(tok)}',this)">Copiar</button></div>
+    <p style="font-size:13px;font-weight:700;color:var(--dm);margin:14px 0 6px">Código de exemplo</p>
+    <textarea id="capta-snip" readonly style="width:100%;box-sizing:border-box;height:210px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--tx);font-family:ui-monospace,monospace;font-size:11px;padding:10px;resize:vertical">${esc(code)}</textarea>
+    <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="cpArea('capta-snip',this)">Copiar código</button>
+    <p class="note" style="margin-top:8px">A nota e a temperatura são calculadas <b>aqui no Capta</b>, pelas perguntas cadastradas neste cliente — os pontos enviados pelo site precisam bater com elas.</p>
+    <p class="note">O token fica visível no código do site: ele serve pra <b>identificar e revogar</b> a origem, não é senha. Pra trocar, gere outro no Supabase.</p>`;
+}
+
 function snippetIframe(t){
-  const url = BASE+'/capta.html?t='+t.slug;
+  const url = BASE+'/capta.html?t='+t.slug+'&o=whatsapp';
   return [
 '<!-- Capta · porteiro de WhatsApp — cole antes de </body> -->',
 '<button id="capta-wa" aria-label="Falar no WhatsApp" onclick="captaOpen()">',
@@ -689,6 +727,8 @@ function clienteDrawer(t){
       <select id="c-integ">
         <option value="link" ${(!t||t?.integracao==='link')?'selected':''}>Link — o botão do site aponta pro formulário</option>
         <option value="iframe" ${t?.integracao==='iframe'?'selected':''}>WhatsApp porteiro — botão flutuante abre o form em modal</option>
+        <option value="api" ${t?.integracao==='api'?'selected':''}>Form externo (API) — o formulário do próprio site grava no Capta</option>
+        <option value="ambos" ${t?.integracao==='ambos'?'selected':''}>Site completo — formulário próprio (API) + porteiro de WhatsApp</option>
       </select>
     </div>
     ${ed?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
