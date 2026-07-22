@@ -214,6 +214,14 @@ h2{font-size:16px;font-weight:700}
 .wb-btn{position:absolute;right:14px;bottom:12px;display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;font-size:13.5px;font-weight:700;padding:10px 16px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .wb-btn.esq{right:auto;left:14px}
 .wb-code{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.5;padding:10px;resize:vertical;margin-bottom:10px}
+.notas-box{margin:14px 0 4px}
+.notas-lb{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:7px;display:flex;align-items:center;gap:8px}
+.notas-st{font-size:11px;font-weight:600;color:var(--faint)}
+.notas-st.ok{color:#16A34A}
+.notas-st.err{color:var(--dr)}
+.notas-ta{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--line);border-radius:11px;color:var(--ink);font-family:inherit;font-size:14px;line-height:1.55;padding:11px 12px;resize:vertical}
+.notas-ta:focus{outline:none;border-color:var(--brand)}
+.nota-dot{font-size:12px;opacity:.75;margin-left:5px}
 .lead-toast{position:fixed;left:50%;top:18px;transform:translateX(-50%) translateY(-16px);z-index:9997;background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;box-shadow:0 12px 34px rgba(0,0,0,.28);cursor:pointer;opacity:0;transition:.35s;display:flex;align-items:center;gap:8px;max-width:90%}
 .lead-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .lead-toast .lt-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:ltpulse 1.6s infinite}
@@ -2981,10 +2989,10 @@ function applyLeadFilters(){
 function exportLeadsCSV(){
   const rows = currentFilteredLeads();
   if(!rows.length){ alert('Nenhum lead pra exportar neste filtro.'); return; }
-  const head = ['Nome','Contato','E-mail','Origem','Temperatura','Score','Status','Data'];
+  const head = ['Nome','Contato','E-mail','Origem','Temperatura','Score','Status','Data','Anotações'];
   const q = v => { v=(v==null?'':String(v)); return /[";\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
   const lines = [head.join(';')];
-  rows.forEach(l=>{ lines.push([l.nome,l.contato,l.email,l.origem,l.temperatura,(l.score??''),(l.status||'novo'),(l.criado_em?new Date(l.criado_em).toLocaleString('pt-BR'):'')].map(q).join(';')); });
+  rows.forEach(l=>{ lines.push([l.nome,l.contato,l.email,l.origem,l.temperatura,(l.score??''),(l.status||'novo'),(l.criado_em?new Date(l.criado_em).toLocaleString('pt-BR'):''),(l.notas||'')].map(q).join(';')); });
   const csv = '\ufeff' + lines.join('\r\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -3019,7 +3027,7 @@ function leadRow(l,i){
   const score = free ? `<span class="lockmini">🔒</span>` : `${l.score??'–'}`;
   const zap = zapHref(l);
   return `<tr data-i="${i}">
-    <td><div class="cell-lead"><span class="av sm" style="background:${color(l.nome)}">${ini(l.nome)}</span><div><div class="nm">${esc(l.nome)}</div><div class="sub">${esc(l.contato||'')}</div></div></div></td>
+    <td><div class="cell-lead"><span class="av sm" style="background:${color(l.nome)}">${ini(l.nome)}</span><div><div class="nm">${esc(l.nome)}${l.notas?'<span class="nota-dot" title="Tem anotação">📝</span>':''}</div><div class="sub">${esc(l.contato||'')}</div></div></div></td>
     <td>${l.origem?esc(l.origem):'—'}</td>
     <td>${timeAgo(l.criado_em)}</td>
     <td>${temp}</td>
@@ -3044,7 +3052,7 @@ function leadCard(l, i){
   return `<div class="lead" data-i="${i}">
     <div class="av" style="background:${color(l.nome)}">${ini(l.nome)}</div>
     <div class="mid">
-      <div class="nm">${esc(l.nome)}</div>
+      <div class="nm">${esc(l.nome)}${l.notas?'<span class="nota-dot" title="Tem anotação">📝</span>':''}</div>
       <div class="meta">${l.origem?'<span>'+esc(l.origem)+'</span>·':''}<span>${timeAgo(l.criado_em)}</span>${l.status&&l.status!=='novo'?'·<span class="stbadge">'+esc(l.status)+'</span>':''}</div>
     </div>
     <div class="right">${right}${zap?`<a class="zap-mini" href="${zap}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Chamar no WhatsApp">💬</a>`:''}</div>
@@ -3082,9 +3090,40 @@ function openLead(i){
         : '<div class="row"><span style="color:var(--faint)">Sem perguntas neste funil</span></div>'}
     </div>
     <div class="stbtns">${STATUSES.map(s=>`<button class="${l.status===s?'on':''}" data-s="${s}">${s}</button>`).join('')}</div>
+    <div class="notas-box">
+      <div class="notas-lb">📝 Suas anotações <span id="notas-st" class="notas-st"></span></div>
+      <textarea id="lead-notas" class="notas-ta" rows="3" placeholder="O que rolou na conversa? Ex: quer proposta de site, tem clínica, retomar segunda…">${esc(l.notas||'')}</textarea>
+    </div>
     <a class="zap" href="https://wa.me/${zapNum}?text=${msg}" target="_blank" rel="noopener">💬 Responder no WhatsApp</a>`;
   dbody.querySelectorAll('.stbtns button').forEach(b => b.onclick=()=>setStatus(l,b.dataset.s));
+  ligarNotas(l);
   scrim.classList.add('on'); drawer.classList.add('on');
+}
+
+// salva a anotação sozinha, pouco depois de parar de digitar
+function ligarNotas(l){
+  const ta = document.getElementById('lead-notas');
+  const st = document.getElementById('notas-st');
+  if(!ta) return;
+  let timer = null;
+  const salvar = async () => {
+    const txt = ta.value;
+    if(txt === (l.notas||'')) return;
+    if(st){ st.textContent = 'salvando…'; st.className = 'notas-st'; }
+    l.notas = txt;
+    if(DEMO){ if(st){ st.textContent='salvo ✓'; st.className='notas-st ok'; } return; }
+    try{
+      const r = await fetch(`${LEADS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ lead_id: l.id, notas: txt })
+      });
+      const d = await r.json().catch(()=>({}));
+      if(r.ok && d.ok !== false){ if(st){ st.textContent='salvo ✓'; st.className='notas-st ok'; } }
+      else { if(st){ st.textContent = d.error && d.error.includes('coluna') ? 'falta rodar o SQL' : 'não salvou'; st.className='notas-st err'; } }
+    }catch(e){ if(st){ st.textContent='sem conexão'; st.className='notas-st err'; } }
+  };
+  ta.oninput = () => { if(st){ st.textContent=''; } clearTimeout(timer); timer = setTimeout(salvar, 900); };
+  ta.onblur = () => { clearTimeout(timer); salvar(); };
 }
 
 async function setStatus(l, status){
