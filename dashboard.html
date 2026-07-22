@@ -198,6 +198,11 @@ h2{font-size:16px;font-weight:700}
 .btn-export{background:var(--card);border:1px solid var(--line);border-radius:11px;color:var(--ink);font-family:inherit;font-weight:600;font-size:13.5px;padding:10px 14px;cursor:pointer;transition:.14s}
 .btn-export:hover{background:var(--line-2);border-color:var(--brand);color:var(--brand)}
 .lead-count{font-size:12.5px;color:var(--muted);margin-top:12px;text-align:center}
+.prontas-box{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px;margin:0 0 12px}
+.prontas-lb{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px}
+.prontas-row{display:flex;gap:8px}
+.nicho-sel{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-family:inherit;font-size:13.5px;padding:10px;cursor:pointer}
+.prontas-go{width:auto!important;flex:0 0 auto;padding:10px 18px!important;margin:0!important}
 .lead-toast{position:fixed;left:50%;top:18px;transform:translateX(-50%) translateY(-16px);z-index:9997;background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;box-shadow:0 12px 34px rgba(0,0,0,.28);cursor:pointer;opacity:0;transition:.35s;display:flex;align-items:center;gap:8px;max-width:90%}
 .lead-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .lead-toast .lt-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:ltpulse 1.6s infinite}
@@ -3413,7 +3418,13 @@ function paintEditor(f){
     <h3 style="font-size:18px;font-weight:800;margin-bottom:3px">Perguntas · ${esc(f.nome)}</h3>
     <p style="font-size:12.5px;color:var(--muted);margin-bottom:14px">Cada opção vale pontos (0–3). Mais pontos = mais quente.</p>
     ${maya}
-    <button class="btn-ghost" style="width:100%;margin:0 0 12px" onclick="usarPerguntasProntas()">📋 Usar perguntas prontas <span style="opacity:.6;font-weight:500">— qualificam qualquer lead</span></button>
+    <div class="prontas-box">
+      <div class="prontas-lb">📋 Perguntas prontas para o seu ramo</div>
+      <div class="prontas-row">
+        <select id="nicho-sel" class="nicho-sel">${nichoOptions()}</select>
+        <button class="btn-ghost prontas-go" onclick="usarPerguntasProntas()">Usar</button>
+      </div>
+    </div>
     <div id="ed-maya"></div>
     <div id="ed-list">${editorList()}</div>
     <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
@@ -3433,16 +3444,99 @@ function editorList(){
   </div>`).join('');
 }
 function repaintEditor(){ const f=(FORMS.forms||[]).find(x=>x.id===EDIT.formId)||{nome:''}; paintEditor(f); }
-window.usarPerguntasProntas = () => {
-  const modelo = [
+// ---- Perguntas prontas por ramo (0-3 pontos: mais pontos = mais quente) ----
+const NICHOS = {
+  geral: { nome:'Geral (serve pra qualquer negócio)', perguntas:[
     {texto:'O que você procura agora?', opcoes:[{label:'Quero contratar / comprar',pontos:3},{label:'Quero um orçamento',pontos:2},{label:'Só tirando dúvidas',pontos:1}]},
     {texto:'Pra quando você precisa?', opcoes:[{label:'Essa semana',pontos:3},{label:'Esse mês',pontos:2},{label:'Sem pressa, pesquisando',pontos:0}]},
     {texto:'Já tem um valor em mente?', opcoes:[{label:'Sim, quero fechar',pontos:3},{label:'Quero entender preços',pontos:1},{label:'Ainda não pensei',pontos:0}]},
-  ];
-  const existentes = new Set(EDIT.perguntas.map(q=>q.texto));
-  modelo.forEach(m=>{ if(!existentes.has(m.texto)) EDIT.perguntas.push(m); });
-  repaintEditor();
+  ]},
+  saude: { nome:'Saúde, clínica e terapias', perguntas:[
+    {texto:'Como podemos ajudar?', opcoes:[{label:'Quero agendar uma avaliação',pontos:3},{label:'Quero entender como funciona',pontos:2},{label:'Só buscando informação',pontos:0}]},
+    {texto:'Quando pretende começar?', opcoes:[{label:'O quanto antes',pontos:3},{label:'Nas próximas semanas',pontos:2},{label:'Ainda sem data',pontos:0}]},
+    {texto:'Prefere atendimento particular ou por convênio?', opcoes:[{label:'Particular',pontos:3},{label:'Convênio',pontos:2},{label:'Ainda não sei',pontos:1}]},
+  ]},
+  educacao: { nome:'Educação, escolas e cursos', opcoes:null, perguntas:[
+    {texto:'O que você busca?', opcoes:[{label:'Quero fazer a matrícula',pontos:3},{label:'Saber valores e turmas',pontos:2},{label:'Só conhecendo',pontos:1}]},
+    {texto:'Para quando?', opcoes:[{label:'Turma atual',pontos:3},{label:'Próximo semestre',pontos:2},{label:'Ainda sem data',pontos:0}]},
+    {texto:'Para quem é?', opcoes:[{label:'Para meu filho(a)',pontos:2},{label:'Para mim',pontos:2},{label:'Para minha equipe/empresa',pontos:3}]},
+  ]},
+  beleza: { nome:'Beleza e estética', perguntas:[
+    {texto:'O que você quer fazer?', opcoes:[{label:'Agendar um horário',pontos:3},{label:'Saber preços',pontos:2},{label:'Conhecer o trabalho',pontos:1}]},
+    {texto:'Quando pretende vir?', opcoes:[{label:'Essa semana',pontos:3},{label:'Esse mês',pontos:2},{label:'Ainda vendo',pontos:0}]},
+    {texto:'Já é cliente?', opcoes:[{label:'Sim, quero remarcar',pontos:3},{label:'Não, primeira vez',pontos:2},{label:'Só acompanho',pontos:0}]},
+  ]},
+  alimentacao: { nome:'Alimentação, delivery e festas', perguntas:[
+    {texto:'Como podemos ajudar?', opcoes:[{label:'Fazer um pedido / encomenda',pontos:3},{label:'Orçar um evento ou festa',pontos:3},{label:'Ver cardápio e preços',pontos:1}]},
+    {texto:'Para quando?', opcoes:[{label:'Hoje ou amanhã',pontos:3},{label:'Essa semana',pontos:2},{label:'Ainda planejando',pontos:0}]},
+    {texto:'Para quantas pessoas?', opcoes:[{label:'Mais de 50',pontos:3},{label:'De 11 a 50',pontos:2},{label:'Até 10',pontos:1}]},
+  ]},
+  automotivo: { nome:'Oficina e automotivo', perguntas:[
+    {texto:'O que você precisa?', opcoes:[{label:'Meu carro está parado, é urgente',pontos:3},{label:'Manutenção ou revisão',pontos:2},{label:'Só um orçamento',pontos:1}]},
+    {texto:'Para quando?', opcoes:[{label:'Hoje ou amanhã',pontos:3},{label:'Essa semana',pontos:2},{label:'Sem pressa',pontos:0}]},
+    {texto:'Já sabe qual é o serviço?', opcoes:[{label:'Sim, sei o que precisa',pontos:3},{label:'Tenho uma ideia',pontos:2},{label:'Preciso de diagnóstico',pontos:1}]},
+  ]},
+  loja: { nome:'Loja, varejo e e-commerce', perguntas:[
+    {texto:'O que você procura?', opcoes:[{label:'Quero comprar agora',pontos:3},{label:'Ver disponibilidade e preço',pontos:2},{label:'Só olhando',pontos:0}]},
+    {texto:'Para quando?', opcoes:[{label:'Hoje / essa semana',pontos:3},{label:'Esse mês',pontos:2},{label:'Sem data',pontos:0}]},
+    {texto:'Como prefere receber?', opcoes:[{label:'Retirar na loja',pontos:2},{label:'Entrega',pontos:2},{label:'Ainda não sei',pontos:1}]},
+  ]},
+  servicos: { nome:'Reformas, obras e serviços', perguntas:[
+    {texto:'O que você precisa?', opcoes:[{label:'Quero contratar o serviço',pontos:3},{label:'Um orçamento detalhado',pontos:2},{label:'Tirar dúvidas',pontos:1}]},
+    {texto:'Quando pretende começar?', opcoes:[{label:'Imediato',pontos:3},{label:'Próximo mês',pontos:2},{label:'Ainda planejando',pontos:0}]},
+    {texto:'Já tem projeto ou medidas?', opcoes:[{label:'Sim, tenho tudo',pontos:3},{label:'Tenho parte',pontos:2},{label:'Preciso de ajuda nisso',pontos:1}]},
+  ]},
+  imoveis: { nome:'Imóveis e corretagem', perguntas:[
+    {texto:'Você quer:', opcoes:[{label:'Comprar',pontos:3},{label:'Alugar',pontos:3},{label:'Só pesquisar valores',pontos:1}]},
+    {texto:'Quando pretende mudar?', opcoes:[{label:'Até 30 dias',pontos:3},{label:'Em 2 a 3 meses',pontos:2},{label:'Sem data definida',pontos:0}]},
+    {texto:'Já tem financiamento aprovado?', opcoes:[{label:'Sim, aprovado',pontos:3},{label:'Em análise',pontos:2},{label:'Ainda não',pontos:1}]},
+  ]},
+  consultoria: { nome:'Advocacia, contabilidade e consultoria', perguntas:[
+    {texto:'Qual é a sua necessidade?', opcoes:[{label:'Contratar uma assessoria',pontos:3},{label:'Consulta sobre um caso',pontos:2},{label:'Informação geral',pontos:1}]},
+    {texto:'Qual a urgência?', opcoes:[{label:'Tenho prazo correndo',pontos:3},{label:'Nas próximas semanas',pontos:2},{label:'Sem urgência',pontos:0}]},
+    {texto:'É para:', opcoes:[{label:'Minha empresa',pontos:3},{label:'Pessoa física',pontos:2},{label:'Ainda avaliando',pontos:1}]},
+  ]},
+  academia: { nome:'Academia, esporte e bem-estar', perguntas:[
+    {texto:'O que você busca?', opcoes:[{label:'Quero começar a treinar',pontos:3},{label:'Saber planos e valores',pontos:2},{label:'Conhecer o espaço',pontos:1}]},
+    {texto:'Quando quer começar?', opcoes:[{label:'Essa semana',pontos:3},{label:'Esse mês',pontos:2},{label:'Ainda pensando',pontos:0}]},
+    {texto:'Já treinou antes?', opcoes:[{label:'Treino atualmente',pontos:3},{label:'Sim, quero retomar',pontos:2},{label:'Nunca treinei',pontos:1}]},
+  ]},
+  marketing: { nome:'Marketing, agência e serviços digitais', perguntas:[
+    {texto:'O que você precisa?', opcoes:[{label:'Contratar um projeto',pontos:3},{label:'Um orçamento',pontos:2},{label:'Entender o serviço',pontos:1}]},
+    {texto:'Quando quer começar?', opcoes:[{label:'Imediato',pontos:3},{label:'Próximo mês',pontos:2},{label:'Ainda planejando',pontos:0}]},
+    {texto:'Seu negócio já investe em marketing?', opcoes:[{label:'Sim, com verba definida',pontos:3},{label:'Já tentei, sem resultado',pontos:2},{label:'Nunca investi',pontos:1}]},
+  ]},
+  eventos: { nome:'Fotografia e eventos', perguntas:[
+    {texto:'Qual é o evento?', opcoes:[{label:'Casamento',pontos:3},{label:'Aniversário / festa',pontos:2},{label:'Ensaio ou corporativo',pontos:2}]},
+    {texto:'Já tem data?', opcoes:[{label:'Sim, data marcada',pontos:3},{label:'Mês definido',pontos:2},{label:'Ainda planejando',pontos:0}]},
+    {texto:'Já tem orçamento em mente?', opcoes:[{label:'Sim',pontos:3},{label:'Quero entender valores',pontos:1},{label:'Ainda não pensei',pontos:0}]},
+  ]},
+  pet: { nome:'Pet shop e veterinária', perguntas:[
+    {texto:'Como podemos ajudar?', opcoes:[{label:'Agendar banho e tosa',pontos:3},{label:'Consulta veterinária',pontos:3},{label:'Saber preços',pontos:1}]},
+    {texto:'Para quando?', opcoes:[{label:'Hoje ou amanhã',pontos:3},{label:'Essa semana',pontos:2},{label:'Só pesquisando',pontos:0}]},
+    {texto:'Seu pet já é atendido aqui?', opcoes:[{label:'Sim, já é cliente',pontos:3},{label:'Não, primeira vez',pontos:2},{label:'Só me informando',pontos:0}]},
+  ]},
 };
+function nichoOptions(){
+  const salvo = (()=>{ try{ return localStorage.getItem('capta_nicho')||'geral'; }catch(e){ return 'geral'; } })();
+  return Object.keys(NICHOS).map(k=>`<option value="${k}" ${k===salvo?'selected':''}>${esc(NICHOS[k].nome)}</option>`).join('');
+}
+window.usarPerguntasProntas = () => {
+  const sel = document.getElementById('nicho-sel');
+  const key = (sel && sel.value) || 'geral';
+  try{ localStorage.setItem('capta_nicho', key); }catch(e){}
+  const modelo = (NICHOS[key] || NICHOS.geral).perguntas;
+  const existentes = new Set(EDIT.perguntas.map(q=>q.texto));
+  let add = 0;
+  modelo.forEach(m=>{ if(!existentes.has(m.texto)){ EDIT.perguntas.push(JSON.parse(JSON.stringify(m))); add++; } });
+  repaintEditor();
+  if(!add) toastMini('Essas perguntas já estão no formulário.');
+};
+function toastMini(txt){
+  const b=document.createElement('div');
+  b.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:9999;background:var(--ink);color:#fff;padding:11px 17px;border-radius:11px;font-size:13.5px;box-shadow:0 10px 28px rgba(0,0,0,.25);max-width:90%';
+  b.textContent=txt; document.body.appendChild(b); setTimeout(()=>b.remove(),2600);
+}
 window.addPergunta = () => {
   const txt=document.getElementById('np-txt').value.trim();
   const raw=document.getElementById('np-ops').value.trim();
