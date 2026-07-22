@@ -203,6 +203,17 @@ h2{font-size:16px;font-weight:700}
 .prontas-row{display:flex;gap:8px}
 .nicho-sel{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-family:inherit;font-size:13.5px;padding:10px;cursor:pointer}
 .prontas-go{width:auto!important;flex:0 0 auto;padding:10px 18px!important;margin:0!important}
+.site-box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0}
+.site-box>b{font-size:15px}
+.site-p{font-size:13px;color:var(--muted);line-height:1.55;margin:6px 0 14px}
+.site-opts{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.site-opts label{flex:1;min-width:150px;font-size:12px;font-weight:700;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+.site-opts input,.site-opts select{background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-family:inherit;font-size:13.5px;padding:9px 11px;font-weight:600}
+.wb-preview{position:relative;background:var(--bg);border:1px dashed var(--line);border-radius:12px;height:74px;margin-bottom:12px}
+.wb-lb{position:absolute;top:7px;left:11px;font-size:10.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.wb-btn{position:absolute;right:14px;bottom:12px;display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#fff;font-size:13.5px;font-weight:700;padding:10px 16px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.wb-btn.esq{right:auto;left:14px}
+.wb-code{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.5;padding:10px;resize:vertical;margin-bottom:10px}
 .lead-toast{position:fixed;left:50%;top:18px;transform:translateX(-50%) translateY(-16px);z-index:9997;background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;box-shadow:0 12px 34px rgba(0,0,0,.28);cursor:pointer;opacity:0;transition:.35s;display:flex;align-items:center;gap:8px;max-width:90%}
 .lead-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .lead-toast .lt-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:ltpulse 1.6s infinite}
@@ -3100,6 +3111,18 @@ function renderForm(){
         <button class="btn-up" id="qr-dl" style="width:auto">⬇ Baixar QR (PNG)</button>
       </div>
     </div>
+    <div class="site-box">
+      <b>🔗 Já tem um site? Coloque o Capta nele</b>
+      <p class="site-p">Troque o botão flutuante de WhatsApp do seu site por este. Em vez de cair direto no chat, a pessoa passa pelo formulário, se qualifica, e só então chega no seu WhatsApp — já pontuada aqui no painel.</p>
+      <div class="site-opts">
+        <label>Texto do botão<input id="wb-txt" value="Fale conosco"></label>
+        <label>Posição<select id="wb-pos"><option value="right">Direita</option><option value="left">Esquerda</option></select></label>
+      </div>
+      <div class="wb-preview"><span class="wb-lb">Prévia</span><div id="wb-demo"></div></div>
+      <textarea id="wb-code" class="wb-code" readonly rows="4"></textarea>
+      <button class="btn-up" id="wb-copy" style="width:auto">📋 Copiar código</button>
+      <p class="note" style="margin-top:10px">Cole antes do <b>&lt;/body&gt;</b> do seu site. No WordPress/Wix, use um bloco de HTML.</p>
+    </div>
     ${isFree() ? iaLockedCard() : '<div id="ia-box" class="ia-box"></div>'}
     <div class="sec-h"><h2>Onde divulgar</h2></div>
     <div class="plancard">
@@ -3115,9 +3138,42 @@ function renderForm(){
     const b = document.getElementById('cpy'); b.textContent='Copiado ✓'; setTimeout(()=>b.textContent='Copiar',1500);
   };
   try{ drawQR(document.getElementById('qrc'), link); }catch(e){}
+  montarBotaoSite(link);
   const dl = document.getElementById('qr-dl');
   if(dl) dl.onclick = () => { const cv=document.getElementById('qrc'); if(!cv) return; const a=document.createElement('a'); a.download='qr-capta.png'; a.href=cv.toDataURL('image/png'); a.click(); };
   if(!isFree()) renderIA('inicio');
+}
+
+// ---- Botão flutuante pra colar em sites que a pessoa já tem ----
+function snippetBotaoSite(link, texto, pos){
+  const url = link + (link.includes('?') ? '&' : '?') + 'o=site';
+  const lado = pos === 'left' ? 'left:20px' : 'right:20px';
+  return `<!-- Capta -->
+<a href="${url}" target="_blank" rel="noopener" aria-label="${texto}" style="position:fixed;${lado};bottom:20px;z-index:99999;display:inline-flex;align-items:center;gap:10px;background:#25D366;color:#fff;font-family:system-ui,-apple-system,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:14px 20px;border-radius:999px;box-shadow:0 8px 26px rgba(0,0,0,.22)">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M17.5 14.4c-.3-.2-1.7-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.7 1-.9 1.2-.2.2-.3.2-.6.1-1.7-.9-2.9-1.6-4-3.5-.3-.5.3-.5.8-1.5.1-.2 0-.4 0-.5s-.7-1.6-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.1 3.3 5.2 4.6 1.9.8 2.7.9 3.6.8.6-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3z"/><path d="M12 2A10 10 0 0 0 3.5 17.4L2 22l4.7-1.5A10 10 0 1 0 12 2zm0 18.2c-1.6 0-3.1-.4-4.4-1.2l-.3-.2-2.8.9.9-2.7-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>
+${texto}</a>`;
+}
+function montarBotaoSite(link){
+  const txt = document.getElementById('wb-txt');
+  const pos = document.getElementById('wb-pos');
+  const code = document.getElementById('wb-code');
+  const demo = document.getElementById('wb-demo');
+  const copy = document.getElementById('wb-copy');
+  if(!txt || !code) return;
+  const atualiza = () => {
+    const t = (txt.value || 'Fale conosco').slice(0,28);
+    const snippet = snippetBotaoSite(link, t, pos.value);
+    code.value = snippet;
+    if(demo){
+      demo.innerHTML = `<span class="wb-btn ${pos.value==='left'?'esq':''}"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 2A10 10 0 0 0 3.5 17.4L2 22l4.7-1.5A10 10 0 1 0 12 2z"/></svg>${esc(t)}</span>`;
+    }
+  };
+  txt.oninput = atualiza; pos.onchange = atualiza; atualiza();
+  if(copy) copy.onclick = () => {
+    code.select();
+    navigator.clipboard?.writeText(code.value).catch(()=>{ try{ document.execCommand('copy'); }catch(e){} });
+    copy.textContent = '✓ Código copiado!'; setTimeout(()=>copy.textContent='📋 Copiar código', 1900);
+  };
 }
 
 function drawQR(canvas, text, scale, margin){
