@@ -611,6 +611,8 @@ function snippetIframe(t){
 '<script>',
 'function captaOpen(){var f=document.getElementById("capta-if");if(!f.getAttribute("src"))f.setAttribute("src","'+url+'");document.getElementById("capta-ov").classList.add("on");document.body.style.overflow="hidden";}',
 'function captaClose(){document.getElementById("capta-ov").classList.remove("on");document.body.style.overflow="";}',
+'/* o wa.me nao abre dentro de iframe: o formulario avisa e quem navega e a pagina */',
+'window.addEventListener("message",function(e){if(e.origin!=="'+BASE+'")return;var d=e.data||{};if(d.type==="capta:whatsapp"&&d.url){captaClose();window.location.href=d.url;}});',
 '<\/script>'
   ].join('\n');
 }

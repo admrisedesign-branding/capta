@@ -206,6 +206,21 @@ async function salvarLead(){
   return { ok:false, erro: (erro && (erro.message || erro.hint)) || 'falha desconhecida' };
 }
 
+/* ---- Abrir o WhatsApp mesmo dentro de iframe (porteiro) ----
+   O wa.me não permite ser carregado em iframe. Estando embutido, avisamos a
+   página-mãe (que está no topo) e também tentamos abrir em nova aba. */
+const CAPTA_EMBUTIDO = (function(){ try { return window.top !== window.self; } catch(e) { return true; } })();
+const ALVO_TOPO = CAPTA_EMBUTIDO ? ' target="_blank" rel="noopener"' : '';
+
+function irParaWhats(url){
+  if(CAPTA_EMBUTIDO){
+    try { window.parent.postMessage({ type:'capta:whatsapp', url: url }, '*'); } catch(e){}
+    try { window.open(url, '_blank', 'noopener'); } catch(e){}
+    return;
+  }
+  location.href = url;
+}
+
 async function finish(){
   loading('Quase lá…');
   const r = await salvarLead();
@@ -223,7 +238,7 @@ async function finish(){
     body: JSON.stringify({ tenant_id: state.tenant.id, contato: state.contato }) }).catch(() => {});
 
   screenDone(url);
-  setTimeout(() => { location.href = url; }, 1200);
+  setTimeout(() => { irParaWhats(url); }, 1200);
 }
 
 // Tela de erro: avisa em vez de fingir que deu certo, e oferece tentar de novo
@@ -233,13 +248,13 @@ function screenErro(url){
     <h1>Quase lá!</h1>
     <p class="sub">Tivemos um problema pra registrar suas respostas. Você pode tentar de novo ou falar direto com a gente no WhatsApp.</p>
     <button class="btn" id="retry">Tentar de novo</button>
-    <a class="btn ghost" href="${url}">Falar no WhatsApp</a>
+    <a class="btn ghost" href="${url}"${ALVO_TOPO}>Falar no WhatsApp</a>
   </div>`;
   const b = document.getElementById('retry');
   if(b) b.onclick = async () => {
     b.disabled = true; b.textContent = 'Enviando…';
     const r2 = await salvarLead();
-    if(r2.ok){ screenDone(url); setTimeout(() => { location.href = url; }, 1200); }
+    if(r2.ok){ screenDone(url); setTimeout(() => { irParaWhats(url); }, 1200); }
     else { b.disabled = false; b.textContent = 'Tentar de novo'; }
   };
 }
@@ -250,7 +265,7 @@ function screenDone(url){
       <div class="check"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M20 6L9 17l-5-5"/></svg></div>
       <h1 style="font-size:23px">Tudo certo, ${esc(state.nome.split(' ')[0])}!</h1>
       <p class="sub" style="margin:8px auto 0;max-width:30ch">Estamos te levando pro WhatsApp. Se não abrir, toca abaixo.</p>
-      <a class="zap" href="${url}">💬 Abrir o WhatsApp</a>
+      <a class="zap" href="${url}"${ALVO_TOPO}>💬 Abrir o WhatsApp</a>
     </div>`;
 }
 
