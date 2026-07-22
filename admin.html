@@ -541,6 +541,7 @@ window.abrirLinks = id => {
     <div class="link-box"><input value="${dl}" readonly><button onclick="cp('${dl}',this)">Copiar</button></div>
     <p class="note">Só o cliente acessa — não compartilhe publicamente</p>
     ${integSec}
+    ${saudacaoSec(t)}
     <hr>
     <p style="font-size:12px;color:var(--dr)">Plano: <b style="color:var(--tx)">${t.plano} (R$${PLANOS[t.plano]}/mês)</b> · Integração: <b style="color:var(--tx)">${t.integracao||'link'}</b> · WhatsApp: <b style="color:var(--tx)">${t.whatsapp}</b></p>
   `);
@@ -548,6 +549,24 @@ window.abrirLinks = id => {
 };
 window.cp = (txt,btn) => { navigator.clipboard?.writeText(txt); btn.textContent='Copiado ✓'; setTimeout(()=>btn.textContent='Copiar',1500); };
 window.cpArea = (id,btn) => { const el=document.getElementById(id); el.select(); navigator.clipboard?.writeText(el.value); btn.textContent='Copiado ✓'; setTimeout(()=>btn.textContent='Copiar código',1500); };
+
+function saudacaoSec(t){
+  const link = BASE+'/capta.html?t='+t.slug+'&o=whatsapp-direto';
+  const txt = [
+    'Oi! Aqui é da '+t.nome+' \u{1F44B}',
+    '',
+    'Pra te passar um orçamento certinho, responde umas perguntas rápidas (leva 1 minuto):',
+    link,
+    '',
+    'Assim já sabemos o que você precisa e voltamos com o valor.'
+  ].join('\n');
+  return `<p style="font-size:13px;font-weight:700;color:var(--dm);margin:18px 0 6px">\u{1F4AC} Mensagem de saudação — WhatsApp Business</p>
+    <p class="note" style="margin-bottom:8px">Pega quem chega direto no WhatsApp (indicação, cartão, placa) e nunca passou pelo site. O WhatsApp envia sozinho na primeira mensagem de quem nunca conversou com o número.</p>
+    <textarea id="capta-saud" readonly style="width:100%;box-sizing:border-box;height:140px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--tx);font-size:12.5px;line-height:1.5;padding:10px;resize:vertical">${esc(txt)}</textarea>
+    <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="cpArea('capta-saud',this)">Copiar mensagem</button>
+    <p class="note" style="margin-top:8px">No celular do cliente: <b>WhatsApp Business → Ferramentas comerciais → Mensagem de saudação</b> → ativar, colar o texto, enviar para <b>Todos que não estão nos contatos</b>. Vale criar também uma <b>Resposta rápida</b> com o mesmo texto (atalho <b>/form</b>), porque a saudação só dispara pra quem nunca escreveu antes.</p>
+    <p class="note">Esse link marca origem <b>whatsapp-direto</b> — no painel dá pra separar quem veio de indicação de quem veio do site.</p>`;
+}
 
 function snippetApiSec(t){
   const url = BASE+'/api/capta-ingest';
