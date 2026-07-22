@@ -2697,7 +2697,12 @@ async function load(){
   document.getElementById('who-plan').textContent = 'Plano '+planoAtual();
   document.getElementById('acct').textContent = ini(DATA.tenant.nome);
   document.getElementById('demo-tag').style.display = DEMO ? '' : 'none';
-  render('painel');
+  // guarda este painel pra o app abrir direto na próxima vez
+  if(!DEMO && SLUG && TOKEN){
+    try{ localStorage.setItem('capta_dash', `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`); }catch(e){}
+  }
+  const irPara = params.get('ir');
+  if(irPara && TITLES[irPara]) goTab(irPara); else render('painel');
   if(params.get('tour')==='1') setTimeout(startTour, 500);
   if(params.get('pago')==='1') avisoPagamento();
   startLeadPolling();

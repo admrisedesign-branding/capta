@@ -191,7 +191,7 @@ window.onboard = async () => {
   }catch(e){ $('ob-err').textContent='Erro inesperado. Tente de novo.'; $('ob-go').disabled=false; $('ob-go').textContent='Criar meu painel grátis →'; }
 };
 
-window.sair = async () => { await sb.auth.signOut(); location.reload(); };
+window.sair = async () => { try{ localStorage.removeItem('capta_dash'); }catch(e){} await sb.auth.signOut(); location.reload(); };
 
 function traduz(m){
   m = (m||'').toLowerCase();
@@ -205,7 +205,21 @@ function traduz(m){
 // ao abrir: se já tem sessão (inclusive volta do Google), roteia
 (async () => {
   const { data:{ session } } = await sb.auth.getSession();
-  if(session) route(); else show('auth-view');
+  if(session){
+    // atalho: se já entrou antes neste aparelho, vai direto pro painel (sem esperar a rede)
+    try{
+      const salvo = localStorage.getItem('capta_dash');
+      if(salvo){
+        const ir = new URLSearchParams(location.search).get('ir');
+        location.replace(ir ? salvo + '&ir=' + encodeURIComponent(ir) : salvo);
+        return;
+      }
+    }catch(e){}
+    route();
+  } else {
+    try{ localStorage.removeItem('capta_dash'); }catch(e){}
+    show('auth-view');
+  }
 })();
 </script>
 </body>
