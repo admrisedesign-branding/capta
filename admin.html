@@ -1,883 +1,158 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Capta · Admin RISE</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-:root{
-  --brand:#2E5BFF; --brand-deep:#1E44D6; --brand-2:#5B8DEF;
-  --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
-  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
-  --tx:#141A2E; --ink:#141A2E; --dm:#697089; --dr:#9AA1B4; --or:#2E5BFF;
-  --quente:#E03127; --quente-bg:rgba(224,49,39,.12);
-  --morno:#C47A08;  --morno-bg:rgba(224,147,15,.14);
-  --frio:#3E6FD6;   --frio-bg:rgba(91,141,239,.15);
-  --verde:#16A34A;  --verde-bg:rgba(22,163,74,.12);
-  --roxo:#8B4BFF;   --roxo-bg:rgba(139,75,255,.12);
-  --gray-bg:rgba(105,112,137,.12);
-  --surface2:#F1F3F8;
-  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased;font-size:14px}
-button{font-family:inherit;cursor:pointer}
-h2{font-size:16px;font-weight:700}
-hr{border:0;border-top:1px solid var(--line);margin:18px 0}
-input,select,textarea{font-family:inherit}
+// /api/capta-admin.js — todas as leituras e escritas do painel da RISE.
+// Valida o usuário pelo access_token do Supabase e confere se o e-mail está
+// em capta_admins. Só então executa com a chave de serviço.
+// Assim o navegador nunca precisa de permissão de escrita no banco.
+//
+// POST { access_token, action, ...params }
+//   listar            -> { tenants, leads }
+//   perguntas_listar   { tenant_id }
+//   pergunta_criar     { tenant_id, ordem, texto, opcoes }
+//   pergunta_apagar    { id }
+//   lead_status        { lead_id, status }
+//   tenant_ativo       { id, ativo }
+//   tenant_salvar      { id?, payload }
+//
+// Env: SUPABASE_SERVICE_ROLE_KEY
 
-/* ---------- Login ---------- */
-.login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px}
-.login-card{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:34px 30px;width:100%;max-width:400px}
-.login-brand{display:flex;align-items:center;gap:9px;font-size:20px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
-.login-brand .brand-c{width:32px;height:32px;border-radius:9px}
-.login-tag{background:var(--brand-soft);color:var(--brand);font-size:10px;font-weight:800;letter-spacing:.06em;padding:3px 9px;border-radius:99px}
-.login-card h1{font-size:20px;font-weight:800;margin:16px 0 3px}
-.login-card>p{font-size:13.5px;color:var(--dm);margin-bottom:18px}
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const STATUS_OK    = ['novo', 'contatado', 'fechado', 'perdido'];
+const PLANOS_OK    = ['free', 'pro', 'business', 'gestao'];
 
-/* ---------- Layout ---------- */
-.layout{display:flex;min-height:100%}
-.side{width:238px;flex:0 0 238px;background:var(--card);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
-.main{flex:1;min-width:0;display:flex;flex-direction:column}
-.content{padding:22px 26px 60px;max-width:1240px;width:100%;margin:0 auto}
-.brand{display:flex;align-items:center;gap:9px;padding:4px 8px 14px;font-size:18px;font-weight:800;letter-spacing:-.02em}
-.brand-c{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;display:grid;place-items:center;font-weight:800;box-shadow:0 4px 12px var(--brand-soft);flex:0 0 auto}
-.brand-badge{background:var(--brand-soft);color:var(--brand);font-size:9.5px;font-weight:800;letter-spacing:.05em;padding:2px 7px;border-radius:99px;margin-left:2px}
-.nav{display:flex;flex-direction:column;gap:3px}
-.nav-lbl{font-size:11px;font-weight:700;color:var(--dr);text-transform:uppercase;letter-spacing:.06em;padding:8px 10px 4px}
-.nav-item{display:flex;align-items:center;gap:11px;width:100%;border:0;background:transparent;color:var(--dm);font-size:14px;font-weight:600;padding:10px 11px;border-radius:11px;text-align:left;transition:.14s}
-.nav-item svg{width:18px;height:18px;flex:0 0 auto;stroke:currentColor}
-.nav-item:hover{background:var(--line-2);color:var(--tx)}
-.nav-item.on{background:var(--brand-soft);color:var(--brand)}
-.side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
-.who{display:flex;flex-direction:column;gap:6px;padding:4px 8px}
-.who b{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dm)}
-.logout{align-self:flex-start;border:1px solid var(--line);background:var(--card);color:var(--dm);font-size:12.5px;font-weight:600;padding:6px 13px;border-radius:9px}
-.logout:hover{border-color:var(--quente);color:var(--quente)}
-
-.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.burger{display:none;border:1px solid var(--line);background:var(--card);width:38px;height:38px;border-radius:10px;font-size:17px;color:var(--tx)}
-.crumb{font-size:17px;font-weight:700;letter-spacing:-.01em}
-.top-right{margin-left:auto;display:flex;align-items:center;gap:12px}
-.acct{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;display:grid;place-items:center;font-size:12.5px;font-weight:700}
-
-.reveal{animation:rise .35s ease both}
-@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-
-/* ---------- Stat / metric cards ---------- */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow)}
-.stat .s-ico{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;margin-bottom:12px;background:var(--brand-soft);color:var(--brand)}
-.stat .s-ico svg{width:19px;height:19px;stroke:currentColor}
-.stat .s-ico.g{background:var(--verde-bg);color:var(--verde)}.stat .s-ico.q{background:var(--quente-bg);color:var(--quente)}
-.stat .lbl{font-size:12.5px;color:var(--dm);font-weight:600}
-.stat .num{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:2px 0;font-variant-numeric:tabular-nums}
-.stat .sub{font-size:12px;color:var(--dr)}
-
-.rev-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--shadow);margin-bottom:22px}
-.rev-card h3{font-size:14px;font-weight:700;margin-bottom:12px}
-.rev-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;font-size:13.5px;border-top:1px solid var(--line-2);color:var(--dm)}
-.rev-row .v{font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums}
-.rev-total{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:4px;border-top:2px solid var(--line);font-weight:700}
-.rev-total .total{font-size:18px;font-weight:800;color:var(--brand);font-variant-numeric:tabular-nums}
-
-.sec-h{display:flex;align-items:center;justify-content:space-between;margin:6px 0 12px}
-
-/* ---------- Client cards ---------- */
-.client-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);margin-bottom:12px}
-.client-top{display:flex;align-items:center;gap:13px;margin-bottom:14px}
-.client-av{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;display:grid;place-items:center;font-size:16px;font-weight:700;flex:0 0 auto}
-.client-info{min-width:0;flex:1}
-.client-info h3{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.client-info .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--dr);margin-top:4px}
-.plan-badge{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 9px;border-radius:99px}
-.plan-free{background:var(--gray-bg);color:var(--dm)}
-.plan-pro{background:var(--brand-soft);color:var(--brand)}
-.plan-business{background:var(--roxo-bg);color:var(--roxo)}
-.plan-gestao{background:var(--verde-bg);color:var(--verde)}
-.ativo-dot{width:8px;height:8px;border-radius:50%;background:var(--verde);display:inline-block;margin-right:3px}
-.ativo-dot.off{background:var(--dr)}
-.new-badge{background:var(--verde);color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;padding:2px 7px;border-radius:999px;letter-spacing:.02em}
-.meta2{font-size:12px;color:var(--muted);margin-top:4px}
-.signup-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:11px 0;border-top:1px solid var(--line)}
-.signup-row:first-of-type{border-top:0}
-.signup-main{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;flex:1;min-width:170px}
-.signup-sub{font-size:12px;color:var(--muted);flex-basis:100%;order:3}
-.signup-act{display:flex;gap:6px}
-.client-actions{display:flex;gap:8px;flex-wrap:wrap}
-
-/* ---------- Buttons ---------- */
-.btn{border:0;font-family:inherit;font-weight:700;border-radius:11px;transition:.14s;font-size:14px;padding:11px 18px}
-.btn-primary{background:var(--brand);color:#fff}
-.btn-primary:hover{background:var(--brand-deep)}
-.btn-full{width:100%}
-.btn-sm{font-size:12.5px;padding:8px 14px;border-radius:9px}
-.btn-ghost{background:var(--card);border:1px solid var(--line);color:var(--dm)}
-.btn-ghost:hover{border-color:var(--brand-2);color:var(--tx)}
-.btn-danger{background:var(--quente-bg);color:var(--quente)}
-
-/* ---------- Chips ---------- */
-.chips{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-.chip{border:1px solid var(--line);background:var(--card);font-size:13px;font-weight:600;color:var(--dm);padding:7px 14px;border-radius:99px;transition:.14s}
-.chip:hover{border-color:var(--brand-2);color:var(--tx)}
-.chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
-
-/* ---------- Leads (table + cards) ---------- */
-.ltable-wrap{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
-.ltable{width:100%;border-collapse:collapse;font-size:13.5px}
-.ltable th{text-align:left;font-size:11.5px;font-weight:700;color:var(--dr);text-transform:uppercase;letter-spacing:.04em;padding:12px 16px;background:var(--line-2);border-bottom:1px solid var(--line)}
-.ltable td{padding:12px 16px;border-bottom:1px solid var(--line-2);vertical-align:middle}
-.ltable tbody tr{cursor:pointer;transition:.12s}
-.ltable tbody tr:hover{background:var(--brand-softer)}
-.ltable tbody tr:last-child td{border-bottom:0}
-.cell-lead{display:flex;align-items:center;gap:10px}
-.cell-lead .nm{font-weight:600}.cell-lead .sub{font-size:12px;color:var(--dr)}
-.cli-tag{color:var(--brand);font-weight:700}
-.av{width:38px;height:38px;border-radius:10px;color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700;flex:0 0 auto}
-.av.sm{width:34px;height:34px;border-radius:9px;font-size:12px}
-.score-cell{font-weight:700;font-variant-numeric:tabular-nums}
-.tbadge{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:99px}
-.tbadge.q{background:var(--quente-bg);color:var(--quente)}.tbadge.m{background:var(--morno-bg);color:var(--morno)}.tbadge.f{background:var(--frio-bg);color:var(--frio)}
-.status{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:99px;text-transform:capitalize;display:inline-flex;align-items:center;gap:6px}
-.status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
-.status.novo{background:var(--brand-soft);color:var(--brand)}
-.status.contatado{background:var(--morno-bg);color:var(--morno)}
-.status.fechado{background:var(--verde-bg);color:var(--verde)}
-.status.perdido{background:var(--gray-bg);color:var(--dm)}
-
-.lcards{display:none;flex-direction:column;gap:10px}
-.lead{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);cursor:pointer}
-.lead .mid{flex:1;min-width:0}
-.lead .nm{font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lead .meta-l{font-size:12px;color:var(--dr);display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
-.lead .right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:0 0 auto}
-.temp{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px}
-.temp.q{background:var(--quente-bg);color:var(--quente)}.temp.m{background:var(--morno-bg);color:var(--morno)}.temp.f{background:var(--frio-bg);color:var(--frio)}
-
-.empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--r);padding:40px 20px;text-align:center;color:var(--dr);font-size:13.5px;line-height:1.7}
-
-/* ---------- Forms / fields ---------- */
-.field{margin-bottom:14px}
-.field label{display:block;font-size:12.5px;font-weight:600;color:var(--dm);margin-bottom:6px}
-.field input,.field select,.field textarea{width:100%;background:var(--card);border:1px solid var(--line);border-radius:10px;color:var(--tx);font-size:14px;padding:11px 12px}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--brand)}
-.err{color:var(--quente);font-size:12.5px;min-height:16px;margin-bottom:6px}
-.note{font-size:12.5px;color:var(--dm);line-height:1.6}
-.link-box{display:flex;gap:8px;margin-bottom:8px}
-.link-box input{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:13px;color:var(--tx)}
-.link-box button{border:0;background:var(--brand);color:#fff;font-weight:700;padding:0 16px;border-radius:10px;font-size:13px}
-.toggle{position:relative;display:inline-block;width:42px;height:24px}
-.toggle input{display:none}
-.toggle-slider{position:absolute;inset:0;background:var(--line);border-radius:99px;transition:.2s}
-.toggle-slider::before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
-.toggle input:checked+.toggle-slider{background:var(--brand)}
-.toggle input:checked+.toggle-slider::before{transform:translateX(18px)}
-
-/* ---------- Drawer ---------- */
-.scrim,.scrim2{position:fixed;inset:0;background:rgba(20,26,46,.4);opacity:0;pointer-events:none;transition:.25s;z-index:40}
-.scrim.on,.scrim2.on{opacity:1;pointer-events:auto}
-.drawer{position:fixed;z-index:50;background:var(--card);transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:0 -10px 40px rgba(20,26,46,.2);right:0;top:0;height:100%;width:440px;max-width:92vw;transform:translateX(100%);padding:26px 24px;overflow-y:auto}
-.drawer.on{transform:none}
-.drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-.drawer-head h2{font-size:19px;font-weight:800}
-.drawer-close{border:0;background:var(--line-2);width:32px;height:32px;border-radius:9px;font-size:15px;color:var(--dm)}
-.scorebar{background:var(--brand-softer);border:1px solid var(--line);border-radius:13px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
-.scorebar b{font-size:13px;color:var(--dm)}
-.qa-row{display:flex;justify-content:space-between;padding:8px 0;font-size:13.5px;border-top:1px solid var(--line-2)}
-.qa-row .qa-a{font-weight:800;color:var(--verde)}
-.stbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:16px}
-.stbtns button{border:1.5px solid var(--line);background:var(--card);color:var(--dm);font-weight:600;font-size:12px;padding:9px 4px;border-radius:10px;text-transform:capitalize;transition:.12s}
-.stbtns button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
-.zap-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#25D366;color:#fff;font-weight:700;font-size:14.5px;padding:13px;border-radius:12px;text-decoration:none}
-.q-item{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px}
-.q-item-head{display:flex;align-items:center;gap:9px;margin-bottom:8px}
-.q-num{width:22px;height:22px;border-radius:7px;background:var(--brand-soft);color:var(--brand);font-size:12px;font-weight:800;display:grid;place-items:center;flex:0 0 auto}
-.q-txt{flex:1;font-size:13.5px;font-weight:700}
-.opt-item{display:flex;justify-content:space-between;font-size:12.5px;color:var(--dm);padding:4px 0;border-top:1px solid var(--line-2)}
-.opt-pts{font-weight:800;color:var(--verde)}
-
-@media(max-width:860px){
-  .side{position:fixed;z-index:45;left:0;top:0;height:100%;transform:translateX(-100%);box-shadow:0 0 40px rgba(20,26,46,.18)}
-  .side.open{transform:none}
-  .burger{display:grid;place-items:center}
-  .topbar{padding:0 16px}
-  .content{padding:16px 16px 70px}
-  .stats{grid-template-columns:repeat(2,1fr);gap:12px}
-  .ltable-wrap{display:none}
-  .lcards{display:flex}
-  .drawer{left:0;right:0;top:auto;bottom:0;width:100%;max-width:100%;height:auto;max-height:90vh;border-radius:22px 22px 0 0;transform:translateY(100%);padding:22px 18px 30px}
-  .drawer.on{transform:none}
-  .client-actions .btn{flex:1}
-}
-@media(max-width:400px){ .stats{grid-template-columns:1fr} }
-</style>
-</head>
-<body>
-
-<!-- LOGIN -->
-<div id="login-wrap" class="login-wrap">
-  <div class="login-card">
-    <div class="login-brand"><span class="brand-c">C</span>capta <span class="login-tag">ADMIN</span></div>
-    <h1>Entrar no painel</h1>
-    <p>Acesso exclusivo da equipe RISE</p>
-    <div class="field"><label>E-mail</label><input type="email" id="l-email" placeholder="seu@email.com" autocomplete="email"></div>
-    <div class="field"><label>Senha</label><input type="password" id="l-senha" placeholder="••••••••"></div>
-    <div class="err" id="l-err"></div>
-    <button class="btn btn-primary btn-full" id="l-btn" style="margin-top:8px">Entrar →</button>
-  </div>
-</div>
-
-<!-- APP -->
-<div id="admin-app" style="display:none">
-  <div class="layout">
-    <aside class="side" id="side">
-      <div class="brand"><span class="brand-c">C</span>capta<span class="brand-badge">ADMIN</span></div>
-      <nav class="nav">
-        <span class="nav-lbl">RISE</span>
-        <button class="nav-item on" data-t="painel"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Painel</button>
-        <button class="nav-item" data-t="clientes"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>Clientes</button>
-        <button class="nav-item" data-t="leads"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2s5 4 5 9a5 5 0 0 1-10 0c0-1.5.6-2.8 1.4-3.8C8 9 9 10 9 11c0-2 1-4 3-9z"/></svg>Leads</button>
-      </nav>
-      <div class="side-foot"><div class="who"><b id="adm-email">—</b><button class="logout" onclick="logout()">Sair</button></div></div>
-    </aside>
-    <div class="scrim2" id="side-scrim"></div>
-
-    <div class="main">
-      <header class="topbar">
-        <button class="burger" id="burger">☰</button>
-        <div class="crumb" id="page-title">Painel</div>
-        <div class="top-right"><div class="acct" id="acct">RS</div></div>
-      </header>
-      <main class="content" id="view"></main>
-    </div>
-  </div>
-</div>
-
-<div class="scrim" id="scrim"></div>
-<div class="drawer" id="drawer"><div id="drawer-body"></div></div>
-
-<script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const SB_URL  = 'https://wpoeigoledhzyvomudgf.supabase.co';
-const SB_KEY  = 'sb_publishable_S4eWNjOtaiXTo5sr9Hek0A_42NzE4jf';
-const BASE    = 'https://capta.riseagencia.com';
-const PLANOS  = { free:0, pro:97, business:197, gestao:397 };
-const sb = createClient(SB_URL, SB_KEY);
-
-// ---- STATE ----
-let S = { tenants:[], leads:[], tab:'painel', lf:{ tenant:'all', temp:'all' } };
-let CONFIG = { maya:false };
-let AF = { tenant:null, data:null, editFormId:null, editPerguntas:[] };
-const TITLES = { painel:'Painel', clientes:'Clientes', leads:'Leads' };
-
-// ---- UTILS ----
-const COLORS = ['#2E5BFF','#16A34A','#E0930F','#8B4BFF','#E03127','#5B8DEF'];
-const ini  = n => (n||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-const col  = n => COLORS[(n||'A').charCodeAt(0)%COLORS.length];
-const tcss = t => t==='Quente'?'q':t==='Morno'?'m':'f';
-const ago  = iso => { const s=Math.floor((Date.now()-new Date(iso))/1000); if(s<60)return 'agora'; if(s<3600)return `há ${Math.floor(s/60)}m`; if(s<86400)return `há ${Math.floor(s/3600)}h`; return `há ${Math.floor(s/86400)}d`; };
-const esc  = s => (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const num  = n => (n||0).toLocaleString('pt-BR');
-const IC = {
-  users:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
-  money:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
-  bolt:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>',
-  flame:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2s5 4 5 9a5 5 0 0 1-10 0c0-1.5.6-2.8 1.4-3.8C8 9 9 10 9 11c0-2 1-4 3-9z"/></svg>',
-};
-
-// ---- AUTH ----
-async function init(){
-  const { data:{ session } } = await sb.auth.getSession();
-  if(session) onLogin(session.user);
-}
-document.getElementById('l-btn').onclick = async () => {
-  const email = document.getElementById('l-email').value.trim();
-  const senha = document.getElementById('l-senha').value;
-  const btn   = document.getElementById('l-btn');
-  btn.textContent='Entrando…'; btn.disabled=true;
-  const { error } = await sb.auth.signInWithPassword({ email, password:senha });
-  if(error){ document.getElementById('l-err').textContent='E-mail ou senha incorretos.'; btn.textContent='Entrar →'; btn.disabled=false; }
-  else { const { data:{ session } } = await sb.auth.getSession(); onLogin(session.user); }
-};
-document.getElementById('l-senha').onkeydown = e => { if(e.key==='Enter') document.getElementById('l-btn').click(); };
-
-function onLogin(user){
-  document.getElementById('login-wrap').style.display='none';
-  document.getElementById('admin-app').style.display='block';
-  document.getElementById('adm-email').textContent = user.email;
-  document.getElementById('acct').textContent = ini(user.email.split('@')[0].replace('.',' '));
-  loadAll();
-}
-window.logout = async () => { await sb.auth.signOut(); location.reload(); };
-
-// ---- DATA ----
-async function loadAll(){ try{ const rc=await fetch('/api/capta-config'); if(rc.ok) CONFIG=await rc.json(); }catch(e){} await Promise.all([loadTenants(),loadLeads()]); render(); }
-async function loadTenants(){
-  const { data } = await sb.from('capta_tenants').select('*').order('criado_em',{ascending:false});
-  S.tenants = data||[];
-}
-async function loadLeads(){
-  const { data } = await sb.from('capta_leads').select('*,capta_tenants(nome,slug)').order('criado_em',{ascending:false});
-  S.leads = data||[];
+async function sb(path, opts = {}) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+  });
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
 }
 
-// ---- NAV ----
-const side=document.getElementById('side'), sideScrim=document.getElementById('side-scrim');
-function closeSide(){ side.classList.remove('open'); sideScrim.classList.remove('on'); }
-document.getElementById('burger').onclick=()=>{ side.classList.add('open'); sideScrim.classList.add('on'); };
-sideScrim.onclick=closeSide;
-document.querySelectorAll('.nav-item').forEach(t => t.onclick = () => {
-  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('on'));
-  t.classList.add('on'); S.tab=t.dataset.t;
-  document.getElementById('page-title').textContent=TITLES[t.dataset.t];
-  render(); closeSide();
-});
-document.getElementById('scrim').onclick = closeDrawer;
-
-function render(){ ({painel:rPainel,clientes:rClientes,leads:rLeads}[S.tab])(); }
-
-// Cadastros recentes (últimos 7 dias) — visibilidade dos novos self-service + trava anti-spam
-function recentSignupsCard(){
-  const lim = Date.now() - 7*864e5;
-  const novos = S.tenants.filter(t => new Date(t.criado_em).getTime() >= lim);
-  if(!novos.length) return '';
-  return `<div class="rev-card">
-    <h3>Cadastros recentes · últimos 7 dias (${novos.length})</h3>
-    ${novos.slice(0,15).map(t=>`<div class="signup-row">
-      <div class="signup-main">${esc(t.nome)} <span class="plan-badge plan-${t.plano}">${t.plano}</span>${(Date.now()-new Date(t.criado_em)<2*864e5)?'<span class="new-badge">novo</span>':''}${t.ativo?'':' <span style="color:var(--dr);font-size:12px">(inativo)</span>'}</div>
-      <div class="signup-act">
-        <button class="btn btn-ghost btn-sm" onclick="filtrarLeads('${t.id}')">Ver</button>
-        <button class="btn btn-ghost btn-sm" onclick="toggleAtivo('${t.id}',${t.ativo?'false':'true'})">${t.ativo?'🚫 Desativar':'✅ Reativar'}</button>
-      </div>
-      <div class="signup-sub">${t.owner_email?esc(t.owner_email):'sem e-mail'} · cadastro ${ago(t.criado_em)}</div>
-    </div>`).join('')}
-  </div>`;
-}
-window.toggleAtivo = async (id, novo) => {
-  const ativo = (novo===true || novo==='true');
-  if(!ativo && !confirm('Desativar este cadastro? Ele deixa de contar como cliente ativo. Você pode reativar depois.')) return;
-  try{
-    const { error } = await sb.from('capta_tenants').update({ ativo }).eq('id', id);
-    if(error){ alert('Não foi possível atualizar: '+error.message); return; }
-    const t = S.tenants.find(x=>x.id===id); if(t) t.ativo = ativo;
-    render();
-  }catch(e){ alert('Erro ao atualizar o cadastro.'); }
-};
-
-// ---- PAINEL ----
-function rPainel(){
-  const now=new Date(), mes=now.getMonth(), ano=now.getFullYear();
-  const ativos=S.tenants.filter(t=>t.ativo);
-  const lhoje=S.leads.filter(l=>new Date(l.criado_em).toDateString()===now.toDateString());
-  const lmes=S.leads.filter(l=>{const d=new Date(l.criado_em);return d.getMonth()===mes&&d.getFullYear()===ano;});
-  const qhoje=lhoje.filter(l=>l.temperatura==='Quente');
-  const byP={free:0,pro:0,business:0,gestao:0};
-  ativos.forEach(t=>{if(byP[t.plano]!==undefined)byP[t.plano]++;});
-  const receita=byP.pro*97+byP.business*197+byP.gestao*397;
-
-  document.getElementById('view').innerHTML=`<div class="reveal">
-    <div class="stats">
-      <div class="stat"><div class="s-ico">${IC.users}</div><div class="lbl">Clientes ativos</div><div class="num">${ativos.length}</div><div class="sub">${S.tenants.length} no total</div></div>
-      <div class="stat"><div class="s-ico g">${IC.money}</div><div class="lbl">Receita mensal</div><div class="num">R$${num(receita)}</div><div class="sub">recorrente</div></div>
-      <div class="stat"><div class="s-ico">${IC.bolt}</div><div class="lbl">Leads do mês</div><div class="num">${lmes.length}</div><div class="sub">${lhoje.length} hoje</div></div>
-      <div class="stat"><div class="s-ico q">${IC.flame}</div><div class="lbl">Quentes hoje</div><div class="num">${qhoje.length}</div><div class="sub">pra converter</div></div>
-    </div>
-    <div class="rev-card">
-      <h3>Receita por plano</h3>
-      <div class="rev-row"><span>Free · ${byP.free} cliente${byP.free!==1?'s':''} × R$0</span><span class="v">R$0</span></div>
-      <div class="rev-row"><span>Pro · ${byP.pro} cliente${byP.pro!==1?'s':''} × R$97</span><span class="v">R$${num(byP.pro*97)}</span></div>
-      <div class="rev-row"><span>Business · ${byP.business} cliente${byP.business!==1?'s':''} × R$197</span><span class="v">R$${num(byP.business*197)}</span></div>
-      <div class="rev-row"><span>Gestão · ${byP.gestao} cliente${byP.gestao!==1?'s':''} × R$397</span><span class="v">R$${num(byP.gestao*397)}</span></div>
-      <div class="rev-total"><span>Total mensal</span><span class="total">R$${num(receita)}</span></div>
-    </div>
-    ${recentSignupsCard()}
-    <div class="sec-h"><h2>Últimos leads</h2></div>
-    ${leadsList(S.leads.slice(0,6),true)}
-  </div>`;
-  bindLeads();
+// confirma que o token pertence a um admin da RISE
+async function exigirAdmin(access_token) {
+  if (!access_token) return null;
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${access_token}` },
+  });
+  if (!r.ok) return null;
+  const user = await r.json();
+  const email = (user && user.email || '').toLowerCase().trim();
+  if (!email) return null;
+  const rows = await sb(`capta_admins?email=eq.${encodeURIComponent(email)}&select=email&limit=1`);
+  return (rows && rows.length) ? email : null;
 }
 
-// ---- CLIENTES ----
-function rClientes(){
-  document.getElementById('view').innerHTML=`<div class="reveal">
-    <div class="sec-h"><h2>Clientes (${S.tenants.length})</h2>
-      <button class="btn btn-primary btn-sm" onclick="abrirNovoCliente()">+ Novo cliente</button>
-    </div>
-    ${S.tenants.length?S.tenants.map(t=>clientCard(t)).join(''):'<div class="empty">Nenhum cliente ainda. Crie o primeiro!</div>'}
-  </div>`;
-}
-function clientCard(t){
-  const lt=S.leads.filter(l=>l.tenant_id===t.id);
-  const now=new Date();
-  const lm=lt.filter(l=>{const d=new Date(l.criado_em);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
-  const novo=(Date.now()-new Date(t.criado_em))<7*864e5;
-  return `<div class="client-card">
-    <div class="client-top">
-      <div class="client-av">${ini(t.nome)}</div>
-      <div class="client-info">
-        <h3>${esc(t.nome)}</h3>
-        <div class="meta">
-          <span class="plan-badge plan-${t.plano}">${t.plano}</span>
-          ${novo?'<span class="new-badge">novo</span>':''}
-          <span>/${esc(t.slug)}</span>
-          <span><span class="ativo-dot ${t.ativo?'':'off'}"></span>${t.ativo?'ativo':'inativo'}</span>
-          <span>· ${lm.length} leads/mês · ${lt.length} total</span>
-        </div>
-        <div class="meta2">${t.owner_email?esc(t.owner_email)+' · ':''}cadastro ${ago(t.criado_em)}</div>
-      </div>
-    </div>
-    <div class="client-actions">
-      <button class="btn btn-ghost btn-sm" onclick="abrirLinks('${t.id}')">🔗 Links</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirFormularios('${t.id}')">📋 Formulários</button>
-      <button class="btn btn-ghost btn-sm" onclick="filtrarLeads('${t.id}')">👁 Leads (${lt.length})</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirEditar('${t.id}')">✏ Editar</button>
-      <button class="btn btn-ghost btn-sm" onclick="toggleAtivo('${t.id}',${t.ativo?'false':'true'})">${t.ativo?'🚫 Desativar':'✅ Reativar'}</button>
-    </div>
-  </div>`;
-}
+module.exports = async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
+  if (!SERVICE_KEY) return res.status(500).json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY no Vercel.' });
 
-// ---- LEADS ----
-function rLeads(){
-  const {tenant:ft,temp:ftemp}=S.lf;
-  let ls=S.leads;
-  if(ft!=='all') ls=ls.filter(l=>l.tenant_id===ft);
-  if(ftemp!=='all') ls=ls.filter(l=>tcss(l.temperatura)===ftemp);
-  const cq=S.leads.filter(l=>l.temperatura==='Quente').length;
-  const cm=S.leads.filter(l=>l.temperatura==='Morno').length;
-  const cf=S.leads.filter(l=>l.temperatura==='Frio').length;
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
+  const { access_token, action } = body || {};
 
-  document.getElementById('view').innerHTML=`<div class="reveal">
-    <div class="field" style="max-width:340px;margin-bottom:12px">
-      <select id="f-tenant" onchange="S.lf.tenant=this.value;rLeads()">
-        <option value="all">Todos os clientes</option>
-        ${S.tenants.map(t=>`<option value="${t.id}" ${ft===t.id?'selected':''}>${esc(t.nome)}</option>`).join('')}
-      </select>
-    </div>
-    <div class="chips">
-      <button class="chip ${ftemp==='all'?'on':''}" onclick="S.lf.temp='all';rLeads()">Todos ${S.leads.length}</button>
-      <button class="chip ${ftemp==='q'?'on':''}" onclick="S.lf.temp='q';rLeads()">🔥 Quentes ${cq}</button>
-      <button class="chip ${ftemp==='m'?'on':''}" onclick="S.lf.temp='m';rLeads()">🌡 Mornos ${cm}</button>
-      <button class="chip ${ftemp==='f'?'on':''}" onclick="S.lf.temp='f';rLeads()">❄️ Frios ${cf}</button>
-    </div>
-    ${ls.length?leadsList(ls,true):'<div class="empty">Nenhum lead nesse filtro.</div>'}
-  </div>`;
-  bindLeads();
-}
-window.rLeads = rLeads;
+  let admin;
+  try { admin = await exigirAdmin(access_token); }
+  catch (e) { return res.status(500).json({ error: e.message }); }
+  if (!admin) return res.status(403).json({ error: 'Acesso restrito à equipe da RISE.' });
 
-function leadsList(leads, showClient){
-  const rows = leads.map(l=>leadRow(l,showClient)).join('');
-  const cards = leads.map(l=>leadCard(l,showClient)).join('');
-  return `<div class="ltable-wrap"><table class="ltable">
-    <thead><tr><th>Lead</th>${showClient?'<th>Cliente</th>':''}<th>Contato</th><th>Quando</th><th>Temperatura</th><th>Score</th><th>Status</th></tr></thead>
-    <tbody>${rows}</tbody></table></div>
-    <div class="lcards">${cards}</div>`;
-}
-function leadRow(l,showClient){
-  const cn=l.capta_tenants?.nome||S.tenants.find(t=>t.id===l.tenant_id)?.nome||'';
-  return `<tr data-id="${l.id}">
-    <td><div class="cell-lead"><span class="av sm" style="background:${col(l.nome)}">${ini(l.nome)}</span><div><div class="nm">${esc(l.nome)}</div><div class="sub">${l.origem?esc(l.origem):''}</div></div></div></td>
-    ${showClient?`<td><span class="cli-tag">${esc(cn)}</span></td>`:''}
-    <td>${esc(l.contato||'—')}</td>
-    <td>${ago(l.criado_em)}</td>
-    <td><span class="tbadge ${tcss(l.temperatura)}">${esc(l.temperatura||'—')}</span></td>
-    <td class="score-cell">${l.score??'–'}</td>
-    <td><span class="status ${l.status||'novo'}">${l.status||'novo'}</span></td>
-  </tr>`;
-}
-function leadCard(l, showClient){
-  const cn=l.capta_tenants?.nome||S.tenants.find(t=>t.id===l.tenant_id)?.nome||'';
-  return `<div class="lead" data-id="${l.id}">
-    <div class="av" style="background:${col(l.nome)}">${ini(l.nome)}</div>
-    <div class="mid">
-      <div class="nm">${esc(l.nome)}</div>
-      <div class="meta-l">${showClient&&cn?`<span class="cli-tag">${esc(cn)}</span>`:''}<span>${esc(l.contato||'')}</span><span>${ago(l.criado_em)}</span>${l.status&&l.status!=='novo'?`<span>${esc(l.status)}</span>`:''}</div>
-    </div>
-    <div class="right"><span class="temp ${tcss(l.temperatura)}">${esc(l.temperatura||'—')}</span><span style="font-size:12px;color:var(--dr);font-weight:700">${l.score??'–'}/100</span></div>
-  </div>`;
-}
-function bindLeads(){ document.querySelectorAll('.lead[data-id],tr[data-id]').forEach(el=>el.onclick=()=>abrirLead(el.dataset.id)); }
+  try {
+    switch (action) {
+      case 'listar': {
+        const [tenants, leads] = await Promise.all([
+          sb('capta_tenants?select=*&order=criado_em.desc'),
+          sb('capta_leads?select=*,capta_tenants(nome,slug)&order=criado_em.desc&limit=2000'),
+        ]);
+        return res.status(200).json({ tenants: tenants || [], leads: leads || [] });
+      }
 
-// ---- DRAWER ----
-function openDrawer(html){ document.getElementById('drawer-body').innerHTML=html; document.getElementById('scrim').classList.add('on'); document.getElementById('drawer').classList.add('on'); }
-function closeDrawer(){ document.getElementById('scrim').classList.remove('on'); document.getElementById('drawer').classList.remove('on'); }
-window.closeDrawer=closeDrawer;
+      case 'perguntas_listar': {
+        const { tenant_id } = body;
+        if (!tenant_id) return res.status(400).json({ error: 'tenant_id obrigatório.' });
+        const qs = await sb(`capta_perguntas?tenant_id=eq.${encodeURIComponent(tenant_id)}&select=*&order=ordem`);
+        return res.status(200).json({ perguntas: qs || [] });
+      }
 
-// ---- LINKS ----
-window.abrirLinks = id => {
-  const t=S.tenants.find(x=>x.id===id); if(!t)return;
-  const fl=`${BASE}/capta.html?t=${t.slug}`;
-  const dl=`${BASE}/dashboard.html?t=${t.slug}&k=${t.dashboard_token}`;
-  const integSec = t.integracao==='iframe'
-    ? `<p style="font-size:13px;font-weight:700;color:var(--dm);margin:18px 0 6px">📲 Código pro site — porteiro de WhatsApp</p>
-       <textarea id="capta-snip" readonly style="width:100%;box-sizing:border-box;height:150px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--tx);font-family:ui-monospace,monospace;font-size:11px;padding:10px;resize:vertical"></textarea>
-       <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="cpArea('capta-snip',this)">Copiar código</button>
-       <p class="note" style="margin-top:8px">Cole antes de <b>&lt;/body&gt;</b> no site do cliente. O botão verde do WhatsApp abre o formulário do Capta em modal — só libera o WhatsApp depois que a pessoa responde.</p>`
-    : `<p style="font-size:13px;font-weight:700;color:var(--dm);margin:18px 0 6px">📲 Integração no site</p>
-       <p class="note">No site, aponte o botão/ícone de WhatsApp para o <b>link do formulário</b> acima. A pessoa responde e cai no WhatsApp já qualificada (porteiro).</p>`;
-  openDrawer(`
-    <div class="drawer-head"><h2>Links — ${esc(t.nome)}</h2><button class="drawer-close" onclick="closeDrawer()">✕</button></div>
-    <p style="font-size:13.5px;color:var(--dm);margin-bottom:18px">Copie e entregue esses links pro cliente.</p>
-    <p style="font-size:13px;font-weight:700;color:var(--dm);margin-bottom:6px">🔗 Formulário (lead preenche)</p>
-    <div class="link-box"><input value="${fl}" readonly><button onclick="cp('${fl}',this)">Copiar</button></div>
-    <p class="note" style="margin-bottom:18px">Cole na bio, no anúncio, no Google Meu Negócio — no lugar do link do WhatsApp</p>
-    <p style="font-size:13px;font-weight:700;color:var(--dm);margin-bottom:6px">📊 Painel do cliente</p>
-    <div class="link-box"><input value="${dl}" readonly><button onclick="cp('${dl}',this)">Copiar</button></div>
-    <p class="note">Só o cliente acessa — não compartilhe publicamente</p>
-    ${integSec}
-    <hr>
-    <p style="font-size:12px;color:var(--dr)">Plano: <b style="color:var(--tx)">${t.plano} (R$${PLANOS[t.plano]}/mês)</b> · Integração: <b style="color:var(--tx)">${t.integracao||'link'}</b> · WhatsApp: <b style="color:var(--tx)">${t.whatsapp}</b></p>
-  `);
-  if(t.integracao==='iframe'){ const ta=document.getElementById('capta-snip'); if(ta) ta.value=snippetIframe(t); }
-};
-window.cp = (txt,btn) => { navigator.clipboard?.writeText(txt); btn.textContent='Copiado ✓'; setTimeout(()=>btn.textContent='Copiar',1500); };
-window.cpArea = (id,btn) => { const el=document.getElementById(id); el.select(); navigator.clipboard?.writeText(el.value); btn.textContent='Copiado ✓'; setTimeout(()=>btn.textContent='Copiar código',1500); };
+      case 'pergunta_criar': {
+        const { tenant_id, ordem, texto, opcoes } = body;
+        if (!tenant_id || !texto || !Array.isArray(opcoes) || opcoes.length < 2)
+          return res.status(400).json({ error: 'Dados incompletos da pergunta.' });
+        await sb('capta_perguntas', {
+          method: 'POST', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ tenant_id, ordem: Number(ordem) || 1, texto: String(texto).slice(0, 300), opcoes, ativo: true }),
+        });
+        return res.status(200).json({ ok: true });
+      }
 
-function snippetIframe(t){
-  const url = BASE+'/capta.html?t='+t.slug;
-  return [
-'<!-- Capta · porteiro de WhatsApp — cole antes de </body> -->',
-'<button id="capta-wa" aria-label="Falar no WhatsApp" onclick="captaOpen()">',
-'  <svg viewBox="0 0 448 512" width="30" height="30" fill="#fff"><path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l119.7-31.4c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-156.9zM223.9 438.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-71 18.6 19-69.2-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-185.7 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.2-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"/></svg>',
-'</button>',
-'<div id="capta-ov" onclick="if(event.target===this)captaClose()">',
-'  <div id="capta-box">',
-'    <button id="capta-cl" onclick="captaClose()" aria-label="Fechar">\u2715</button>',
-'    <iframe id="capta-if" title="Atendimento" loading="lazy"></iframe>',
-'  </div>',
-'</div>',
-'<style>',
-'#capta-wa{position:fixed;right:18px;bottom:18px;width:60px;height:60px;border:0;border-radius:50%;background:#25D366;box-shadow:0 6px 22px rgba(0,0,0,.28);cursor:pointer;z-index:99998;display:grid;place-items:center;transition:transform .15s}',
-'#capta-wa:hover{transform:scale(1.06)}',
-'#capta-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:none;align-items:center;justify-content:center;padding:16px}',
-'#capta-ov.on{display:flex}',
-'#capta-box{position:relative;width:100%;max-width:430px;height:min(86vh,720px);background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45)}',
-'#capta-if{width:100%;height:100%;border:0;display:block}',
-'#capta-cl{position:absolute;top:10px;right:10px;width:34px;height:34px;border:0;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:18px;line-height:1;cursor:pointer;z-index:2}',
-'</style>',
-'<script>',
-'function captaOpen(){var f=document.getElementById("capta-if");if(!f.getAttribute("src"))f.setAttribute("src","'+url+'");document.getElementById("capta-ov").classList.add("on");document.body.style.overflow="hidden";}',
-'function captaClose(){document.getElementById("capta-ov").classList.remove("on");document.body.style.overflow="";}',
-'<\/script>'
-  ].join('\n');
-}
+      case 'pergunta_apagar': {
+        const { id } = body;
+        if (!id) return res.status(400).json({ error: 'id obrigatório.' });
+        await sb(`capta_perguntas?id=eq.${encodeURIComponent(id)}`, {
+          method: 'DELETE', headers: { Prefer: 'return=minimal' },
+        });
+        return res.status(200).json({ ok: true });
+      }
 
-// ---- PERGUNTAS ----
-window.abrirPerguntas = async id => {
-  const t=S.tenants.find(x=>x.id===id);
-  const {data:qs}=await sb.from('capta_perguntas').select('*').eq('tenant_id',id).order('ordem');
-  openDrawer(`
-    <div class="drawer-head"><h2>Perguntas — ${esc(t.nome)}</h2><button class="drawer-close" onclick="closeDrawer()">✕</button></div>
-    <div id="q-list">
-      ${(qs||[]).map((q,i)=>`
-        <div class="q-item">
-          <div class="q-item-head"><span class="q-num">${i+1}</span><span class="q-txt">${esc(q.texto)}</span><button class="btn btn-danger btn-sm" onclick="delQ('${q.id}','${id}')">✕</button></div>
-          ${(q.opcoes||[]).map(o=>`<div class="opt-item"><span>${esc(o.label)}</span><span class="opt-pts">+${o.pontos}pts</span></div>`).join('')}
-        </div>`).join('')||'<p style="color:var(--dr);font-size:14px;margin-bottom:16px">Sem perguntas ainda.</p>'}
-    </div>
-    <hr>
-    <h3 style="font-size:15px;font-weight:700;margin-bottom:14px">+ Nova pergunta</h3>
-    <div class="field"><label>Texto da pergunta *</label><input id="nq-txt" placeholder="Ex: Quando você quer começar?"></div>
-    <p style="font-size:12px;color:var(--brand);font-weight:700;margin-bottom:8px">Opções e pontuação:</p>
-    <div class="field" style="margin-bottom:8px"><div style="display:flex;gap:8px"><input placeholder="Essa semana" id="ol0" style="flex:1"><input type="number" min="0" max="10" placeholder="3" id="op0" style="width:66px"></div></div>
-    <div class="field" style="margin-bottom:8px"><div style="display:flex;gap:8px"><input placeholder="Em breve" id="ol1" style="flex:1"><input type="number" min="0" max="10" placeholder="1" id="op1" style="width:66px"></div></div>
-    <div class="field" style="margin-bottom:8px"><div style="display:flex;gap:8px"><input placeholder="Só pesquisando" id="ol2" style="flex:1"><input type="number" min="0" max="10" placeholder="0" id="op2" style="width:66px"></div></div>
-    <p class="note" style="margin-bottom:12px">Interesse imediato = 3pts · talvez = 1pt · só curioso = 0pt</p>
-    <div class="err" id="nq-err"></div>
-    <button class="btn btn-primary btn-full" onclick="salvarQ('${id}','${(qs||[]).length}')">Salvar pergunta</button>
-  `);
-};
-window.salvarQ = async (tid, ordem) => {
-  const txt=document.getElementById('nq-txt').value.trim();
-  if(!txt){document.getElementById('nq-err').textContent='Escreve a pergunta.';return;}
-  const opts=[];
-  for(let i=0;i<3;i++){
-    const l=document.getElementById(`ol${i}`)?.value.trim();
-    const p=parseInt(document.getElementById(`op${i}`)?.value||'0');
-    if(l) opts.push({label:l,pontos:isNaN(p)?0:p});
+      case 'lead_status': {
+        const { lead_id, status } = body;
+        if (!lead_id || !STATUS_OK.includes(status))
+          return res.status(400).json({ error: 'lead_id e status válido são obrigatórios.' });
+        await sb(`capta_leads?id=eq.${encodeURIComponent(lead_id)}`, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status }),
+        });
+        return res.status(200).json({ ok: true });
+      }
+
+      case 'tenant_ativo': {
+        const { id, ativo } = body;
+        if (!id) return res.status(400).json({ error: 'id obrigatório.' });
+        await sb(`capta_tenants?id=eq.${encodeURIComponent(id)}`, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ativo: !!ativo }),
+        });
+        return res.status(200).json({ ok: true });
+      }
+
+      case 'tenant_salvar': {
+        const { id, payload } = body;
+        if (!payload || !payload.nome || !payload.slug)
+          return res.status(400).json({ error: 'nome e slug são obrigatórios.' });
+        if (payload.plano && !PLANOS_OK.includes(payload.plano))
+          return res.status(400).json({ error: 'plano inválido.' });
+
+        const limpo = {
+          nome: String(payload.nome).slice(0, 120),
+          slug: String(payload.slug).toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 60),
+          whatsapp: String(payload.whatsapp || '').replace(/\D/g, '').slice(0, 20),
+          headline: String(payload.headline || 'Fale com a gente').slice(0, 200),
+          msg_template: String(payload.msg_template || 'Oi! Sou {nome}, vim pelo formulário.').slice(0, 400),
+          owner_email: payload.owner_email ? String(payload.owner_email).toLowerCase().trim().slice(0, 160) : null,
+          plano: payload.plano || 'free',
+          integracao: payload.integracao || 'link',
+          ativo: payload.ativo !== false,
+        };
+
+        if (id) {
+          await sb(`capta_tenants?id=eq.${encodeURIComponent(id)}`, {
+            method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(limpo),
+          });
+        } else {
+          limpo.dashboard_token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+          await sb('capta_tenants', {
+            method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(limpo),
+          });
+        }
+        return res.status(200).json({ ok: true });
+      }
+
+      default:
+        return res.status(400).json({ error: 'Ação desconhecida.' });
+    }
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
   }
-  if(opts.length<2){document.getElementById('nq-err').textContent='Adiciona pelo menos 2 opções.';return;}
-  const {error}=await sb.from('capta_perguntas').insert({tenant_id:tid,ordem:parseInt(ordem)+1,texto:txt,opcoes:opts});
-  if(error){document.getElementById('nq-err').textContent=error.message;return;}
-  abrirPerguntas(tid);
 };
-window.delQ = async (qid,tid) => {
-  if(!confirm('Apagar esta pergunta?'))return;
-  await sb.from('capta_perguntas').delete().eq('id',qid);
-  abrirPerguntas(tid);
-};
-
-// ---- LEAD DETAIL ----
-window.abrirLead = id => {
-  const l=S.leads.find(x=>x.id===id); if(!l)return;
-  const cn=S.tenants.find(t=>t.id===l.tenant_id)?.nome||l.capta_tenants?.nome||'';
-  const rs=Object.values(l.respostas||{});
-  const zn=(l.contato||'').replace(/\D/g,'');
-  const msg=encodeURIComponent(`Oi ${(l.nome||'').split(' ')[0]}! Vi seu contato pelo formulário — posso te ajudar?`);
-  const ct=tcss(l.temperatura)==='q'?'var(--quente)':tcss(l.temperatura)==='m'?'var(--morno)':'var(--frio)';
-  const ST=['novo','contatado','fechado','perdido'];
-  openDrawer(`
-    <div class="drawer-head"><h2>Lead</h2><button class="drawer-close" onclick="closeDrawer()">✕</button></div>
-    <div style="display:flex;align-items:center;gap:13px;margin-bottom:16px">
-      <div class="av" style="background:${col(l.nome)};width:48px;height:48px;border-radius:13px;font-size:18px">${ini(l.nome)}</div>
-      <div>
-        <div style="font-size:18px;font-weight:800">${esc(l.nome)}</div>
-        <div style="font-size:13px;color:var(--dm)">${esc(l.contato||'')}${l.origem?' · '+esc(l.origem):''}</div>
-        ${cn?`<div style="font-size:12px;color:var(--brand);font-weight:700">${esc(cn)}</div>`:''}
-      </div>
-    </div>
-    <div class="scorebar"><b>Pontuação</b><span style="font-size:19px;font-weight:800;color:${ct}">${l.score??'–'}/100 · ${esc(l.temperatura||'')}</span></div>
-    <div style="margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--dm)">Respostas</div>
-      ${rs.length?rs.map(r=>`<div class="qa-row"><span>${esc(r.label)}</span><span class="qa-a">+${r.pontos}</span></div>`).join(''):'<div style="color:var(--dr);font-size:13px">Sem respostas</div>'}
-    </div>
-    <div class="stbtns" id="st-${id}">
-      ${ST.map(s=>`<button class="${l.status===s?'on':''}" onclick="setStatus('${id}','${s}',this)">${s}</button>`).join('')}
-    </div>
-    ${zn?`<a class="zap-btn" href="https://wa.me/${zn}?text=${msg}" target="_blank">💬 Responder no WhatsApp</a>`:''}
-  `);
-};
-window.setStatus = async (lid,status,btn) => {
-  document.querySelectorAll(`#st-${lid} button`).forEach(b=>b.classList.toggle('on',b===btn));
-  const l=S.leads.find(x=>x.id===lid); if(l) l.status=status;
-  await sb.from('capta_leads').update({status}).eq('id',lid);
-};
-
-// ---- NOVO / EDITAR CLIENTE ----
-window.abrirNovoCliente = () => clienteDrawer(null);
-window.abrirEditar = id => clienteDrawer(S.tenants.find(t=>t.id===id));
-window.filtrarLeads = id => {
-  S.lf.tenant=id; S.tab='leads';
-  document.querySelectorAll('.nav-item').forEach(t=>t.classList.toggle('on',t.dataset.t==='leads'));
-  document.getElementById('page-title').textContent=TITLES.leads;
-  closeDrawer(); rLeads();
-};
-function clienteDrawer(t){
-  const ed=!!t;
-  openDrawer(`
-    <div class="drawer-head"><h2>${ed?'Editar':'Novo'} cliente</h2><button class="drawer-close" onclick="closeDrawer()">✕</button></div>
-    <div class="field"><label>Nome do negócio *</label><input id="c-nome" value="${esc(t?.nome||'')}" placeholder="Ex: Clínica Bella"></div>
-    <div class="field"><label>Slug (URL) * — só letras minúsculas e hífens</label><input id="c-slug" value="${esc(t?.slug||'')}" placeholder="clinica-bella" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'-')"></div>
-    <div class="field"><label>WhatsApp destino dos leads * — só números, com 55+DDD</label><input id="c-wa" value="${esc(t?.whatsapp||'55')}" placeholder="5592999990000" inputmode="tel"></div>
-    <div class="field"><label>Headline do formulário</label><input id="c-hl" value="${esc(t?.headline||'')}" placeholder="Quer uma consulta gratuita?"></div>
-    <div class="field"><label>Mensagem template — use {nome} pro nome do lead</label><textarea id="c-msg" rows="2">${esc(t?.msg_template||'Oi! Sou {nome}, vim pelo formulário e quero saber mais.')}</textarea></div>
-    <div class="field"><label>E-mail do dono — recebe aviso de lead novo</label><input id="c-email" type="email" value="${esc(t?.owner_email||'')}" placeholder="dono@negocio.com"></div>
-    <div class="field"><label>Plano</label>
-      <select id="c-plano">
-        <option value="free" ${(!t||t?.plano==='free')?'selected':''}>Free — R$0 (1 form · 30 leads/mês · sem qualificação)</option>
-        <option value="pro" ${t?.plano==='pro'?'selected':''}>Pro — R$97/mês (ilimitado + qualificação + IA)</option>
-        <option value="business" ${t?.plano==='business'?'selected':''}>Business — R$197/mês (+ landing IA + remarketing)</option>
-        <option value="gestao" ${t?.plano==='gestao'?'selected':''}>Gestão — R$397/mês (RISE gerencia os leads)</option>
-      </select>
-    </div>
-    <div class="field"><label>Integração no site — como o site se conecta ao Capta</label>
-      <select id="c-integ">
-        <option value="link" ${(!t||t?.integracao==='link')?'selected':''}>Link — o botão do site aponta pro formulário</option>
-        <option value="iframe" ${t?.integracao==='iframe'?'selected':''}>WhatsApp porteiro — botão flutuante abre o form em modal</option>
-      </select>
-    </div>
-    ${ed?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <label class="toggle"><input type="checkbox" id="c-ativo" ${t?.ativo?'checked':''}><span class="toggle-slider"></span></label>
-      <span style="font-size:14px;color:var(--dm)">Cliente ativo</span>
-    </div>`:''}
-    <div class="err" id="c-err"></div>
-    <button class="btn btn-primary btn-full" onclick="salvarCliente(${ed?`'${t.id}'`:'null'})">${ed?'Salvar alterações':'Criar cliente + gerar links'}</button>
-  `);
-  if(!ed){
-    document.getElementById('c-nome').oninput = function(){
-      const slug=this.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-      document.getElementById('c-slug').value=slug;
-    };
-  }
-}
-window.salvarCliente = async id => {
-  const nome=document.getElementById('c-nome').value.trim();
-  const slug=document.getElementById('c-slug').value.trim();
-  const wa=document.getElementById('c-wa').value.replace(/\D/g,'');
-  const hl=document.getElementById('c-hl').value.trim();
-  const msg=document.getElementById('c-msg').value.trim();
-  const email=document.getElementById('c-email').value.trim();
-  const plano=document.getElementById('c-plano').value;
-  const integ=document.getElementById('c-integ').value;
-  const ativo=id?document.getElementById('c-ativo')?.checked:true;
-  const errEl=document.getElementById('c-err');
-  if(!nome){errEl.textContent='Nome obrigatório.';return;}
-  if(!slug){errEl.textContent='Slug obrigatório.';return;}
-  if(wa.length<10){errEl.textContent='WhatsApp inválido (mín 10 dígitos com DDD).';return;}
-  const payload={nome,slug,whatsapp:wa,headline:hl||'Fale com a gente',msg_template:msg||'Oi! Sou {nome}, vim pelo formulário.',owner_email:email||null,plano,integracao:integ,ativo};
-  let error;
-  if(id){ ({error}=await sb.from('capta_tenants').update(payload).eq('id',id)); }
-  else   { ({error}=await sb.from('capta_tenants').insert(payload)); }
-  if(error){errEl.textContent=error.message;return;}
-  await loadAll();
-  closeDrawer();
-  if(!id){ const novo=S.tenants.find(t=>t.slug===slug); if(novo) setTimeout(()=>window.abrirLinks(novo.id),300); }
-  else { render(); }
-};
-
-/* ================= FORMULÁRIOS POR CLIENTE (Fase 5) ================= */
-const FAPI = '/api/capta-forms', MAPI = '/api/capta-maya';
-const afQS = t => `?t=${encodeURIComponent(t.slug)}&k=${encodeURIComponent(t.dashboard_token)}`;
-
-window.abrirFormularios = async (tid) => {
-  const t = S.tenants.find(x=>x.id===tid); if(!t) return;
-  AF = { tenant:t, data:null, editFormId:null, editPerguntas:[] };
-  openDrawer(`<div class="drawer-head"><h2>Formulários — ${esc(t.nome)}</h2><button class="drawer-close" onclick="closeDrawer()">✕</button></div><div id="af-body"><p style="color:var(--dr);font-size:14px">Carregando…</p></div>`);
-  await afLoad(); afList();
-};
-async function afLoad(){
-  try{ const r = await fetch(FAPI+afQS(AF.tenant)); AF.data = r.ok ? await r.json() : {forms:[],limite:1,plano:AF.tenant.plano}; }
-  catch(e){ AF.data = {forms:[],limite:1,plano:AF.tenant.plano}; }
-}
-function afList(){
-  const F=AF.data, forms=F.forms||[], limite=F.limite!=null?F.limite:1, usados=forms.length, cheio=usados>=limite;
-  const limTxt = limite>=1000000000?`${usados} formulário${usados!==1?'s':''}`:`${usados} de ${limite}`;
-  document.getElementById('af-body').innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <span style="font-size:13px;color:var(--dm)">${limTxt}</span>
-      ${cheio?`<span style="font-size:12px;color:var(--dr)">limite do plano ${esc(F.plano||'')}</span>`:`<button class="btn btn-primary btn-sm" onclick="afNovo()">+ Novo</button>`}
-    </div>
-    ${forms.length?forms.map(afCard).join(''):'<div class="empty">Nenhum formulário ainda. Crie o primeiro.</div>'}`;
-}
-function afCard(f){
-  const link=`${location.origin}/capta.html?t=${AF.tenant.slug}&f=${f.pubid}`;
-  const nq=(f.perguntas||[]).length;
-  return `<div class="q-item" style="padding:14px">
-    <div style="font-weight:700;font-size:14.5px">${esc(f.nome)}${f.ativo?'':' <span style="color:var(--dr);font-size:11px">(inativo)</span>'}</div>
-    ${f.proposito?`<div style="font-size:12px;color:var(--dm);margin-top:2px">${esc(f.proposito)}</div>`:''}
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:9px 0">
-      <span class="plan-badge plan-pro">${nq} perg.</span>
-      <span class="plan-badge plan-free">${f.leads||0} leads</span>
-      ${f.pede_email?'<span class="plan-badge plan-gestao">e-mail</span>':''}
-    </div>
-    <div class="link-box" style="margin-bottom:8px"><input value="${link}" readonly><button onclick="cp('${link}',this)">Copiar</button></div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="afPerguntas('${f.id}')">❓ Perguntas (${nq})</button>
-      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="afEditar('${f.id}')">✏ Editar</button>
-    </div>
-  </div>`;
-}
-window.afNovo = () => {
-  document.getElementById('af-body').innerHTML = `
-    <button class="btn btn-ghost btn-sm" onclick="afList()" style="margin-bottom:14px">← Voltar</button>
-    <div class="field"><label>Nome do formulário *</label><input id="afn-nome" placeholder="Ex: Consulta gratuita"></div>
-    <div class="field"><label>Propósito (opcional)</label><input id="afn-prop" placeholder="Ex: anúncio do Instagram"></div>
-    <label style="display:flex;align-items:center;gap:9px;margin-bottom:14px;font-size:14px;color:var(--dm)"><input type="checkbox" id="afn-email"> Pedir e-mail neste formulário</label>
-    <div class="err" id="afn-err"></div>
-    <button class="btn btn-primary btn-full" onclick="afCriar()">Criar formulário</button>`;
-};
-window.afCriar = async () => {
-  const nome=document.getElementById('afn-nome').value.trim();
-  if(!nome){document.getElementById('afn-err').textContent='Dá um nome pro formulário.';return;}
-  const proposito=document.getElementById('afn-prop').value.trim(), pede_email=document.getElementById('afn-email').checked;
-  try{
-    const r=await fetch(FAPI+afQS(AF.tenant),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',nome,proposito,pede_email})});
-    const d=await r.json();
-    if(!r.ok){document.getElementById('afn-err').textContent=d.error==='limite'?`Plano permite ${d.limite} formulário(s).`:(d.error||'Erro');return;}
-    await afLoad(); if(d.form) afPerguntasFor(d.form.id); else afList();
-  }catch(e){document.getElementById('afn-err').textContent=e.message;}
-};
-window.afEditar = (id) => {
-  const f=(AF.data.forms||[]).find(x=>x.id===id); if(!f)return;
-  document.getElementById('af-body').innerHTML = `
-    <button class="btn btn-ghost btn-sm" onclick="afList()" style="margin-bottom:14px">← Voltar</button>
-    <div class="field"><label>Nome</label><input id="afe-nome" value="${esc(f.nome)}"></div>
-    <div class="field"><label>Propósito</label><input id="afe-prop" value="${esc(f.proposito||'')}"></div>
-    <label style="display:flex;align-items:center;gap:9px;margin-bottom:8px;font-size:14px;color:var(--dm)"><input type="checkbox" id="afe-email" ${f.pede_email?'checked':''}> Pedir e-mail</label>
-    <label style="display:flex;align-items:center;gap:9px;margin-bottom:14px;font-size:14px;color:var(--dm)"><input type="checkbox" id="afe-ativo" ${f.ativo?'checked':''}> Formulário ativo</label>
-    <div class="err" id="afe-err"></div>
-    <button class="btn btn-primary btn-full" onclick="afSalvar('${id}')">Salvar</button>
-    <button class="btn btn-danger btn-full" style="margin-top:8px" onclick="afApagar('${id}')">Apagar formulário</button>`;
-};
-window.afSalvar = async (id) => {
-  const nome=document.getElementById('afe-nome').value.trim(), proposito=document.getElementById('afe-prop').value.trim();
-  const pede_email=document.getElementById('afe-email').checked, ativo=document.getElementById('afe-ativo').checked;
-  try{ await fetch(FAPI+afQS(AF.tenant),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',id,nome,proposito,pede_email,ativo})}); await afLoad(); afList(); }
-  catch(e){document.getElementById('afe-err').textContent=e.message;}
-};
-window.afApagar = async (id) => {
-  if(!confirm('Apagar este formulário e suas perguntas?'))return;
-  try{ await fetch(FAPI+afQS(AF.tenant),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',id})}); await afLoad(); afList(); }catch(e){alert(e.message);}
-};
-window.afPerguntas = (id) => afPerguntasFor(id);
-function afPerguntasFor(id){
-  const f=(AF.data.forms||[]).find(x=>x.id===id); if(!f)return;
-  AF.editFormId=id;
-  AF.editPerguntas=(f.perguntas||[]).map(p=>({texto:p.texto,opcoes:(p.opcoes||[]).map(o=>({label:o.label,pontos:o.pontos}))}));
-  afPaintEditor(f);
-}
-function afPaintEditor(f){
-  const maya = CONFIG.maya
-    ? `<button class="btn btn-primary btn-full" style="margin-bottom:12px" onclick="afMayaStart()">✨ Gerar com IA (Maya)</button>`
-    : `<button class="btn btn-ghost btn-full" style="margin-bottom:12px;opacity:.55;cursor:not-allowed" disabled>✨ Gerar com IA (em breve)</button>`;
-  document.getElementById('af-body').innerHTML = `
-    <button class="btn btn-ghost btn-sm" onclick="afList()" style="margin-bottom:14px">← Voltar aos formulários</button>
-    <div style="font-weight:700;font-size:15px;margin-bottom:3px">Perguntas · ${esc(f.nome)}</div>
-    <p style="font-size:12px;color:var(--dm);margin-bottom:12px">Cada opção vale pontos (0–3). Mais pontos = mais quente.</p>
-    ${maya}
-    <div id="af-maya"></div>
-    <div id="af-qlist">${afEditorList()}</div>
-    <hr>
-    <div style="font-size:13px;font-weight:700;margin-bottom:10px">+ Adicionar pergunta (manual)</div>
-    <div class="field"><label>Pergunta</label><input id="afq-txt" placeholder="Ex: Quando quer começar?"></div>
-    <div class="field"><label>Opções — uma por linha, pontos após "|"</label><textarea id="afq-ops" rows="3" placeholder="Essa semana | 3&#10;Esse mês | 1&#10;Só pesquisando | 0"></textarea></div>
-    <div class="err" id="afq-err"></div>
-    <button class="btn btn-ghost btn-full" onclick="afAddPergunta()">Adicionar pergunta</button>
-    <button class="btn btn-primary btn-full" style="margin-top:8px" onclick="afSalvarPerguntas()">Salvar formulário (${AF.editPerguntas.length})</button>`;
-}
-function afEditorList(){
-  if(!AF.editPerguntas.length) return '<div class="empty" style="padding:16px">Nenhuma pergunta ainda. Adicione manual ou gere com a Maya.</div>';
-  return AF.editPerguntas.map((q,i)=>`<div class="q-item">
-    <div class="q-item-head"><span class="q-num">${i+1}</span><span class="q-txt">${esc(q.texto)}</span><button class="btn btn-danger btn-sm" onclick="afDelPergunta(${i})">✕</button></div>
-    ${(q.opcoes||[]).map(o=>`<div class="opt-item"><span>${esc(o.label)}</span><span class="opt-pts">+${o.pontos}</span></div>`).join('')}
-  </div>`).join('');
-}
-function afRepaint(){ const f=(AF.data.forms||[]).find(x=>x.id===AF.editFormId)||{nome:''}; afPaintEditor(f); }
-window.afAddPergunta = () => {
-  const txt=document.getElementById('afq-txt').value.trim(), raw=document.getElementById('afq-ops').value.trim();
-  if(!txt){document.getElementById('afq-err').textContent='Escreve a pergunta.';return;}
-  const opcoes=raw.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const p=l.split('|');return{label:(p[0]||'').trim(),pontos:parseInt((p[1]||'0').trim())||0};}).filter(o=>o.label);
-  if(opcoes.length<2){document.getElementById('afq-err').textContent='Coloca pelo menos 2 opções.';return;}
-  AF.editPerguntas.push({texto:txt,opcoes}); afRepaint();
-};
-window.afDelPergunta = (i) => { AF.editPerguntas.splice(i,1); afRepaint(); };
-window.afSalvarPerguntas = async () => {
-  try{
-    const r=await fetch(FAPI+afQS(AF.tenant),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'salvar_perguntas',id:AF.editFormId,perguntas:AF.editPerguntas})});
-    const d=await r.json(); if(!r.ok){document.getElementById('afq-err').textContent=d.error||'Erro ao salvar';return;}
-    await afLoad(); afList();
-  }catch(e){document.getElementById('afq-err').textContent=e.message;}
-};
-window.afMayaStart = () => {
-  document.getElementById('af-maya').innerHTML = `<div class="q-item" style="padding:14px;margin-bottom:12px">
-    <div style="font-weight:700;margin-bottom:6px">✨ Maya</div>
-    <p style="font-size:12.5px;color:var(--dm);margin-bottom:10px">Conta o que o negócio faz — a Maya monta as perguntas.</p>
-    <div class="field"><label>Nicho / o que vende</label><input id="afm-nicho" placeholder="Ex: escola de natação infantil"></div>
-    <div class="field"><label>Instagram (opcional)</label><input id="afm-insta" placeholder="@negocio"></div>
-    <div class="err" id="afm-err"></div>
-    <button class="btn btn-primary btn-full" onclick="afMayaGerar()">Gerar perguntas ✨</button>
-  </div>`;
-};
-window.afMayaGerar = async () => {
-  const nicho=document.getElementById('afm-nicho').value.trim();
-  if(!nicho){document.getElementById('afm-err').textContent='Conta o que o negócio faz.';return;}
-  const instagram=document.getElementById('afm-insta').value.trim();
-  document.getElementById('af-maya').innerHTML='<div class="q-item" style="padding:16px;text-align:center;margin-bottom:12px"><p style="color:var(--dm);font-size:13px">Maya está montando as perguntas…</p></div>';
-  try{
-    const f=(AF.data.forms||[]).find(x=>x.id===AF.editFormId);
-    const r=await fetch(MAPI,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'gerar',slug:AF.tenant.slug,token:AF.tenant.dashboard_token,contexto:{nicho,instagram,pede_email:!!(f&&f.pede_email)}})});
-    const d=await r.json();
-    if(!r.ok){document.getElementById('af-maya').innerHTML=`<div class="q-item" style="padding:14px;margin-bottom:12px"><p style="color:var(--dm);font-size:13px">${esc(d.error||'Erro')}</p><button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="afMayaStart()">Tentar de novo</button></div>`;return;}
-    (d.perguntas||[]).forEach(q=>AF.editPerguntas.push({texto:q.texto,opcoes:q.opcoes})); afRepaint();
-  }catch(e){document.getElementById('af-maya').innerHTML=`<div class="q-item" style="padding:14px"><p style="color:var(--dm);font-size:13px">${esc(e.message)}</p></div>`;}
-};
-
-window.S = S;
-init();
-</script>
-</body>
-</html>
