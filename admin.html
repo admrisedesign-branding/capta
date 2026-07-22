@@ -552,21 +552,38 @@ window.cpArea = (id,btn) => { const el=document.getElementById(id); el.select();
 
 function saudacaoSec(t){
   const link = BASE+'/capta.html?t='+t.slug+'&o=whatsapp-direto';
-  const txt = [
+  // Automática: dispara para QUALQUER primeiro contato — inclusive quem acabou
+  // de preencher o formulário do site. Por isso o convite é condicional.
+  const auto = [
     'Oi! Aqui é da '+t.nome+' \u{1F44B}',
+    'Recebemos sua mensagem e já te respondemos.',
     '',
-    'Pra te passar um orçamento certinho, responde umas perguntas rápidas (leva 1 minuto):',
+    'Se você ainda não preencheu nosso formulário rápido, ele agiliza seu orçamento:',
+    link
+  ].join('\n');
+  // Manual: enviada só para quem chegou sem passar por nenhum funil.
+  const manual = [
+    'Pra te passar o orçamento certinho, responde umas perguntas rápidas (leva 1 minuto):',
     link,
     '',
-    'Assim já sabemos o que você precisa e voltamos com o valor.'
+    'Assim já sei o que você precisa e volto com o valor.'
   ].join('\n');
-  return `<p style="font-size:13px;font-weight:700;color:var(--dm);margin:18px 0 6px">\u{1F4AC} Mensagem de saudação — WhatsApp Business</p>
-    <p class="note" style="margin-bottom:8px">Pega quem chega direto no WhatsApp (indicação, cartão, placa) e nunca passou pelo site. O WhatsApp envia sozinho na primeira mensagem de quem nunca conversou com o número.</p>
-    <textarea id="capta-saud" readonly style="width:100%;box-sizing:border-box;height:140px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--tx);font-size:12.5px;line-height:1.5;padding:10px;resize:vertical">${esc(txt)}</textarea>
-    <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="cpArea('capta-saud',this)">Copiar mensagem</button>
-    <p class="note" style="margin-top:8px">No celular do cliente: <b>WhatsApp Business → Ferramentas comerciais → Mensagem de saudação</b> → ativar, colar o texto, enviar para <b>Todos que não estão nos contatos</b>. Vale criar também uma <b>Resposta rápida</b> com o mesmo texto (atalho <b>/form</b>), porque a saudação só dispara pra quem nunca escreveu antes.</p>
-    <p class="note">Esse link marca origem <b>whatsapp-direto</b> — no painel dá pra separar quem veio de indicação de quem veio do site.</p>`;
+  return `<p style="font-size:13px;font-weight:700;color:var(--dm);margin:18px 0 6px">\u{1F4AC} Mensagens pro WhatsApp Business</p>
+    <p class="note" style="margin-bottom:10px">Pra capturar quem chega direto no WhatsApp (indicação, cartão, placa) e nunca passou pelo site.</p>
+
+    <p style="font-size:12.5px;font-weight:700;color:var(--dm);margin-bottom:6px">1 · Saudação automática</p>
+    <textarea id="capta-saud" readonly style="width:100%;box-sizing:border-box;height:130px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--tx);font-size:12.5px;line-height:1.5;padding:10px;resize:vertical">${esc(auto)}</textarea>
+    <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="cpArea('capta-saud',this)">Copiar saudação</button>
+    <p class="note" style="margin-top:8px">Em <b>Ferramentas comerciais → Mensagem de saudação</b>. Ela dispara em <u>todo</u> primeiro contato — inclusive de quem acabou de preencher o formulário do site. Por isso o convite é condicional (“se ainda não preencheu”): assim não soa estranho pra quem já respondeu.</p>
+
+    <p style="font-size:12.5px;font-weight:700;color:var(--dm);margin:16px 0 6px">2 · Resposta rápida <span style="font-weight:400">(atalho /form)</span></p>
+    <textarea id="capta-rap" readonly style="width:100%;box-sizing:border-box;height:110px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--tx);font-size:12.5px;line-height:1.5;padding:10px;resize:vertical">${esc(manual)}</textarea>
+    <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="cpArea('capta-rap',this)">Copiar resposta rápida</button>
+    <p class="note" style="margin-top:8px">Em <b>Ferramentas comerciais → Respostas rápidas</b>. O dono manda em dois toques quando percebe que a pessoa chegou sem contexto. Direta, sem “se”, porque ele já sabe que ela não passou pelo funil.</p>
+    <p class="note">Prefere zero risco de mensagem estranha? Use só a resposta rápida e deixe a saudação desligada.</p>
+    <p class="note">Os dois links marcam origem <b>whatsapp-direto</b> — no painel dá pra separar indicação de quem veio do site.</p>`;
 }
+
 
 function snippetApiSec(t){
   const url = BASE+'/api/capta-ingest';
