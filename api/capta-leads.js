@@ -44,27 +44,46 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     let leads;
     try {
-      leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&select=id,nome,contato,origem,temperatura,score,status,criado_em,respostas&order=criado_em.desc`);
-    } catch (e) { return res.status(500).json({ error: e.message }); }
+      leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&select=id,nome,contato,origem,temperatura,score,status,criado_em,respostas,notas&order=criado_em.desc`);
+    } catch (e) {
+      // banco ainda sem a coluna de notas: segue sem ela
+      try {
+        leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&select=id,nome,contato,origem,temperatura,score,status,criado_em,respostas&order=criado_em.desc`);
+      } catch (e2) { return res.status(500).json({ error: e2.message }); }
+    }
     return res.status(200).json({
       tenant: { nome: tenant.nome, plano: tenant.plano, slug: tenant.slug, integracao: tenant.integracao },
       leads: leads || [],
     });
   }
 
-  // ---------- PATCH: status de um lead ----------
+  // ---------- PATCH: status e/ou anotações de um lead ----------
   if (req.method === 'PATCH') {
     let body = req.body;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
-    const { lead_id, status } = body || {};
-    if (!lead_id || !STATUS_OK.includes(status))
-      return res.status(400).json({ error: 'lead_id e status válido são obrigatórios.' });
+    const { lead_id, status, notas } = body || {};
+    if (!lead_id) return res.status(400).json({ error: 'lead_id é obrigatório.' });
+
+    const patch = {};
+    if (status !== undefined) {
+      if (!STATUS_OK.includes(status)) return res.status(400).json({ error: 'status inválido.' });
+      patch.status = status;
+    }
+    if (notas !== undefined) patch.notas = String(notas || '').slice(0, 4000);
+    if (!Object.keys(patch).length)
+      return res.status(400).json({ error: 'Informe status ou notas.' });
+
     try {
       // escopo no tenant: um cliente nunca altera lead de outro
       await sb(`capta_leads?id=eq.${encodeURIComponent(lead_id)}&tenant_id=eq.${tenant.id}`, {
-        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status }),
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch),
       });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
+    } catch (e) {
+      const msg = String(e.message || '');
+      if (msg.includes('notas'))
+        return res.status(500).json({ error: 'A coluna de anotações ainda não existe no banco. Rode o SQL sql-notas.sql no Supabase.' });
+      return res.status(500).json({ error: e.message });
+    }
     return res.status(200).json({ ok: true });
   }
 
