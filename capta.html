@@ -48,6 +48,8 @@ input:focus{outline:none;border-color:var(--or);background:var(--surface);box-sh
 .btn:hover{transform:translateY(-1px)}
 .btn[disabled]{opacity:.4;cursor:not-allowed;transform:none}
 .btn-back{background:none;border:none;color:var(--dr);font-weight:600;font-size:14px;padding:10px;width:auto;margin-top:8px;cursor:pointer;font-family:inherit}
+a.btn{display:block;text-align:center;text-decoration:none;box-sizing:border-box}
+.btn.ghost{background:none;color:var(--dr);border:1px solid currentColor;box-shadow:none;margin-top:10px;opacity:.9}
 .err{color:#ff8a5c;font-size:13px;font-weight:600;min-height:18px;margin-top:6px}
 .foot{text-align:center;font-size:11px;color:var(--dr);margin-top:24px}
 .center{margin:auto 0;text-align:center}
@@ -170,28 +172,76 @@ function screenQ(){
   if(back) back.onclick = () => { state.idx--; screenQ(); };
 }
 
+function leadPayload(){
+  return {
+    tenant_id: state.tenant.id,
+    formulario_id: state.form ? state.form.id : null,
+    nome: state.nome,
+    contato: state.contato,
+    email: state.email || null,
+    respostas: state.ans,
+    origem: ORIGEM
+  };
+}
+
+// Grava o lead SEM depender de permissão de leitura (o .select() exige SELECT no RLS
+// e, quando não há, o banco cancela o insert inteiro e o lead se perde).
+async function salvarLead(){
+  const payload = leadPayload();
+  let erro = null;
+  for(let tentativa = 1; tentativa <= 3; tentativa++){
+    try{
+      const { error } = await sb.from('capta_leads').insert(payload);
+      if(!error) return { ok:true };
+      erro = error;
+    }catch(e){ erro = e; }
+    if(tentativa < 3) await new Promise(r => setTimeout(r, 700 * tentativa));
+  }
+  // guarda localmente pra não perder o contato mesmo com falha
+  try{
+    const fila = JSON.parse(localStorage.getItem('capta_leads_pendentes') || '[]');
+    fila.push({ ...payload, _falhou_em: new Date().toISOString() });
+    localStorage.setItem('capta_leads_pendentes', JSON.stringify(fila));
+  }catch(e){}
+  return { ok:false, erro: (erro && (erro.message || erro.hint)) || 'falha desconhecida' };
+}
+
 async function finish(){
   loading('Quase lá…');
-  let leadId = null;
-  try{
-    const { data, error } = await sb.from('capta_leads').insert({
-      tenant_id: state.tenant.id,
-      formulario_id: state.form ? state.form.id : null,
-      nome: state.nome,
-      contato: state.contato,
-      email: state.email || null,
-      respostas: state.ans,
-      origem: ORIGEM
-    }).select('id').single();
-    if(error) throw error;
-    leadId = data.id;
-    fetch(NOTIFY_API, { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lead_id: leadId }) }).catch(() => {});
-  } catch(e){ console.warn('insert falhou:', e?.message); }
+  const r = await salvarLead();
   const msg = state.tenant.msg_template.replace(/\{nome\}/g, state.nome);
   const url = `https://wa.me/${state.tenant.whatsapp}?text=${encodeURIComponent(msg)}`;
+
+  if(!r.ok){
+    console.error('Capta: não foi possível gravar o lead —', r.erro);
+    screenErro(url);
+    return;
+  }
+
+  // notificação por e-mail (best effort, não bloqueia)
+  fetch(NOTIFY_API, { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ tenant_id: state.tenant.id, contato: state.contato }) }).catch(() => {});
+
   screenDone(url);
   setTimeout(() => { location.href = url; }, 1200);
+}
+
+// Tela de erro: avisa em vez de fingir que deu certo, e oferece tentar de novo
+function screenErro(url){
+  app.innerHTML = `<div class="card fade">
+    <p class="eb">${esc(state.tenant.nome)}</p>
+    <h1>Quase lá!</h1>
+    <p class="sub">Tivemos um problema pra registrar suas respostas. Você pode tentar de novo ou falar direto com a gente no WhatsApp.</p>
+    <button class="btn" id="retry">Tentar de novo</button>
+    <a class="btn ghost" href="${url}">Falar no WhatsApp</a>
+  </div>`;
+  const b = document.getElementById('retry');
+  if(b) b.onclick = async () => {
+    b.disabled = true; b.textContent = 'Enviando…';
+    const r2 = await salvarLead();
+    if(r2.ok){ screenDone(url); setTimeout(() => { location.href = url; }, 1200); }
+    else { b.disabled = false; b.textContent = 'Tentar de novo'; }
+  };
 }
 
 function screenDone(url){
