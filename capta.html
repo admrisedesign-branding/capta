@@ -95,8 +95,11 @@ async function init(){
   const { data:t } = await sb.from('capta_tenants')
     .select('id,nome,whatsapp,msg_template,cor,headline,plano').eq('slug',SLUG).single();
   if(!t){ return fatal('Negócio não encontrado ou inativo.'); }
-  // resolve o formulário (multi-formulário): ?f=pubid, senão o principal (mais antigo ativo)
-  let form = null;
+  // Resolve o formulário (multi-formulário): ?f=pubid, senão o principal.
+  // "Principal" = o mais antigo ativo QUE TENHA PERGUNTAS. Sem essa condição,
+  // um formulário vazio (um "Teste" criado no admin, por exemplo) sequestra o
+  // link público e a pessoa vê uma tela sem perguntas.
+  let form = null, qs = null;
   try {
     if(FORMID){
       const { data } = await sb.from('capta_formularios')
@@ -104,18 +107,27 @@ async function init(){
       form = data && data[0];
     }
     if(!form){
-      const { data } = await sb.from('capta_formularios')
-        .select('id,pede_email').eq('tenant_id',t.id).eq('ativo',true).order('criado_em',{ascending:true}).limit(1);
-      form = data && data[0];
+      const { data:forms } = await sb.from('capta_formularios')
+        .select('id,pede_email').eq('tenant_id',t.id).eq('ativo',true).order('criado_em',{ascending:true});
+      const lista = forms || [];
+      if(lista.length){
+        const { data:todas } = await sb.from('capta_perguntas')
+          .select('id,texto,opcoes,formulario_id').eq('tenant_id',t.id).eq('ativo',true).order('ordem');
+        const porForm = {};
+        (todas||[]).forEach(q => { (porForm[q.formulario_id] = porForm[q.formulario_id] || []).push(q); });
+        form = lista.find(f => (porForm[f.id]||[]).length) || lista[0];
+        qs = porForm[form.id] || null;
+      }
     }
   } catch(e){ /* sem tabela de formulários: segue no modo antigo por tenant */ }
-  let qs;
-  if(form){
-    ({ data:qs } = await sb.from('capta_perguntas')
-      .select('id,texto,opcoes').eq('formulario_id',form.id).eq('ativo',true).order('ordem'));
-  } else {
-    ({ data:qs } = await sb.from('capta_perguntas')
-      .select('id,texto,opcoes').eq('tenant_id',t.id).eq('ativo',true).order('ordem'));
+  if(!qs){
+    if(form){
+      ({ data:qs } = await sb.from('capta_perguntas')
+        .select('id,texto,opcoes').eq('formulario_id',form.id).eq('ativo',true).order('ordem'));
+    } else {
+      ({ data:qs } = await sb.from('capta_perguntas')
+        .select('id,texto,opcoes').eq('tenant_id',t.id).eq('ativo',true).order('ordem'));
+    }
   }
   state.tenant = t; state.form = form; state.perguntas = qs || [];
   if(t.cor) document.documentElement.style.setProperty('--or', t.cor);
