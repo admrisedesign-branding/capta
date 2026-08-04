@@ -11,6 +11,7 @@
 //   lead_status        { lead_id, status }
 //   tenant_ativo       { id, ativo }
 //   tenant_salvar      { id?, payload }
+//   tenant_excluir     { id }
 //
 // Env: SUPABASE_SERVICE_ROLE_KEY
 
@@ -146,6 +147,19 @@ module.exports = async function handler(req, res) {
             method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(limpo),
           });
         }
+        return res.status(200).json({ ok: true });
+      }
+
+      case 'tenant_excluir': {
+        const { id } = body;
+        if (!id) return res.status(400).json({ error: 'id obrigatório.' });
+        // apaga primeiro os dados dependentes, depois o próprio tenant,
+        // pra não deixar leads/perguntas/formulários órfãos
+        const scope = `tenant_id=eq.${encodeURIComponent(id)}`;
+        await sb(`capta_leads?${scope}`,       { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        await sb(`capta_perguntas?${scope}`,   { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        await sb(`capta_formularios?${scope}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        await sb(`capta_tenants?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
         return res.status(200).json({ ok: true });
       }
 
