@@ -52,7 +52,7 @@ module.exports = async function handler(req, res) {
   const esc = encodeURIComponent(email);
 
   async function tenantDoDono() {
-    const t = await sbRest(`capta_tenants?owner_email=ilike.${esc}&select=slug,dashboard_token,ativo&limit=1`);
+    const t = await sbRest(`capta_tenants?owner_email=eq.${esc}&select=slug,dashboard_token,ativo&limit=1`);
     return t && t[0];
   }
 
@@ -106,7 +106,9 @@ module.exports = async function handler(req, res) {
 
   // ---------- ROTEAMENTO ----------
   try {
-    const admins = await sbRest(`capta_admins?email=ilike.${esc}&select=email`);
+    // comparação EXATA (eq), não ilike — ilike sem escapar curinga pode dar match indevido.
+    // email já vem normalizado em minúsculas; filtramos exatamente por ele.
+    const admins = await sbRest(`capta_admins?email=eq.${esc}&select=email`);
     if (admins && admins.length) return res.status(200).json({ role: 'admin', url: '/admin.html' });
   } catch (e) {}
 
