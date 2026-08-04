@@ -3198,7 +3198,8 @@ async function excluirLead(l){
 function sairDaConta(){
   if(!confirm('Deseja sair da sua conta?')) return;
   try{ localStorage.removeItem('capta_dash'); }catch(e){}
-  location.href = '/login.html';
+  // desloga de verdade: o login.html com ?logout=1 encerra a sessão do Supabase
+  location.href = '/login.html?logout=1';
 }
 
 async function setStatus(l, status){
