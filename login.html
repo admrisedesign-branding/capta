@@ -204,17 +204,18 @@ function traduz(m){
 
 // ao abrir: se já tem sessão (inclusive volta do Google), roteia
 (async () => {
+  // logout explícito vindo do dashboard: encerra a sessão e mostra o login limpo
+  if(new URLSearchParams(location.search).get('logout')==='1'){
+    try{ localStorage.removeItem('capta_dash'); }catch(e){}
+    try{ await sb.auth.signOut(); }catch(e){}
+    history.replaceState(null,'','/login.html');
+    show('auth-view'); return;
+  }
   const { data:{ session } } = await sb.auth.getSession();
   if(session){
-    // atalho: se já entrou antes neste aparelho, vai direto pro painel (sem esperar a rede)
-    try{
-      const salvo = localStorage.getItem('capta_dash');
-      if(salvo){
-        const ir = new URLSearchParams(location.search).get('ir');
-        location.replace(ir ? salvo + '&ir=' + encodeURIComponent(ir) : salvo);
-        return;
-      }
-    }catch(e){}
+    // sempre roteia pela sessão real (o servidor decide admin/cliente pelo e-mail logado).
+    // não usar atalho de localStorage: um capta_dash salvo de outro acesso mandaria a pessoa
+    // pro painel errado sem checar de quem é a sessão.
     route();
   } else {
     try{ localStorage.removeItem('capta_dash'); }catch(e){}
