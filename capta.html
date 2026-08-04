@@ -243,10 +243,31 @@ function irParaWhats(url){
   location.href = url;
 }
 
+// Monta uma mensagem humana a partir do que a pessoa respondeu — serve pra
+// qualquer cliente (usa os labels das respostas, sem assumir o nicho).
+function montarMensagem(){
+  const primeiro = (state.nome||'').trim().split(/\s+/)[0] || '';
+  const respostas = state.perguntas
+    .map(q => (state.ans[q.id]||{}).label)
+    .filter(Boolean);
+  const linhas = [];
+  linhas.push('Oi! Sou ' + primeiro + ', vim pelo formulário.');
+  if(respostas.length){
+    linhas.push('Resumo do que preciso:');
+    respostas.forEach(r => linhas.push('• ' + r));
+  }
+  linhas.push('Pode me passar um orçamento?');
+  return linhas.join('\n');
+}
+
 async function finish(){
   loading('Quase lá…');
   const r = await salvarLead();
-  const msg = state.tenant.msg_template.replace(/\{nome\}/g, state.nome);
+  // se houver respostas, monta a mensagem humana; senão, cai no template do tenant
+  const temRespostas = state.perguntas.some(q => (state.ans[q.id]||{}).label);
+  const msg = temRespostas
+    ? montarMensagem()
+    : (state.tenant.msg_template || 'Oi! Sou {nome}, vim pelo formulário.').replace(/\{nome\}/g, state.nome);
   const url = `https://wa.me/${state.tenant.whatsapp}?text=${encodeURIComponent(msg)}`;
 
   if(!r.ok){
