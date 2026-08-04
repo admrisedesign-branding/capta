@@ -1,6 +1,7 @@
 // /api/capta-leads.js — Vercel Serverless Function (Node 18+)
 // GET  ?t=slug&k=token  -> { tenant:{nome,plano,...}, leads:[...] }   (painel do cliente lê os leads)
 // PATCH ?t=slug&k=token  body { lead_id, status }                     (muda o status de um lead)
+// DELETE ?t=slug&k=token body { lead_id }                             (exclui um lead)
 //
 // Variável de ambiente no Vercel:
 //   SUPABASE_SERVICE_ROLE_KEY  (secreta)  -> Supabase → Settings → API → service_role
@@ -87,5 +88,22 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  return res.status(405).json({ error: 'Método não suportado (use GET ou PATCH).' });
+  // ---------- DELETE: exclui um lead (escopado no tenant) ----------
+  if (req.method === 'DELETE') {
+    let body = req.body;
+    if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
+    const { lead_id } = body || {};
+    if (!lead_id) return res.status(400).json({ error: 'lead_id é obrigatório.' });
+    try {
+      // escopo no tenant: um cliente nunca apaga lead de outro
+      await sb(`capta_leads?id=eq.${encodeURIComponent(lead_id)}&tenant_id=eq.${tenant.id}`, {
+        method: 'DELETE', headers: { Prefer: 'return=minimal' },
+      });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+    return res.status(200).json({ ok: true });
+  }
+
+  return res.status(405).json({ error: 'Método não suportado (use GET, PATCH ou DELETE).' });
 }
