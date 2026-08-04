@@ -326,7 +326,12 @@ h2{font-size:16px;font-weight:700}
       <div class="crumb" id="page-title">Painel</div>
       <div class="top-right">
         <div class="demo-tag" id="demo-tag" style="display:none">Demonstração</div>
-        <div class="acct" id="acct">—</div>
+        <div class="acct-wrap" style="position:relative">
+          <div class="acct" id="acct" style="cursor:pointer" title="Conta">—</div>
+          <div id="acct-menu" style="display:none;position:absolute;right:0;top:44px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:6px;min-width:150px;z-index:50">
+            <button id="btn-sair" style="width:100%;text-align:left;background:none;border:0;padding:10px 12px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer">Sair</button>
+          </div>
+        </div>
       </div>
     </header>
     <main class="content" id="view"></main>
@@ -2701,6 +2706,15 @@ const side   = document.getElementById('side');
 const sideScrim = document.getElementById('side-scrim');
 
 function closeSide(){ side.classList.remove('open'); sideScrim.classList.remove('on'); }
+// menu da conta (Sair)
+(function(){
+  const acct=document.getElementById('acct'), menu=document.getElementById('acct-menu');
+  if(acct&&menu){
+    acct.addEventListener('click', e=>{ e.stopPropagation(); menu.style.display = menu.style.display==='none'?'block':'none'; });
+    document.addEventListener('click', ()=>{ menu.style.display='none'; });
+  }
+  const bs=document.getElementById('btn-sair'); if(bs) bs.addEventListener('click', sairDaConta);
+})();
 document.getElementById('burger').onclick = () => { side.classList.add('open'); sideScrim.classList.add('on'); };
 sideScrim.onclick = closeSide;
 
@@ -3130,8 +3144,10 @@ function openLead(i){
       <div class="notas-lb">📝 Suas anotações <span id="notas-st" class="notas-st"></span></div>
       <textarea id="lead-notas" class="notas-ta" rows="3" placeholder="O que rolou na conversa? Ex: quer proposta de site, tem clínica, retomar segunda…">${esc(l.notas||'')}</textarea>
     </div>
-    <a class="zap" href="https://wa.me/${zapNum}?text=${msg}" target="_blank" rel="noopener">💬 Responder no WhatsApp</a>`;
+    <a class="zap" href="https://wa.me/${zapNum}?text=${msg}" target="_blank" rel="noopener">💬 Responder no WhatsApp</a>
+    <button class="del-lead" data-id="${l.id}" style="width:100%;margin-top:10px;background:none;border:1px solid var(--line);color:var(--muted);border-radius:11px;padding:11px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">🗑 Excluir este lead</button>`;
   dbody.querySelectorAll('.stbtns button').forEach(b => b.onclick=()=>setStatus(l,b.dataset.s));
+  const delBtn = dbody.querySelector('.del-lead'); if(delBtn) delBtn.onclick=()=>excluirLead(l);
   ligarNotas(l);
   scrim.classList.add('on'); drawer.classList.add('on');
 }
@@ -3160,6 +3176,29 @@ function ligarNotas(l){
   };
   ta.oninput = () => { if(st){ st.textContent=''; } clearTimeout(timer); timer = setTimeout(salvar, 900); };
   ta.onblur = () => { clearTimeout(timer); salvar(); };
+}
+
+async function excluirLead(l){
+  const nome = (l.nome||'este lead').trim();
+  if(!confirm('Excluir '+nome+'?\n\nEssa ação não pode ser desfeita.')) return;
+  if(!DEMO){
+    try{
+      const r = await fetch(`${LEADS_API}?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`, {
+        method:'DELETE', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ lead_id: l.id })
+      });
+      if(!r.ok) throw new Error('falha');
+    }catch(e){ alert('Não consegui excluir agora. Tente de novo.'); return; }
+  }
+  DATA.leads = DATA.leads.filter(x => x.id !== l.id);
+  scrim.classList.remove('on'); drawer.classList.remove('on');
+  render();
+}
+
+function sairDaConta(){
+  if(!confirm('Deseja sair da sua conta?')) return;
+  try{ localStorage.removeItem('capta_dash'); }catch(e){}
+  location.href = '/login.html';
 }
 
 async function setStatus(l, status){
