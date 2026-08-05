@@ -2864,6 +2864,7 @@ const REL_FONTE = {
   ga4:      {cor:'#E8710A', ic:'▲', nome:'Site',      sub:'Google Analytics 4'},
   crm:      {cor:'#7c3aed', ic:'☰', nome:'CRM',       sub:'Leads, funil e matrículas'},
 };
+const raw = s => (s==null?'':String(s));
 function relStyle(){
   if(document.getElementById('rel-style')) return;
   const s=document.createElement('style'); s.id='rel-style';
@@ -2871,18 +2872,26 @@ function relStyle(){
   .relx .rel-topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
   .relx .rel-msel{background:var(--card);border:1px solid var(--line);border-radius:11px;color:var(--ink);font-family:inherit;font-weight:700;font-size:13.5px;padding:9px 12px;cursor:pointer}
   .relx .rel-sub{color:var(--muted);font-size:13px;font-weight:600}
+  .relx .rel-hero{background:linear-gradient(135deg,var(--brand-soft),rgba(22,163,74,.07));border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:16px}
+  .relx .rel-hero .rc{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:10px}
+  .relx .rel-hero .rc b{display:block;font-size:23px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
+  .relx .rel-hero .rc span{font-size:12px;color:var(--muted);font-weight:600}
+  .relx .rel-hero p{margin:0;font-size:13.5px;color:var(--ink);line-height:1.6}
   .relx .rel-fontes{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:18px}
   .relx .rel-fchip{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:30px;padding:6px 12px 6px 8px;font-weight:700;font-size:13px}
   .relx .rel-fchip .d{width:9px;height:9px;border-radius:50%}
   .relx .rel-fchip.off{opacity:.6;font-weight:600;color:var(--muted);border-style:dashed}
   .relx .rel-fchip.off .d{background:var(--muted)!important}
+  .relx .rel-title{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:800;margin:26px 0 4px;letter-spacing:-.01em}
+  .relx .rel-title .dt{width:9px;height:9px;border-radius:50%;background:var(--brand);flex:none}
+  .relx .rel-lead{color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.55;max-width:82ch}
   .relx .rel-sec{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px 20px 22px;margin-bottom:16px;box-shadow:var(--shadow)}
   .relx .rel-h{display:flex;align-items:center;gap:12px}
   .relx .rel-badge{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:16px;flex:none}
   .relx .rel-h h3{font-size:16px;margin:0;font-weight:700}
   .relx .rel-h .ssub{color:var(--muted);font-size:12.5px;font-weight:600}
   .relx .rel-h .rtag{margin-left:auto;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px;border-radius:20px;background:var(--brand-soft);color:var(--brand-deep)}
-  .relx .rel-note{color:var(--ink);opacity:.85;font-size:13px;margin:12px 0 0}
+  .relx .rel-note{color:var(--ink);opacity:.85;font-size:13px;margin:12px 0 0;line-height:1.55}
   .relx .rel-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:16px}
   .relx .rel-kpi{background:var(--bg);border:1px solid var(--line-2);border-radius:12px;padding:12px 13px}
   .relx .rel-kpi .kl{color:var(--muted);font-size:12px;font-weight:600;line-height:1.3;min-height:31px}
@@ -2891,8 +2900,16 @@ function relStyle(){
   .relx .rel-kpi .kd{font-size:12px;font-weight:800;margin-top:4px}
   .relx .rel-kpi .kd.up{color:var(--verde)} .relx .rel-kpi .kd.down{color:var(--quente)} .relx .rel-kpi .kd.flat{color:var(--muted)}
   .relx .rel-kpi .kp{color:var(--faint);font-size:11.5px;font-weight:600;margin-top:4px}
-  .relx .rel-mini{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:end}
-  @media(max-width:720px){.relx .rel-mini{grid-template-columns:1fr}.relx .rel-kpis{grid-template-columns:repeat(2,1fr)}}
+  .relx .rel-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin:14px 0}
+  .relx .rel-tile{background:var(--bg);border:1px solid var(--line-2);border-radius:12px;padding:12px 13px}
+  .relx .rel-tile .tl{color:var(--muted);font-size:12px;font-weight:600;line-height:1.3;min-height:31px}
+  .relx .rel-tile .tv{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-top:3px}
+  .relx .rel-tile .tv small{font-size:13px;color:var(--muted)}
+  .relx .rel-tile .tp{color:var(--faint);font-size:11.5px;font-weight:600;margin-top:3px}
+  .relx .rel-tile.good{border-color:rgba(22,163,74,.35)} .relx .rel-tile.good .tv{color:var(--verde)}
+  .relx .rel-mini{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .relx .rel-2col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  @media(max-width:720px){.relx .rel-mini,.relx .rel-2col,.relx .rel-tiles,.relx .rel-kpis{grid-template-columns:repeat(2,1fr)}.relx .rel-mini,.relx .rel-2col{grid-template-columns:1fr}}
   .relx .rel-ct{font-size:13px;font-weight:700;margin:0 0 12px}
   .relx .rel-bars{display:flex;align-items:flex-end;gap:26px;height:120px;padding:0 6px;border-bottom:1px solid var(--line)}
   .relx .rel-bc{display:flex;flex-direction:column;align-items:center;gap:7px;flex:1;height:100%;justify-content:flex-end}
@@ -2905,10 +2922,37 @@ function relStyle(){
   .relx .rel-leg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
   .relx .rel-fb{display:flex;flex-direction:column;gap:7px;margin-top:6px}
   .relx .rel-fr{display:flex;align-items:center;gap:10px;font-size:13px}
-  .relx .rel-fr .fn{width:150px;color:var(--muted);font-weight:600;flex:none}
+  .relx .rel-fr .fn{color:var(--muted);font-weight:600;flex:none}
   .relx .rel-fr .ft{flex:1;height:22px;background:var(--line-2);border-radius:6px;overflow:hidden}
   .relx .rel-fr .ff{display:block;height:100%;border-radius:6px;min-width:6px}
-  .relx .rel-fr .fv{width:34px;text-align:right;font-weight:800;flex:none}
+  .relx .rel-fr .fv{width:64px;text-align:right;font-weight:800;flex:none;font-size:12px}
+  .relx .rel-det{border:1px solid var(--line);border-radius:12px;margin-top:14px;background:var(--card);overflow:hidden}
+  .relx .rel-det>summary{cursor:pointer;padding:12px 15px;font-weight:700;font-size:13px;color:var(--brand-deep);list-style:none;display:flex;align-items:center;gap:8px}
+  .relx .rel-det>summary::-webkit-details-marker{display:none}
+  .relx .rel-det>summary::before{content:'▾';font-size:12px;transition:.2s}
+  .relx .rel-det[open]>summary::before{transform:rotate(180deg)}
+  .relx .rel-detbody{padding:2px 15px 15px}
+  .relx .rel-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+  .relx .rel-table th{text-align:left;color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.03em;padding:7px 8px;border-bottom:1px solid var(--line)}
+  .relx .rel-table td{padding:8px;border-bottom:1px solid var(--line-2);vertical-align:top}
+  .relx .rel-table .cn{font-weight:700} .relx .rel-table .ct{color:var(--muted);font-size:11px}
+  .relx .rel-callout{background:var(--brand-softer);border:1px solid var(--line);border-radius:12px;padding:13px 15px;font-size:13px;color:var(--ink);line-height:1.6;margin-top:14px}
+  .relx .rel-callout.good{background:rgba(22,163,74,.07)}
+  .relx .rel-box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px;box-shadow:var(--shadow)}
+  .relx .rel-box h4{font-size:13.5px;margin:0 0 10px;font-weight:700}
+  .relx .rel-rec{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--muted);border-radius:12px;padding:13px 15px;margin-bottom:10px;box-shadow:var(--shadow)}
+  .relx .rel-rec.win{border-left-color:var(--verde)} .relx .rel-rec.op{border-left-color:var(--frio)} .relx .rel-rec.at{border-left-color:var(--morno)}
+  .relx .rel-rec .rrt{font-weight:700;font-size:13.5px;margin:0 0 5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .relx .rel-rec .pill{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:20px}
+  .relx .rel-rec .pill.win{background:rgba(22,163,74,.14);color:var(--verde)} .relx .rel-rec .pill.op{background:var(--brand-soft);color:var(--brand-deep)} .relx .rel-rec .pill.at{background:rgba(196,122,8,.16);color:var(--morno)}
+  .relx .rel-rec p{margin:0;font-size:13px;color:var(--ink);opacity:.85;line-height:1.55}
+  .relx .rel-frentes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  @media(max-width:720px){.relx .rel-frentes{grid-template-columns:1fr}}
+  .relx .rel-scope{background:var(--bg);border:1px solid var(--line-2);border-radius:12px;padding:13px 15px}
+  .relx .rel-scope .cat{font-weight:800;font-size:12px;color:var(--brand-deep);margin-bottom:7px}
+  .relx .rel-scope ul{margin:0;padding-left:16px}
+  .relx .rel-scope li{font-size:12.5px;color:var(--ink);opacity:.85;margin-bottom:5px;line-height:1.45}
+  .relx .rel-dec{font-size:13px;color:var(--ink);opacity:.9;line-height:1.5;margin-bottom:10px}
   .relx .rel-lock{background:repeating-linear-gradient(135deg,#fafbfe,#fafbfe 12px,#f2f4f9 12px,#f2f4f9 24px);border:1.5px dashed var(--line);border-radius:var(--r);padding:22px 20px;margin-bottom:16px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
   .relx .rel-lock .lb{width:44px;height:44px;border-radius:12px;background:#fff;border:1px solid var(--line);display:grid;place-items:center;font-size:20px;opacity:.75;flex:none}
   .relx .rel-lock .lk-body{flex:1;min-width:220px}
@@ -2939,7 +2983,7 @@ function relEmpty(){
     <b style="color:var(--ink)">Seus relatórios aparecem aqui</b><br>
     Assim que a Rise publicar o relatório do mês, ele fica disponível nesta aba.</div></div>`;
 }
-window.relSetMes = (m)=>{ REL_MES=m; relPaint(); };
+window.relSetMes = (m)=>{ REL_MES=m; relPaint(); window.scrollTo({top:0,behavior:'smooth'}); };
 function relPaint(){
   const rep = REL_LISTA.find(x=>x.mes===REL_MES) || REL_LISTA[0];
   const dd = rep.dados || {}, f = dd.fontes || {};
@@ -2948,39 +2992,78 @@ function relPaint(){
   if(REL_LISTA.length>1){
     h += `<select class="rel-msel" onchange="relSetMes(this.value)">`+
       REL_LISTA.map(x=>`<option value="${x.mes}" ${x.mes===REL_MES?'selected':''}>${esc((x.dados&&x.dados.titulo)||x.mes)}</option>`).join('')+`</select>`;
-  } else {
-    h += `<div class="rel-msel" style="cursor:default">${esc(dd.titulo||REL_MES)}</div>`;
-  }
+  } else { h += `<div class="rel-msel" style="cursor:default">${esc(dd.titulo||REL_MES)}</div>`; }
   if(dd.comparado) h += `<span class="rel-sub">comparado a ${esc(dd.comparado)}</span>`;
-  h += `</div><div class="rel-fontes"><span class="rel-sub" style="text-transform:uppercase;letter-spacing:.05em;font-size:12px">Integrações</span>`;
+  h += `</div>`;
+  if(dd.resumo) h += relResumo(dd.resumo);
+  h += `<div class="rel-fontes"><span class="rel-sub" style="text-transform:uppercase;letter-spacing:.05em;font-size:12px">Integrações</span>`;
   h += relChip('meta',!!f.meta)+relChip('instagram',!!f.instagram)+relChip('ga4',!!f.ga4)+relChip('crm',!!f.crm,f.crm)+`</div>`;
-  h += f.meta      ? relSec('meta', dd.meta, true)       : relLock('meta','Ative anúncios na Meta e acompanhe investimento, leads e custo por lead aqui no seu portal.');
-  h += f.instagram ? relSecSimple('instagram', dd.instagram) : relLock('instagram','Conecte o Instagram e veja alcance, seguidores, cliques na bio e os posts que mais performam.');
-  h += f.ga4       ? relSec('ga4', dd.ga4, true)         : relLock('ga4','Conecte o Google Analytics do seu site para ver sessões, engajamento e conversões.');
-  h += f.crm       ? relSecCRM(dd.crm)                   : relLock('crm','Ative o CRM para acompanhar leads, funil e fechamentos.');
+  if(dd.rise_inteiro) h += relRise(dd.rise_inteiro);
+  // fontes
+  h += f.meta      ? relSec('meta', dd.meta, true, relMetaExtra(dd.meta))         : relLock('meta','Ative anúncios na Meta e acompanhe investimento, leads e custo por lead aqui no seu portal.');
+  h += f.instagram ? relSecSimple('instagram', dd.instagram, relIgExtra(dd.instagram)) : relLock('instagram','Conecte o Instagram e veja alcance, seguidores, cliques na bio e os posts que mais performam.');
+  h += f.ga4       ? relSec('ga4', dd.ga4, true, relGaExtra(dd.ga4))             : relLock('ga4','Conecte o Google Analytics do seu site para ver sessões, engajamento e conversões.');
+  h += f.crm       ? relSecCRM(dd.crm)                                           : relLock('crm','Ative o CRM para acompanhar leads, funil e fechamentos.');
+  if(dd.qualificacao) h += relQ(dd.qualificacao);
+  if(dd.roi)          h += relROI(dd.roi);
+  if(dd.recomendacoes)h += relRecs(dd.recomendacoes);
+  if(dd.depende)      h += relDepende(dd.depende);
+  if(dd.projecao)     h += relProj(dd.projecao);
   const atual = rep.atualizado_em ? ('Atualizado em '+new Date(rep.atualizado_em).toLocaleDateString('pt-BR')) : '';
-  h += `<div class="rel-foot">Relatório preparado pela Rise. ${atual}</div></div>`;
+  h += `<div class="rel-foot">${raw(dd.fonteNota||'Relatório preparado pela Rise.')} ${atual}</div></div>`;
   view.innerHTML = h;
 }
+/* helpers */
+function relTiles(t){ return `<div class="rel-tiles">`+(t||[]).map(x=>`<div class="rel-tile ${x.good?'good':''}"><div class="tl">${esc(x.l)}</div><div class="tv">${esc(x.v)}${x.s?`<small>${esc(x.s)}</small>`:''}</div><div class="tp">${raw(x.p||'')}</div></div>`).join('')+`</div>`; }
+function relHBars(rows,opt){ opt=opt||{}; const mx=opt.max||Math.max(...((rows||[]).map(r=>r.v)),1); const w=opt.nameW||150;
+  return `<div class="rel-fb">`+(rows||[]).map(r=>`<div class="rel-fr"><span class="fn" style="width:${w}px">${esc(r.n)}</span><span class="ft"><span class="ff" style="width:${Math.max(4,r.v/mx*100)}%;background:${r.c||'var(--brand)'}"></span></span><span class="fv">${esc(r.t!=null?r.t:r.v)}</span></div>`).join('')+`</div>`; }
+function relDet(label,body){ return `<details class="rel-det"><summary>${esc(label)}</summary><div class="rel-detbody">${body}</div></details>`; }
+function relTable(cols,rows){ return `<table class="rel-table"><thead><tr>`+cols.map(c=>`<th>${esc(c)}</th>`).join('')+`</tr></thead><tbody>`+rows.map(r=>`<tr>`+r.map(c=>`<td>${c}</td>`).join('')+`</tr>`).join('')+`</tbody></table>`; }
+function relTitle(t){ return `<div class="rel-title"><span class="dt"></span>${esc(t)}</div>`; }
+function relLead(t){ return `<p class="rel-lead">${raw(t)}</p>`; }
+function relCallout(t,good){ return `<div class="rel-callout ${good?'good':''}">${raw(t)}</div>`; }
+function relResumo(r){ return `<div class="rel-hero"><div class="rc">`+(r.chips||[]).map(c=>`<div><b>${esc(c.v)}</b><span>${esc(c.l)}</span></div>`).join('')+`</div>${r.texto?`<p>${raw(r.texto)}</p>`:''}</div>`; }
 function relChip(k,on,label){ const m=REL_FONTE[k]; return on
   ? `<span class="rel-fchip"><span class="d" style="background:${m.cor}"></span>${esc(label||m.nome)}</span>`
   : `<span class="rel-fchip off"><span class="d"></span>${m.nome} · a contratar</span>`; }
 function relBadge(k){ const m=REL_FONTE[k]; return `<div class="rel-badge" style="background:${m.cor}">${m.ic}</div>`; }
 function relHead(k,sub,tag){ const m=REL_FONTE[k]; return `<div class="rel-h">${relBadge(k)}<div><h3>${m.nome}</h3><div class="ssub">${esc(sub||m.sub)}</div></div>${tag?`<span class="rtag">${esc(tag)}</span>`:''}</div>`; }
 function relKpis(kpis){ return `<div class="rel-kpis">`+(kpis||[]).map(k=>`<div class="rel-kpi"><div class="kl">${esc(k.l)}</div><div class="kv">${esc(k.v)}${k.s?`<small>${esc(k.s)}</small>`:''}</div><div class="kd ${k.dir||'flat'}">${esc(k.d||'')}</div><div class="kp">${esc(k.p||'')}</div></div>`).join('')+`</div>`; }
-function relBars(bar){
-  if(!bar) return '';
+function relBars(bar){ if(!bar) return '';
   const one=(o)=>{ if(!o) return ''; const mx=Math.max(o.prev||0,o.cur||0)||1;
     const hp=Math.max(8,Math.round((o.prev||0)/mx*100)), hc=Math.max(8,Math.round((o.cur||0)/mx*100));
     const fp=(o.vp!=null?o.vp:o.prev), fc=(o.vc!=null?o.vc:o.cur);
     return `<div class="rel-bc"><div class="rel-bw"><div class="rel-bar prev" style="height:${hp}%"><span class="bv" style="color:var(--faint)">${esc(String(fp))}</span></div><div class="rel-bar" style="height:${hc}%;background:var(--brand)"><span class="bv" style="color:var(--brand-deep)">${esc(String(fc))}</span></div></div><div class="rel-bx">${esc(o.x1||o.x2||'')}</div></div>`; };
-  return `<div><p class="rel-ct">${esc(bar.t||'')}</p><div class="rel-bars">${one(bar.a)}${one(bar.b)}</div><div class="rel-leg"><span><i style="background:#cfd3dd"></i>${esc(REL_COMP)}</span><span><i style="background:var(--brand)"></i>${esc(REL_TIT)}</span></div></div>`;
-}
-function relFunil(rows){ const mx=Math.max(...((rows||[]).map(r=>r.v)),1);
-  return `<div><p class="rel-ct">Funil de leads</p><div class="rel-fb">`+(rows||[]).map(r=>`<div class="rel-fr"><span class="fn">${esc(r.n)}</span><span class="ft"><span class="ff" style="width:${Math.max(6,r.v/mx*100)}%;background:${r.c||'var(--brand)'}"></span></span><span class="fv">${r.v}</span></div>`).join('')+`</div></div>`; }
-function relSec(k,d,withBar){ d=d||{}; return `<section class="rel-sec">${relHead(k)}${relKpis(d.kpis)}${(withBar&&d.bar)?`<div class="rel-mini">${relBars(d.bar)}<div><p class="rel-ct">O que isso significa</p><p class="rel-note" style="margin-top:0">${esc(d.note||'')}</p></div></div>`:(d.note?`<p class="rel-note">${esc(d.note)}</p>`:'')}</section>`; }
-function relSecSimple(k,d){ d=d||{}; return `<section class="rel-sec">${relHead(k)}${relKpis(d.kpis)}${d.note?`<p class="rel-note">${esc(d.note)}</p>`:''}</section>`; }
-function relSecCRM(d){ d=d||{}; return `<section class="rel-sec">${relHead('crm','Fonte: '+(d.fonte||'—'), d.fonte)}${relKpis(d.kpis)}${d.funil?`<div class="rel-mini">${relFunil(d.funil)}<div><p class="rel-ct">Sobre este CRM</p><p class="rel-note" style="margin-top:0">${esc(d.note||'')}</p></div></div>`:(d.note?`<p class="rel-note">${esc(d.note)}</p>`:'')}</section>`; }
+  return `<div><p class="rel-ct">${esc(bar.t||'')}</p><div class="rel-bars">${one(bar.a)}${one(bar.b)}</div><div class="rel-leg"><span><i style="background:#cfd3dd"></i>${esc(REL_COMP)}</span><span><i style="background:var(--brand)"></i>${esc(REL_TIT)}</span></div></div>`; }
+function relSec(k,d,withBar,extra){ d=d||{}; const mini=(withBar&&d.bar)?`<div class="rel-mini">${relBars(d.bar)}<div><p class="rel-ct">O que isso significa</p><p class="rel-note" style="margin-top:0">${raw(d.note||'')}</p></div></div>`:(d.note?`<p class="rel-note">${raw(d.note)}</p>`:''); return `<section class="rel-sec">${relHead(k)}${relKpis(d.kpis)}${mini}${extra||''}</section>`; }
+function relSecSimple(k,d,extra){ d=d||{}; return `<section class="rel-sec">${relHead(k)}${relKpis(d.kpis)}${d.note?`<p class="rel-note">${raw(d.note)}</p>`:''}${extra||''}</section>`; }
+function relSecCRM(d){ d=d||{}; const mini=d.funil?`<div class="rel-mini"><div><p class="rel-ct">Funil de leads</p>${relHBars(d.funil,{nameW:200})}</div><div><p class="rel-ct">Sobre este CRM</p><p class="rel-note" style="margin-top:0">${raw(d.note||'')}</p></div></div>`:(d.note?`<p class="rel-note">${raw(d.note)}</p>`:''); return `<section class="rel-sec">${relHead('crm','Fonte: '+(d.fonte||'—'), d.fonte)}${relKpis(d.kpis)}${mini}</section>`; }
+function relMetaExtra(d){ d=d||{}; if(!d.campanhas||!d.campanhas.length) return '';
+  const rows=d.campanhas.map(c=>[`<span class="cn">${esc(c.nome)}</span>${c.tag?`<br><span class="ct">${esc(c.tag)}</span>`:''}`, esc(c.investido), esc(c.alcance), `${esc(c.resultado)}${c.resultTag?`<br><span class="ct">${esc(c.resultTag)}</span>`:''}`]);
+  return relDet('Ver desempenho por campanha', relTable(['Campanha','Investido','Alcance','Resultado'], rows)); }
+function relIgExtra(d){ d=d||{}; if(!d.posts||!d.posts.length) return '';
+  const rows=d.posts.map(p=>[`<span class="cn">${esc(p.nome)}</span>${p.tag?`<br><span class="ct">${esc(p.tag)}</span>`:''}`, esc(p.data), esc(p.alcance), esc(p.views)]);
+  return relDet('Ver posts de maior alcance', relTable(['Post (Reel)','Data','Alcance','Views'], rows)); }
+function relGaExtra(d){ d=d||{}; if(!d.origem||!d.origem.length) return '';
+  return relDet('Ver origem do tráfego (canais)', relHBars(d.origem,{nameW:150})); }
+function relRise(x){ const tiles=relTiles(x.tiles);
+  const frentes=`<div class="rel-frentes">`+(x.frentes||[]).map(f=>`<div class="rel-scope"><div class="cat">${esc(f.cat)}</div><ul>`+(f.itens||[]).map(i=>`<li>${raw(i)}</li>`).join('')+`</ul></div>`).join('')+`</div>`;
+  const body=`${x.intro?`<p class="rel-lead" style="margin:4px 0 12px">${raw(x.intro)}</p>`:''}${tiles}${frentes}${x.frase?relCallout(x.frase):''}`;
+  return relTitle('A Rise, por inteiro')+relDet('Ver tudo o que a Rise construiu (diagnóstico, site, CRM, comercial, social…)', body); }
+function relQ(q){ const charts=`<div class="rel-2col"><div class="rel-box"><h4>Leads por bairro</h4>${relHBars(q.bairros,{nameW:180})}</div><div class="rel-box"><h4>Área de interesse</h4>${relHBars(q.areas,{nameW:170})}</div></div><div class="rel-2col"><div class="rel-box"><h4>Trilha escolhida</h4>${relHBars(q.trilhas,{nameW:130})}</div><div class="rel-box"><h4>Temperatura do lead</h4>${relHBars(q.temperatura,{nameW:90})}${q.texto?`<p class="rel-note" style="margin-top:10px">${raw(q.texto)}</p>`:''}</div></div>`;
+  return relTitle('Qualificação dos leads')+(q.intro?relLead(q.intro):'')+(q.callout?relCallout(q.callout,true):'')+relTiles(q.tiles)+relDet('Ver detalhamento por bairro, área, trilha e temperatura', charts); }
+function relROI(roi){ let h=relTitle('Conversão & ROI')+(roi.intro?relLead(roi.intro):'')+relTiles(roi.tiles)+(roi.callout?relCallout(roi.callout,true):'');
+  const bars=roi.bars?`<div class="rel-box"><h4>Investimento × retorno em matrículas</h4>${relHBars(roi.bars,{nameW:220})}${roi.nota?`<p class="rel-note" style="margin-top:10px">${raw(roi.nota)}</p>`:''}</div>`:'';
+  const ec=roi.entrega?`<div class="rel-box"><h4>Quem entrega × quem converte</h4><div style="display:flex;flex-direction:column;gap:12px">`+roi.entrega.map(e=>`<div><div style="font-size:12.5px;font-weight:700;color:${e.cor||'var(--brand)'}">${esc(e.t)}</div><div style="font-size:12.5px;color:var(--ink);opacity:.85;line-height:1.5">${raw(e.txt)}</div></div>`).join('')+`</div></div>`:'';
+  if(bars||ec) h+=`<div class="rel-2col">${bars}${ec}</div>`; return h; }
+function relRecs(list){ if(!list.length) return ''; return relTitle('Recomendações & próximos passos')+list.map(r=>`<div class="rel-rec ${r.tipo||''}"><p class="rrt"><span class="pill ${r.tipo||''}">${esc(r.tag)}</span>${esc(r.titulo)}</p><p>${raw(r.texto)}</p></div>`).join(''); }
+function relDepende(d){ const goal=`<div class="rel-box"><h4>Rumo à meta de 30 matrículas/mês</h4>${relHBars(d.goal,{nameW:210})}${d.goalNota?`<p class="rel-note" style="margin-top:10px">${raw(d.goalNota)}</p>`:''}</div>`;
+  const dec=`<div class="rel-box"><h4>Decisões que aceleram o resultado</h4>`+(d.decisoes||[]).map(x=>`<div class="rel-dec">${raw(x)}</div>`).join('')+`</div>`;
+  return relTitle('O que depende de você')+(d.intro?relLead(d.intro):'')+`<div class="rel-2col">${goal}${dec}</div>`; }
+function relProj(p){ let h=relTitle('Projeção — próximos 2 meses')+(p.intro?relLead(p.intro):'')+relTiles(p.tiles);
+  const bars=`<div class="rel-box"><h4>Matrículas — realizado × projeção</h4>${relHBars(p.bars,{nameW:190})}</div>`;
+  const de=`<div class="rel-box"><h4>De onde vem esse crescimento</h4>`+(p.deonde||[]).map(x=>`<div style="margin-bottom:10px"><div style="font-size:12.5px;font-weight:700;color:${x.cor||'var(--brand)'}">${esc(x.t)}</div><div style="font-size:12.5px;color:var(--ink);opacity:.85;line-height:1.5">${raw(x.txt)}</div></div>`).join('')+(p.disclaimer?`<div class="rel-callout" style="margin-top:6px">${raw(p.disclaimer)}</div>`:'')+`</div>`;
+  h+=`<div class="rel-2col">${bars}${de}</div>`; if(p.resumo) h+=relCallout(p.resumo,true); return h; }
 function relLock(k,txt){ const m=REL_FONTE[k]; return `<div class="rel-lock"><div class="lb">🔒</div><div class="lk-body"><h3>${m.nome} · a contratar</h3><p>${esc(txt)}</p></div><button class="lk-cta" onclick="alert('Fale com a Rise para ativar esta integração.')">Falar com a Rise →</button></div>`; }
 
 function freeBanner(c){
