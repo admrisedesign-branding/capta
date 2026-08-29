@@ -2691,7 +2691,7 @@ window.goPlanoFromDrawer = () => { scrim.classList.remove('on'); drawer.classLis
 window.goCheckout = async (key) => {
   if(DEMO){ alert('No app real, aqui abre o pagamento do Mercado Pago (assinatura mensal).'); return; }
   try{
-    const r = await fetch('/api/capta-mp-create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ slug:SLUG, token:TOKEN, plano:key }) });
+    const r = await fetch('/api/capta-mp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ slug:SLUG, token:TOKEN, plano:key }) });
     const d = await r.json();
     if(d.url){ location.href = d.url; return; }
     alert(d.error || 'Não foi possível abrir o pagamento agora. Tente de novo em instantes.');
