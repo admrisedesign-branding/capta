@@ -10,7 +10,7 @@
 //   https://capta.riseagencia.com/api/capta-whatsapp-webhook?canal=<uuid>
 // =====================================================================
 
-const prov = require('./lib/whatsapp-provedor');
+const prov = require('./_lib/whatsapp-provedor');
 
 const SB_URL = process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
