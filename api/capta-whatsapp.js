@@ -11,6 +11,7 @@
 //   acao: 'enviar'      -> { ok, id }        { conversa_id | telefone, texto }
 //   acao: 'conversas'   -> { conversas[] }    lista do inbox
 //   acao: 'mensagens'   -> { mensagens[] }    { conversa_id }
+//   acao: 'midia'       -> { url }            { mensagem_id } — link assinado 5 min
 //   acao: 'webhooks'    -> { ok, url }       (re)configura os webhooks
 //
 // Autenticação: slug + dashboard_token, igual ao resto do painel.
@@ -84,6 +85,7 @@ module.exports = async function handler(req, res) {
       case 'enviar':      return await acaoEnviar(tenant, canal, body, res);
       case 'conversas':   return await acaoConversas(tenant, res);
       case 'mensagens':   return await acaoMensagens(tenant, body, res);
+      case 'midia':       return await acaoMidia(tenant, body, res);
       default:            return res.status(400).json({ erro: 'Ação inválida.' });
     }
   } catch (e) {
@@ -256,7 +258,8 @@ async function acaoMensagens(tenant, body, res) {
 
   const msgs = await sb(
     `capta_mensagens?conversa_id=eq.${id}&tenant_id=eq.${tenant.id}` +
-    `&select=id,direcao,autor,tipo,texto,midia_mime,entrega,criado_em` +
+    `&select=id,direcao,autor,tipo,texto,midia_url,midia_mime,entrega,criado_em,` +
+    `transcricao,transcricao_status` +
     `&order=criado_em.asc&limit=200`
   );
 
@@ -268,6 +271,34 @@ async function acaoMensagens(tenant, body, res) {
   }
 
   return res.status(200).json({ conversa: conv[0], mensagens: msgs || [] });
+}
+
+// ---------------------------------------------------------------------
+// MÍDIA — devolve URL assinada de 5 minutos
+//
+// O bucket é privado. O navegador nunca recebe caminho permanente, e o
+// link morre sozinho — é o que impede foto de criança de vazar por URL
+// que alguém guardou.
+// ---------------------------------------------------------------------
+async function acaoMidia(tenant, body, res) {
+  const id = (body.mensagem_id || '').trim();
+  if (!id) return res.status(400).json({ erro: 'Informe mensagem_id.' });
+
+  const rows = await sb(
+    `capta_mensagens?id=eq.${id}&tenant_id=eq.${tenant.id}&select=midia_url,midia_mime&limit=1`
+  );
+  const m = rows && rows[0];
+  if (!m || !m.midia_url) return res.status(404).json({ erro: 'Sem arquivo.' });
+
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/capta-midia/${m.midia_url}`, {
+    method: 'POST',
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expiresIn: 300 })
+  });
+  if (!r.ok) return res.status(500).json({ erro: 'Não deu para abrir o arquivo.' });
+
+  const d = await r.json();
+  return res.status(200).json({ url: `${SUPABASE_URL}/storage/v1${d.signedURL}`, mime: m.midia_mime });
 }
 
 // =====================================================================
