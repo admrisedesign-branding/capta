@@ -15,7 +15,7 @@
 //
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ZAPI_CLIENT_TOKEN, SITE_URL
 
-const prov = require('./lib/whatsapp-provedor');
+const prov = require('./_lib/whatsapp-provedor');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
