@@ -3766,6 +3766,14 @@ function demoForms(){
     ]}
   ]};
 }
+(function(){
+  var q = new URLSearchParams(location.search);
+  var qs = '?t=' + encodeURIComponent(q.get('t')||'') + '&k=' + encodeURIComponent(q.get('k')||'');
+  var a = document.getElementById('nav-conversas');
+  var b = document.getElementById('nav-whatsapp');
+  if (a) a.onclick = function(){ location.href = '/inbox.html' + qs; };
+  if (b) b.onclick = function(){ location.href = '/whatsapp.html' + qs; };
+})();
 </script>
 </body>
 </html>
