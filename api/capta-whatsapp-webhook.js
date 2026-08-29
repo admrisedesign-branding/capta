@@ -31,15 +31,20 @@ async function sb(caminho, opcoes = {}) {
 }
 
 module.exports = async (req, res) => {
-  // Responde já. Nada abaixo disso pode segurar a resposta.
   if (req.method !== 'POST') return res.status(405).json({ erro: 'use POST' });
-  res.status(200).json({ ok: true });
 
+  // PROCESSA ANTES DE RESPONDER.
+  // No Vercel a instância é congelada assim que a resposta é enviada, então
+  // trabalho assíncrono depois do res.json() pode nunca rodar. Grava
+  // primeiro; o Z-API tolera alguns segundos de espera.
   try {
     await processar(req.query.canal, req.body);
   } catch (e) {
-    console.error('[capta-whatsapp-webhook]', e.message, JSON.stringify(req.body || {}).slice(0, 500));
+    console.error('[capta-whatsapp-webhook]', e.message, JSON.stringify(req.body || {}).slice(0, 800));
   }
+
+  // 200 sempre: erro faz o Z-API reenviar em loop.
+  return res.status(200).json({ ok: true });
 };
 
 async function processar(canalId, payload) {
@@ -170,9 +175,10 @@ async function acharOuCriarConversa(tenant, canalId, evento) {
 // =====================================================================
 // NOTAS
 //
-// 1. RESPONDE 200 ANTES DE PROCESSAR. O Z-API interpreta demora como
-//    falha e reenvia. Erro no processamento vai para o log, não para a
-//    resposta.
+// 1. PROCESSA E DEPOIS RESPONDE 200. Tentador inverter para responder
+//    rápido, mas no Vercel a instância congela após a resposta e o
+//    trabalho pendente se perde. O 200 é devolvido mesmo em erro, porque
+//    resposta de erro faz o Z-API reenviar em loop.
 //
 // 2. MÍDIA: o arquivo no Z-API some em 30 dias e a nossa retenção é de
 //    90. Falta implementar: baixar a URL, subir no bucket PRIVADO do
