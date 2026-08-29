@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conversas — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#2E5BFF; --brand-deep:#1E44D6; --brand-2:#5B8DEF;
+  --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
+  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
+  --ink:#141A2E; --muted:#697089; --faint:#9AA1B4;
+  --quente:#E03127; --quente-bg:rgba(224,49,39,.12);
+  --morno:#C47A08;  --morno-bg:rgba(224,147,15,.14);
+  --frio:#3E6FD6;   --frio-bg:rgba(91,141,239,.15);
+  --verde:#16A34A;  --verde-bg:rgba(22,163,74,.12);
+  --gray-bg:rgba(105,112,137,.12);
+  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;
+  background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px;font-weight:700}
+.voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;
+  padding:7px 13px;border-radius:10px;text-decoration:none;transition:.14s}
+.voltar:hover{border-color:var(--brand);color:var(--brand)}
+
+.wrap{display:grid;grid-template-columns:330px 1fr;gap:18px;padding:22px 26px 26px;
+  max-width:1240px;margin:0 auto;height:calc(100vh - 60px)}
+@media(max-width:840px){
+  .wrap{grid-template-columns:1fr}
+  .painel{display:none}
+  body.aberta .lista{display:none}
+  body.aberta .painel{display:flex}
+}
+
+.lista,.painel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+
+/* Lista de conversas */
+.lista-topo{padding:14px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);font-weight:600}
+.lista-rolagem{overflow-y:auto;flex:1}
+.conv{display:flex;gap:11px;width:100%;border:0;background:transparent;text-align:left;
+  padding:12px 16px;border-bottom:1px solid var(--line-2);transition:.14s}
+.conv:hover{background:var(--brand-softer)}
+.conv[aria-current="true"]{background:var(--brand-soft)}
+.conv-av{width:34px;height:34px;flex:0 0 34px;border-radius:10px;background:var(--gray-bg);color:var(--muted);
+  display:grid;place-items:center;font-weight:700;font-size:13px}
+.conv-mid{min-width:0;flex:1}
+.conv-nome{font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-prev{color:var(--muted);font-size:12.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-dir{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:0 0 auto}
+.conv-hora{font-size:11.5px;color:var(--faint);white-space:nowrap}
+.bolha{min-width:19px;height:19px;padding:0 6px;border-radius:99px;background:var(--brand);color:#fff;
+  font-size:11px;font-weight:700;display:grid;place-items:center}
+
+.tag{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:99px;text-transform:uppercase;letter-spacing:.03em}
+.t-Quente{background:var(--quente-bg);color:var(--quente)}
+.t-Morno{background:var(--morno-bg);color:var(--morno)}
+.t-Frio{background:var(--frio-bg);color:var(--frio)}
+
+/* Painel da conversa */
+.painel-topo{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;
+  justify-content:space-between;gap:12px}
+.painel-nome{font-weight:700;font-size:14.5px}
+.painel-fone{color:var(--muted);font-size:12.5px;margin-top:1px}
+.robo{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--muted);
+  border:1px solid var(--line);border-radius:99px;padding:6px 12px}
+.robo .ponto{width:7px;height:7px;border-radius:50%}
+.robo.on .ponto{background:var(--verde)}
+.robo.off .ponto{background:var(--faint)}
+
+.fluxo{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:9px;background:var(--bg)}
+.msg{max-width:74%;padding:9px 13px;border-radius:14px;font-size:13.5px;line-height:1.55;word-wrap:break-word}
+.msg.entrada{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:5px}
+.msg.saida{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:5px}
+.msg-meta{font-size:10.5px;margin-top:4px;opacity:.62;display:flex;gap:6px;align-items:center}
+.msg.saida .msg-meta{justify-content:flex-end}
+.msg-autor{font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+
+.escrever{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:9px;align-items:flex-end;background:var(--card)}
+.escrever textarea{flex:1;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-family:inherit;
+  font-size:13.5px;resize:none;max-height:120px;color:var(--ink);background:var(--card)}
+.escrever textarea:focus{outline:0;border-color:var(--brand)}
+.enviar{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:13.5px;padding:11px 18px;
+  border-radius:12px;transition:.14s}
+.enviar:hover{background:var(--brand-deep)}
+.enviar:disabled{opacity:.45;cursor:not-allowed}
+
+.vazio{flex:1;display:grid;place-items:center;text-align:center;color:var(--faint);font-size:13.5px;
+  line-height:1.75;padding:40px 24px}
+.aviso{margin:0 18px 12px;background:var(--morno-bg);border:1px solid rgba(224,147,15,.28);border-radius:11px;
+  padding:9px 12px;font-size:12.5px;color:#8A5A04;line-height:1.55}
+.voltar-lista{display:none;border:1px solid var(--line);background:var(--card);color:var(--muted);
+  font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:9px}
+@media(max-width:840px){.voltar-lista{display:block}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
+  <h1>Conversas</h1>
+</div>
+
+<div class="wrap">
+  <div class="lista">
+    <div class="lista-topo" id="contagem">Carregando…</div>
+    <div class="lista-rolagem" id="convs"></div>
+  </div>
+
+  <div class="painel" id="painel">
+    <div class="vazio">Escolha uma conversa para ver o histórico<br>e responder por aqui.</div>
+  </div>
+</div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+
+const elConvs = document.getElementById('convs');
+const elCont  = document.getElementById('contagem');
+const elPain  = document.getElementById('painel');
+let atual = null, timer = null;
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ acao, slug: SLUG, token: TOKEN, ...extra })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(d.erro || `Erro ${r.status}`), { dados: d, status: r.status });
+  return d;
+}
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+function fone(n) {
+  const d = String(n || '').replace(/\D/g, '');
+  const s = d.startsWith('55') ? d.slice(2) : d;
+  if (s.length === 11) return `(${s.slice(0,2)}) ${s.slice(2,7)}-${s.slice(7)}`;
+  return n || '—';
+}
+function hora(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), ag = new Date();
+  const mesmoDia = d.toDateString() === ag.toDateString();
+  return mesmoDia
+    ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+const iniciais = t => (t || '?').trim().slice(0, 2).toUpperCase();
+
+async function carregarLista() {
+  try {
+    const { conversas } = await api('conversas');
+    elCont.textContent = conversas.length
+      ? `${conversas.length} conversa${conversas.length > 1 ? 's' : ''}`
+      : 'Nenhuma conversa';
+
+    if (!conversas.length) {
+      elConvs.innerHTML = `<div class="vazio">Nada por aqui ainda.<br>
+        As mensagens aparecem assim que alguém escrever para o seu WhatsApp.</div>`;
+      return;
+    }
+
+    elConvs.innerHTML = conversas.map(c => {
+      const nome = c.lead?.nome || fone(c.telefone);
+      const temp = c.lead?.temperatura;
+      return `<button class="conv" data-id="${c.id}" aria-current="${c.id === atual}">
+        <span class="conv-av">${esc(iniciais(nome))}</span>
+        <span class="conv-mid">
+          <span class="conv-nome">${esc(nome)}</span>
+          <span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span>
+        </span>
+        <span class="conv-dir">
+          <span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>
+          ${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>`
+            : temp ? `<span class="tag t-${esc(temp)}">${esc(temp)}</span>` : ''}
+        </span>
+      </button>`;
+    }).join('');
+
+    elConvs.querySelectorAll('.conv').forEach(b => {
+      b.onclick = () => abrir(b.dataset.id);
+    });
+  } catch (e) {
+    elCont.textContent = 'Erro';
+    elConvs.innerHTML = `<div class="vazio">${esc(e.message)}</div>`;
+  }
+}
+
+async function abrir(id) {
+  atual = id;
+  document.body.classList.add('aberta');
+  elConvs.querySelectorAll('.conv').forEach(b => b.setAttribute('aria-current', b.dataset.id === id));
+
+  try {
+    const { conversa, mensagens } = await api('mensagens', { conversa_id: id });
+    const nome = conversa.lead?.nome || fone(conversa.telefone);
+
+    elPain.innerHTML = `
+      <div class="painel-topo">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          <button class="voltar-lista" id="volta">←</button>
+          <div style="min-width:0">
+            <div class="painel-nome">${esc(nome)}</div>
+            <div class="painel-fone">${fone(conversa.telefone)}</div>
+          </div>
+        </div>
+        <div class="robo ${conversa.agente_ativo ? 'on' : 'off'}">
+          <span class="ponto"></span>${conversa.agente_ativo ? 'Robô respondendo' : 'Você assumiu'}
+        </div>
+      </div>
+
+      <div class="fluxo" id="fluxo">
+        ${mensagens.length ? mensagens.map(m => `
+          <div class="msg ${m.direcao}">
+            ${m.texto ? esc(m.texto) : `<i>[${esc(m.tipo)}]</i>`}
+            <div class="msg-meta">
+              ${m.autor !== 'lead' ? `<span class="msg-autor">${m.autor === 'agente' ? 'robô' : 'você'}</span>` : ''}
+              <span>${hora(m.criado_em)}</span>
+            </div>
+          </div>`).join('')
+          : '<div class="vazio">Sem mensagens nesta conversa.</div>'}
+      </div>
+
+      ${conversa.agente_ativo
+        ? '<div class="aviso">Se você responder por aqui, o robô para de responder nesta conversa.</div>' : ''}
+
+      <div class="escrever">
+        <textarea id="txt" rows="1" placeholder="Escreva uma mensagem" aria-label="Mensagem"></textarea>
+        <button class="enviar" id="btn">Enviar</button>
+      </div>`;
+
+    const fluxo = document.getElementById('fluxo');
+    fluxo.scrollTop = fluxo.scrollHeight;
+
+    const txt = document.getElementById('txt');
+    txt.oninput = () => { txt.style.height = 'auto'; txt.style.height = Math.min(txt.scrollHeight, 120) + 'px'; };
+    txt.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } };
+    document.getElementById('btn').onclick = enviar;
+    const vb = document.getElementById('volta');
+    if (vb) vb.onclick = () => { document.body.classList.remove('aberta'); atual = null; };
+    txt.focus();
+  } catch (e) {
+    elPain.innerHTML = `<div class="vazio">${esc(e.message)}</div>`;
+  }
+}
+
+async function enviar() {
+  const txt = document.getElementById('txt'), btn = document.getElementById('btn');
+  const texto = txt.value.trim();
+  if (!texto || !atual) return;
+
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    await api('enviar', { conversa_id: atual, texto });
+    txt.value = ''; txt.style.height = 'auto';
+    await abrir(atual);
+    carregarLista();
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    const b = document.getElementById('btn');
+    if (b) { b.disabled = false; b.textContent = 'Enviar'; }
+  }
+}
+
+if (!SLUG || !TOKEN) {
+  elCont.textContent = '';
+  elConvs.innerHTML = '<div class="vazio">Abra esta página pelo painel do seu negócio.</div>';
+} else {
+  carregarLista();
+  timer = setInterval(() => { carregarLista(); if (atual) abrir(atual); }, 10000);
+  document.addEventListener('visibilitychange', () => {
+    clearInterval(timer);
+    if (!document.hidden) {
+      carregarLista(); if (atual) abrir(atual);
+      timer = setInterval(() => { carregarLista(); if (atual) abrir(atual); }, 10000);
+    }
+  });
+}
+</script>
+</body>
+</html>
