@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WhatsApp — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#2E5BFF; --brand-deep:#1E44D6; --brand-2:#5B8DEF;
+  --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
+  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
+  --ink:#141A2E; --muted:#697089; --faint:#9AA1B4;
+  --quente:#E03127; --quente-bg:rgba(224,49,39,.12);
+  --morno:#C47A08;  --morno-bg:rgba(224,147,15,.14);
+  --verde:#16A34A;  --verde-bg:rgba(22,163,74,.12);
+  --gray-bg:rgba(105,112,137,.12);
+  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
+button{font-family:inherit;cursor:pointer}
+h2{font-size:16px;font-weight:700}
+
+.layout{display:flex;min-height:100%}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.content{padding:22px 26px 60px;max-width:1240px;width:100%;margin:0 auto}
+
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;
+  background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px;font-weight:700}
+.voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;
+  padding:7px 13px;border-radius:10px;text-decoration:none;transition:.14s}
+.voltar:hover{border-color:var(--brand);color:var(--brand)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
+.card-eb{font-size:12.5px;color:var(--muted);font-weight:600}
+
+.grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+@media(max-width:880px){.grid{grid-template-columns:1fr}}
+
+/* Estado da conexão */
+.estado{display:flex;align-items:center;gap:10px;font-weight:700;font-size:14px;margin-bottom:4px}
+.ponto{width:9px;height:9px;border-radius:50%;flex:0 0 9px}
+.ponto.on{background:var(--verde);box-shadow:0 0 0 4px var(--verde-bg)}
+.ponto.off{background:var(--faint);box-shadow:0 0 0 4px var(--gray-bg)}
+.ponto.wait{background:var(--morno);box-shadow:0 0 0 4px var(--morno-bg);animation:pulsa 1.4s ease-in-out infinite}
+.ponto.err{background:var(--quente);box-shadow:0 0 0 4px var(--quente-bg)}
+@keyframes pulsa{0%,100%{opacity:1}50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.ponto.wait{animation:none}}
+
+.numero{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+.sub{color:var(--muted);font-size:13px;line-height:1.65;margin-top:6px}
+
+/* QR */
+.qr-box{display:grid;place-items:center;padding:22px 18px;text-align:center}
+.qr-moldura{width:240px;height:240px;border:1px solid var(--line);border-radius:14px;background:#fff;
+  display:grid;place-items:center;overflow:hidden;padding:10px}
+.qr-moldura img{width:100%;height:100%;object-fit:contain;display:block}
+.qr-vazio{color:var(--faint);font-size:13px;line-height:1.6;padding:0 14px}
+.qr-legenda{color:var(--muted);font-size:13px;line-height:1.7;margin-top:14px;max-width:280px}
+
+.btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:13.5px;padding:11px 16px;
+  border-radius:11px;transition:.14s;width:100%;margin-top:14px}
+.btn:hover{background:var(--brand-deep)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--quente);color:var(--quente);background:var(--card)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* Passos */
+.passos{list-style:none;counter-reset:p;margin-top:14px}
+.passos li{counter-increment:p;display:flex;gap:11px;padding:9px 0;border-bottom:1px solid var(--line-2);
+  font-size:13.5px;color:var(--muted);line-height:1.6}
+.passos li:last-child{border-bottom:0}
+.passos li::before{content:counter(p);flex:0 0 22px;height:22px;border-radius:7px;background:var(--brand-softer);
+  color:var(--brand);font-weight:700;font-size:12px;display:grid;place-items:center;margin-top:1px}
+
+.aviso{background:var(--morno-bg);border:1px solid rgba(224,147,15,.28);border-radius:12px;padding:12px 14px;
+  font-size:13px;color:#8A5A04;line-height:1.6;margin-top:14px}
+.erro{background:var(--quente-bg);border:1px solid rgba(224,49,39,.25);border-radius:12px;padding:12px 14px;
+  font-size:13px;color:#A81E17;line-height:1.6;margin-top:14px}
+.empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--r);padding:40px 20px;
+  text-align:center;color:var(--faint);font-size:13.5px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="main">
+    <div class="topbar">
+      <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
+      <h1>WhatsApp</h1>
+    </div>
+
+    <div class="content">
+      <div id="raiz" class="empty">Carregando…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG  = p.get('t') || '';
+const TOKEN = p.get('k') || '';
+const raiz  = document.getElementById('raiz');
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+
+let timerStatus = null, timerQr = null, estadoAtual = null;
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ acao, slug: SLUG, token: TOKEN, ...extra })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(d.erro || `Erro ${r.status}`), { dados: d, status: r.status });
+  return d;
+}
+
+const ROTULOS = {
+  conectado:     { txt: 'Conectado',            cls: 'on'   },
+  aguardando_qr: { txt: 'Aguardando leitura',   cls: 'wait' },
+  desconectado:  { txt: 'Desconectado',         cls: 'off'  },
+  erro:          { txt: 'Erro na conexão',      cls: 'err'  }
+};
+
+function desenhar(estado) {
+  const r = ROTULOS[estado.status] || ROTULOS.desconectado;
+  const conectado = estado.status === 'conectado';
+
+  raiz.className = '';
+  raiz.innerHTML = `
+    <div class="grid">
+      <div class="card">
+        <div class="estado"><span class="ponto ${r.cls}"></span>${r.txt}</div>
+        ${conectado
+          ? `<div class="numero">${formatarFone(estado.numero)}</div>
+             <p class="sub">As mensagens deste número chegam no Capta e ficam registradas na conversa de cada lead.
+             Quem responder pelo celular também aparece aqui.</p>
+             <button class="btn ghost" id="btn-desconectar">Desconectar número</button>`
+          : `<p class="sub">Conecte o WhatsApp do seu negócio para atender pelo Capta.
+             O número continua funcionando normalmente no seu celular.</p>
+             <ol class="passos">
+               <li>Abra o WhatsApp no celular do negócio</li>
+               <li>Toque nos três pontinhos e escolha <b>Aparelhos conectados</b></li>
+               <li>Toque em <b>Conectar aparelho</b></li>
+               <li>Aponte a câmera para o código ao lado</li>
+             </ol>`}
+        ${estado.erro ? `<div class="erro">${estado.erro}</div>` : ''}
+      </div>
+
+      <div class="card qr-box">
+        ${conectado
+          ? `<div class="qr-moldura"><span class="qr-vazio">Tudo certo.<br>Não precisa ler o código.</span></div>
+             <p class="qr-legenda">Para trocar de número, desconecte primeiro.</p>`
+          : `<div class="qr-moldura" id="qr"><span class="qr-vazio">Gerando código…</span></div>
+             <p class="qr-legenda">O código muda a cada minuto. Se demorar para ler, ele se renova sozinho.</p>`}
+      </div>
+    </div>`;
+
+  const bd = document.getElementById('btn-desconectar');
+  if (bd) bd.onclick = desconectar;
+}
+
+function formatarFone(n) {
+  const d = String(n || '').replace(/\D/g, '');
+  const s = d.startsWith('55') ? d.slice(2) : d;
+  if (s.length === 11) return `(${s.slice(0,2)}) ${s.slice(2,7)}-${s.slice(7)}`;
+  if (s.length === 10) return `(${s.slice(0,2)}) ${s.slice(2,6)}-${s.slice(6)}`;
+  return n || '—';
+}
+
+async function puxarQr() {
+  const alvo = document.getElementById('qr');
+  if (!alvo) return;
+  try {
+    const d = await api('qr');
+    if (d.qr) alvo.innerHTML = `<img src="${d.qr}" alt="Código QR para conectar o WhatsApp">`;
+    else alvo.innerHTML = '<span class="qr-vazio">Código indisponível no momento.<br>Tentando de novo…</span>';
+  } catch (e) {
+    alvo.innerHTML = `<span class="qr-vazio">${e.message}</span>`;
+  }
+}
+
+async function checar() {
+  try {
+    const d = await api('status');
+    if (d.status !== estadoAtual) {
+      estadoAtual = d.status;
+      desenhar(d);
+      if (d.status !== 'conectado') { puxarQr(); agendarQr(); }
+      else { clearInterval(timerQr); timerQr = null; }
+    }
+  } catch (e) {
+    clearInterval(timerStatus); clearInterval(timerQr);
+    raiz.className = '';
+    if (e.status === 402) {
+      raiz.innerHTML = `<div class="card">
+        <div class="estado"><span class="ponto off"></span>Disponível no Business</div>
+        <p class="sub">${e.message}</p>
+        <a class="btn" style="display:block;text-align:center;text-decoration:none"
+           href="/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}">Ver planos</a>
+      </div>`;
+    } else if (e.dados && e.dados.precisa === 'instancia') {
+      raiz.innerHTML = `<div class="card">
+        <div class="estado"><span class="ponto wait"></span>Quase lá</div>
+        <p class="sub">Ainda estamos preparando o seu canal de WhatsApp. Avisamos assim que estiver pronto.</p>
+      </div>`;
+    } else {
+      raiz.innerHTML = `<div class="card">
+        <div class="estado"><span class="ponto err"></span>Não deu para verificar</div>
+        <p class="sub">${e.message}</p>
+        <button class="btn" onclick="location.reload()">Tentar de novo</button>
+      </div>`;
+    }
+  }
+}
+
+function agendarQr() {
+  clearInterval(timerQr);
+  timerQr = setInterval(puxarQr, 20000);   // o código expira em ~1 min
+}
+
+if (!SLUG || !TOKEN) {
+  raiz.textContent = 'Abra esta página pelo painel do seu negócio.';
+} else {
+  checar();
+  timerStatus = setInterval(checar, 3000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { clearInterval(timerStatus); clearInterval(timerQr); }
+    else { checar(); timerStatus = setInterval(checar, 3000); if (estadoAtual !== 'conectado') agendarQr(); }
+  });
+}
+
+async function desconectar() {
+  if (!confirm('Desconectar este número? As mensagens param de chegar no Capta.')) return;
+  const b = document.getElementById('btn-desconectar');
+  b.disabled = true; b.textContent = 'Desconectando…';
+  try { await api('desconectar'); estadoAtual = null; checar(); }
+  catch (e) { b.disabled = false; b.textContent = 'Desconectar número'; alert(e.message); }
+}
+</script>
+</body>
+</html>
