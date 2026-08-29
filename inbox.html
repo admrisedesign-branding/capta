@@ -85,6 +85,17 @@ button{font-family:inherit;cursor:pointer}
 .msg.saida .msg-meta{justify-content:flex-end}
 .msg-autor{font-weight:700;text-transform:uppercase;letter-spacing:.04em}
 
+/* Mídia */
+.msg audio{display:block;width:250px;max-width:100%;margin:2px 0}
+.msg img{display:block;max-width:230px;border-radius:9px;margin:2px 0;cursor:zoom-in}
+.msg .arquivo{display:inline-flex;align-items:center;gap:7px;font-weight:600;text-decoration:underline}
+.transcricao{margin-top:7px;padding-top:7px;border-top:1px solid rgba(105,112,137,.18);
+  font-size:12.5px;line-height:1.55;opacity:.9}
+.transcricao::before{content:"Transcrição";display:block;font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.05em;opacity:.6;margin-bottom:2px}
+.pendente{font-size:12px;opacity:.6;margin-top:6px;font-style:italic}
+.carregando-midia{font-size:12px;opacity:.6}
+
 .escrever{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:9px;align-items:flex-end;background:var(--card)}
 .escrever textarea{flex:1;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-family:inherit;
   font-size:13.5px;resize:none;max-height:120px;color:var(--ink);background:var(--card)}
@@ -221,14 +232,7 @@ async function abrir(id) {
       </div>
 
       <div class="fluxo" id="fluxo">
-        ${mensagens.length ? mensagens.map(m => `
-          <div class="msg ${m.direcao}">
-            ${m.texto ? esc(m.texto) : `<i>[${esc(m.tipo)}]</i>`}
-            <div class="msg-meta">
-              ${m.autor !== 'lead' ? `<span class="msg-autor">${m.autor === 'agente' ? 'robô' : 'você'}</span>` : ''}
-              <span>${hora(m.criado_em)}</span>
-            </div>
-          </div>`).join('')
+        ${mensagens.length ? mensagens.map(corpoMsg).join('')
           : '<div class="vazio">Sem mensagens nesta conversa.</div>'}
       </div>
 
@@ -242,6 +246,7 @@ async function abrir(id) {
 
     const fluxo = document.getElementById('fluxo');
     fluxo.scrollTop = fluxo.scrollHeight;
+    carregarMidias();
 
     const txt = document.getElementById('txt');
     txt.oninput = () => { txt.style.height = 'auto'; txt.style.height = Math.min(txt.scrollHeight, 120) + 'px'; };
@@ -252,6 +257,59 @@ async function abrir(id) {
     txt.focus();
   } catch (e) {
     elPain.innerHTML = `<div class="vazio">${esc(e.message)}</div>`;
+  }
+}
+
+function corpoMsg(m) {
+  const temMidia = m.midia_url && ['audio','imagem','video','documento','figurinha'].includes(m.tipo);
+  let miolo = '';
+
+  if (temMidia) {
+    miolo = `<div class="midia" data-id="${m.id}" data-tipo="${m.tipo}">
+      <span class="carregando-midia">abrindo…</span></div>`;
+    if (m.texto) miolo += `<div style="margin-top:5px">${esc(m.texto)}</div>`;
+  } else {
+    miolo = m.texto ? esc(m.texto) : `<i>[${esc(m.tipo)}]</i>`;
+  }
+
+  if (m.tipo === 'audio') {
+    if (m.transcricao) {
+      miolo += `<div class="transcricao">${esc(m.transcricao)}</div>`;
+    } else if (m.transcricao_status === 'pendente') {
+      miolo += `<div class="pendente">Transcrição ainda não disponível</div>`;
+    }
+  }
+
+  return `<div class="msg ${m.direcao}">
+    ${miolo}
+    <div class="msg-meta">
+      ${m.autor !== 'lead' ? `<span class="msg-autor">${m.autor === 'agente' ? 'robô' : 'você'}</span>` : ''}
+      <span>${hora(m.criado_em)}</span>
+    </div>
+  </div>`;
+}
+
+// As URLs são assinadas e valem 5 minutos, então só são pedidas na hora
+// de exibir — nunca ficam guardadas na página.
+async function carregarMidias() {
+  const alvos = document.querySelectorAll('.midia[data-id]');
+  for (const el of alvos) {
+    try {
+      const { url, mime } = await api('midia', { mensagem_id: el.dataset.id });
+      const tipo = el.dataset.tipo;
+      if (tipo === 'audio') {
+        el.innerHTML = `<audio controls preload="none" src="${url}"></audio>`;
+      } else if (tipo === 'imagem' || tipo === 'figurinha') {
+        el.innerHTML = `<img src="${url}" alt="Imagem enviada na conversa"
+          onclick="window.open('${url}','_blank')">`;
+      } else if (tipo === 'video') {
+        el.innerHTML = `<video controls preload="none" src="${url}" style="max-width:230px;border-radius:9px"></video>`;
+      } else {
+        el.innerHTML = `<a class="arquivo" href="${url}" target="_blank" rel="noopener">Abrir arquivo</a>`;
+      }
+    } catch {
+      el.innerHTML = '<span class="carregando-midia">arquivo indisponível</span>';
+    }
   }
 }
 
