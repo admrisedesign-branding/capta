@@ -91,10 +91,11 @@ async function processar(canalId, payload) {
   const direcao = evento.de_mim ? 'saida' : 'entrada';
   const autor   = evento.de_mim ? 'humano' : 'lead';
 
+  let msg;
   try {
-    await sb('capta_mensagens', {
+    const criadas = await sb('capta_mensagens', {
       method: 'POST',
-      headers: { Prefer: 'return=minimal' },
+      headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
         conversa_id: conversa.id,
         tenant_id: tenant,
@@ -102,17 +103,27 @@ async function processar(canalId, payload) {
         autor,
         tipo: evento.tipo,
         texto: evento.texto,
-        midia_url: null,             // preenchido depois do download (ver nota 2)
         midia_mime: evento.midia?.mime || null,
         provedor_msg_id: evento.provedor_msg_id,
         entrega: evento.de_mim ? 'enviada' : null,
+        // Áudio nasce como transcrição pendente. Quem transcreve é a
+        // ação 'transcrever', não o webhook — aqui o tempo é curto.
+        transcricao_status: evento.tipo === 'audio' ? 'pendente' : null,
         criado_em: evento.criado_em
       })
     });
+    msg = criadas && criadas[0];
   } catch (e) {
     // 23505 = índice único → evento reenviado, já gravado. Ignorar.
     if (String(e.message).includes('23505')) return;
     throw e;
+  }
+
+  // Baixa e guarda a mídia. O link do Z-API expira em 30 dias, então
+  // apontar para ele quebraria o histórico em um mês.
+  if (msg && evento.midia?.url) {
+    try { await guardarMidia(tenant, msg, evento); }
+    catch (e) { console.error('[midia]', e.message); }
   }
 
   // Mensagem vinda do celular significa que um humano respondeu por fora.
@@ -124,8 +135,52 @@ async function processar(canalId, payload) {
     });
   }
 
-  // TODO: se evento.midia?.url → baixar e salvar no bucket privado
-  // (o link do Z-API expira em 30 dias). Ver nota 2.
+}
+
+// ---------------------------------------------------------------------
+// Baixa o arquivo do provedor e sobe no bucket privado do Supabase.
+// Nome aleatório, sem nada que permita adivinhar a URL.
+// ---------------------------------------------------------------------
+const EXT = {
+  'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/wav': 'wav',
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+  'video/mp4': 'mp4', 'application/pdf': 'pdf'
+};
+
+async function guardarMidia(tenant, msg, evento) {
+  const r = await fetch(evento.midia.url);
+  if (!r.ok) throw new Error(`download ${r.status}`);
+
+  const bytes = Buffer.from(await r.arrayBuffer());
+  const mime  = evento.midia.mime || r.headers.get('content-type') || 'application/octet-stream';
+  const base  = mime.split(';')[0].trim();
+  const ext   = EXT[base] || 'bin';
+  const caminho = `${tenant}/${msg.id}.${ext}`;
+
+  const up = await fetch(`${SB_URL}/storage/v1/object/capta-midia/${caminho}`, {
+    method: 'POST',
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      'Content-Type': base,
+      'x-upsert': 'true'
+    },
+    body: bytes
+  });
+  if (!up.ok) throw new Error(`upload ${up.status}: ${await up.text()}`);
+
+  await sb('capta_midias', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      tenant_id: tenant, mensagem_id: msg.id,
+      caminho, mime: base, tamanho: bytes.length
+    })
+  });
+
+  await sb(`capta_mensagens?id=eq.${msg.id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ midia_url: caminho, midia_mime: base })
+  });
 }
 
 // ---------------------------------------------------------------------
@@ -180,10 +235,16 @@ async function acharOuCriarConversa(tenant, canalId, evento) {
 //    trabalho pendente se perde. O 200 é devolvido mesmo em erro, porque
 //    resposta de erro faz o Z-API reenviar em loop.
 //
-// 2. MÍDIA: o arquivo no Z-API some em 30 dias e a nossa retenção é de
-//    90. Falta implementar: baixar a URL, subir no bucket PRIVADO do
-//    Supabase com nome aleatório, gravar o caminho em capta_midias e
-//    preencher midia_url na mensagem. Nunca guardar o link do provedor.
+// 2. MÍDIA: implementado em guardarMidia(). O arquivo é baixado do
+//    Z-API (cujo link expira em 30 dias) e sobe no bucket PRIVADO
+//    capta-midia. capta_mensagens.midia_url guarda o CAMINHO no bucket,
+//    nunca uma URL pública — o navegador só recebe URL assinada de curta
+//    duração, gerada na hora pela ação 'midia'.
+//
+// 6. ÁUDIO nasce com transcricao_status = 'pendente'. A transcrição NÃO
+//    acontece aqui: o plano Hobby do Vercel corta a função em 10s e
+//    download + Whisper pode estourar. Quem transcreve é a ação
+//    'transcrever' do capta-whatsapp.js.
 //
 // 3. FALTA CRIAR no banco esta função, que o casamento de conversa usa:
 //
