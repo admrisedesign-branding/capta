@@ -9,6 +9,8 @@
 //   acao: 'qr'          -> { qr }            (base64 pronto para <img>)
 //   acao: 'desconectar' -> { status }
 //   acao: 'enviar'      -> { ok, id }        { conversa_id | telefone, texto }
+//   acao: 'conversas'   -> { conversas[] }    lista do inbox
+//   acao: 'mensagens'   -> { mensagens[] }    { conversa_id }
 //   acao: 'webhooks'    -> { ok, url }       (re)configura os webhooks
 //
 // Autenticação: slug + dashboard_token, igual ao resto do painel.
@@ -80,6 +82,8 @@ module.exports = async function handler(req, res) {
       case 'desconectar': return await acaoDesconectar(canal, res);
       case 'webhooks':    return await acaoWebhooks(canal, res);
       case 'enviar':      return await acaoEnviar(tenant, canal, body, res);
+      case 'conversas':   return await acaoConversas(tenant, res);
+      case 'mensagens':   return await acaoMensagens(tenant, body, res);
       default:            return res.status(400).json({ erro: 'Ação inválida.' });
     }
   } catch (e) {
@@ -222,6 +226,48 @@ async function acaoEnviar(tenant, canal, body, res) {
   });
 
   return res.status(200).json({ ok: true, id: envio.provedor_msg_id, conversa_id: conversa.id });
+}
+
+// ---------------------------------------------------------------------
+// CONVERSAS — lista do inbox, mais recente primeiro
+// ---------------------------------------------------------------------
+async function acaoConversas(tenant, res) {
+  const rows = await sb(
+    `capta_conversas?tenant_id=eq.${tenant.id}` +
+    `&select=id,telefone,agente_ativo,status,nao_lidas,ultima_mensagem,ultima_mensagem_em,` +
+    `lead:lead_id(id,nome,temperatura,status)` +
+    `&order=ultima_mensagem_em.desc.nullslast&limit=100`
+  );
+  return res.status(200).json({ conversas: rows || [] });
+}
+
+// ---------------------------------------------------------------------
+// MENSAGENS de uma conversa. Abrir zera o contador de não lidas.
+// ---------------------------------------------------------------------
+async function acaoMensagens(tenant, body, res) {
+  const id = (body.conversa_id || '').trim();
+  if (!id) return res.status(400).json({ erro: 'Informe conversa_id.' });
+
+  const conv = await sb(
+    `capta_conversas?id=eq.${id}&tenant_id=eq.${tenant.id}` +
+    `&select=id,telefone,agente_ativo,nao_lidas,lead:lead_id(id,nome,temperatura)&limit=1`
+  );
+  if (!conv?.[0]) return res.status(404).json({ erro: 'Conversa não encontrada.' });
+
+  const msgs = await sb(
+    `capta_mensagens?conversa_id=eq.${id}&tenant_id=eq.${tenant.id}` +
+    `&select=id,direcao,autor,tipo,texto,midia_mime,entrega,criado_em` +
+    `&order=criado_em.asc&limit=200`
+  );
+
+  if (conv[0].nao_lidas > 0) {
+    await sb(`capta_conversas?id=eq.${id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ nao_lidas: 0 })
+    });
+  }
+
+  return res.status(200).json({ conversa: conv[0], mensagens: msgs || [] });
 }
 
 // =====================================================================
