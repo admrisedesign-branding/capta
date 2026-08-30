@@ -12,6 +12,12 @@
 //   acao: 'conversas'   -> { conversas[] }    lista do inbox
 //   acao: 'mensagens'   -> { mensagens[] }    { conversa_id }
 //   acao: 'midia'       -> { url }            { mensagem_id } — link assinado 5 min
+//   acao: 'agenda'      -> { turmas[], horarios[], agendamentos[] }
+//   acao: 'agendar'     -> { ok, id }          { lead_id|conversa_id, turma_id, data, crianca_nome, crianca_idade }
+//   acao: 'remarcar'    -> { ok, id }          { agendamento_id, data, turma_id, motivo }
+//   acao: 'presenca'    -> { ok }              { agendamento_id, status }
+//   acao: 'funil'       -> { etapas[], leads[] }
+//   acao: 'mover'       -> { ok }              { lead_id, etapa_id, motivo }
 //   acao: 'webhooks'    -> { ok, url }       (re)configura os webhooks
 //
 // Autenticação: slug + dashboard_token, igual ao resto do painel.
@@ -86,6 +92,12 @@ module.exports = async function handler(req, res) {
       case 'conversas':   return await acaoConversas(tenant, res);
       case 'mensagens':   return await acaoMensagens(tenant, body, res);
       case 'midia':       return await acaoMidia(tenant, body, res);
+      case 'agenda':      return await acaoAgenda(tenant, body, res);
+      case 'agendar':     return await acaoAgendar(tenant, body, res);
+      case 'remarcar':    return await acaoRemarcar(tenant, body, res);
+      case 'presenca':    return await acaoPresenca(tenant, body, res);
+      case 'funil':       return await acaoFunil(tenant, res);
+      case 'mover':       return await acaoMover(tenant, body, res);
       default:            return res.status(400).json({ erro: 'Ação inválida.' });
     }
   } catch (e) {
@@ -299,6 +311,165 @@ async function acaoMidia(tenant, body, res) {
 
   const d = await r.json();
   return res.status(200).json({ url: `${SUPABASE_URL}/storage/v1${d.signedURL}`, mime: m.midia_mime });
+}
+
+// ---------------------------------------------------------------------
+// AGENDA
+// ---------------------------------------------------------------------
+async function rpc(nome, args) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nome}`, {
+    method: 'POST',
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args)
+  });
+  if (!r.ok) throw new Error(`${nome}: ${await r.text()}`);
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
+}
+
+async function acaoAgenda(tenant, body, res) {
+  const dias = Math.min(Number(body.dias) || 21, 60);
+
+  const [turmas, horarios, agendamentos] = await Promise.all([
+    sb(`capta_turmas?tenant_id=eq.${tenant.id}&ativa=is.true&select=*&order=dia_semana,hora_inicio`),
+    rpc('capta_horarios_disponiveis', { p_tenant: tenant.id, p_dias: dias }),
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}` +
+       `&status=in.(agendado,confirmado,compareceu,faltou)` +
+       `&select=id,data,hora_inicio,hora_fim,status,crianca_nome,crianca_idade,turma_id,` +
+       `confirmado_em,lead:lead_id(id,nome,contato)&order=data.asc,hora_inicio.asc&limit=300`)
+  ]);
+
+  return res.status(200).json({ turmas: turmas || [], horarios: horarios || [], agendamentos: agendamentos || [] });
+}
+
+async function acaoAgendar(tenant, body, res) {
+  const { turma_id, data, crianca_nome, crianca_idade } = body;
+  if (!turma_id || !data) return res.status(400).json({ erro: 'Informe turma e data.' });
+
+  let leadId = body.lead_id || null;
+  if (!leadId && body.conversa_id) {
+    const c = await sb(`capta_conversas?id=eq.${body.conversa_id}&tenant_id=eq.${tenant.id}&select=lead_id&limit=1`);
+    leadId = c?.[0]?.lead_id || null;
+  }
+
+  const t = await sb(`capta_turmas?id=eq.${turma_id}&tenant_id=eq.${tenant.id}&select=hora_inicio,hora_fim&limit=1`);
+  if (!t?.[0]) return res.status(404).json({ erro: 'Turma não encontrada.' });
+
+  try {
+    const criado = await sb('capta_agendamentos', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        tenant_id: tenant.id, lead_id: leadId, turma_id, data,
+        hora_inicio: t[0].hora_inicio, hora_fim: t[0].hora_fim,
+        crianca_nome: crianca_nome || null,
+        crianca_idade: crianca_idade || null,
+        status: 'agendado',
+        criado_por: body.usuario_email || 'painel'
+      })
+    });
+
+    // Move o lead para a etapa de aula agendada, se ela existir.
+    if (leadId) {
+      const e = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Aula%20agendada&select=id&limit=1`);
+      if (e?.[0]) await moverLead(tenant.id, leadId, e[0].id, null);
+    }
+
+    return res.status(200).json({ ok: true, id: criado[0].id });
+  } catch (e) {
+    // O gatilho do banco recusa turma lotada e data bloqueada.
+    return res.status(409).json({ erro: limparErro(e.message) });
+  }
+}
+
+async function acaoRemarcar(tenant, body, res) {
+  const { agendamento_id, data, turma_id } = body;
+  if (!agendamento_id || !data || !turma_id) return res.status(400).json({ erro: 'Dados incompletos.' });
+
+  const a = await sb(`capta_agendamentos?id=eq.${agendamento_id}&tenant_id=eq.${tenant.id}&select=id&limit=1`);
+  if (!a?.[0]) return res.status(404).json({ erro: 'Agendamento não encontrado.' });
+
+  try {
+    const novo = await rpc('capta_remarcar', {
+      p_agendamento: agendamento_id, p_nova_data: data, p_nova_turma: turma_id,
+      p_motivo: body.motivo || null, p_ator: body.usuario_email || 'painel'
+    });
+    return res.status(200).json({ ok: true, id: novo });
+  } catch (e) {
+    return res.status(409).json({ erro: limparErro(e.message) });
+  }
+}
+
+// Presença: é isso que alimenta a comissão. Sem marcar, o funil mente.
+async function acaoPresenca(tenant, body, res) {
+  const { agendamento_id, status } = body;
+  if (!['compareceu', 'faltou', 'confirmado', 'cancelado'].includes(status)) {
+    return res.status(400).json({ erro: 'Situação inválida.' });
+  }
+
+  const a = await sb(`capta_agendamentos?id=eq.${agendamento_id}&tenant_id=eq.${tenant.id}&select=id,lead_id&limit=1`);
+  if (!a?.[0]) return res.status(404).json({ erro: 'Agendamento não encontrado.' });
+
+  const agora = new Date().toISOString();
+  const campos = { status };
+  if (status === 'compareceu') campos.compareceu_em = agora;
+  if (status === 'confirmado') { campos.confirmado_em = agora; campos.confirmado_por = 'atendente'; }
+  if (status === 'cancelado')  { campos.cancelado_em = agora; campos.motivo_cancelamento = body.motivo || null; }
+
+  await sb(`capta_agendamentos?id=eq.${agendamento_id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos)
+  });
+
+  if (status === 'compareceu' && a[0].lead_id) {
+    const e = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Compareceu&select=id&limit=1`);
+    if (e?.[0]) await moverLead(tenant.id, a[0].lead_id, e[0].id, null);
+  }
+
+  return res.status(200).json({ ok: true });
+}
+
+// ---------------------------------------------------------------------
+// FUNIL
+// ---------------------------------------------------------------------
+async function acaoFunil(tenant, res) {
+  const [etapas, leads, motivos] = await Promise.all([
+    sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=*&order=ordem`),
+    sb(`capta_leads?tenant_id=eq.${tenant.id}` +
+       `&select=id,nome,contato,temperatura,score,origem,etapa_id,etapa_em,criado_em,motivo_perda` +
+       `&order=etapa_em.desc.nullslast,criado_em.desc&limit=500`),
+    sb(`capta_motivos?tenant_id=eq.${tenant.id}&ativo=is.true&select=id,nome,etapa&order=ordem`)
+      .catch(() => [])
+  ]);
+  return res.status(200).json({ etapas: etapas || [], leads: leads || [], motivos: motivos || [] });
+}
+
+async function acaoMover(tenant, body, res) {
+  const { lead_id, etapa_id } = body;
+  if (!lead_id || !etapa_id) return res.status(400).json({ erro: 'Dados incompletos.' });
+
+  const l = await sb(`capta_leads?id=eq.${lead_id}&tenant_id=eq.${tenant.id}&select=id&limit=1`);
+  if (!l?.[0]) return res.status(404).json({ erro: 'Lead não encontrado.' });
+
+  await moverLead(tenant.id, lead_id, etapa_id, body.motivo || null);
+  return res.status(200).json({ ok: true });
+}
+
+// etapa_em é o que permite dizer "parado há X dias" — o dado que o Kommo
+// não dá sem abrir card por card.
+async function moverLead(tenantId, leadId, etapaId, motivo) {
+  const campos = { etapa_id: etapaId, etapa_em: new Date().toISOString() };
+  if (motivo !== null && motivo !== undefined) campos.motivo_perda = motivo;
+  await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos)
+  });
+}
+
+// Mensagens de erro do Postgres não servem para o cliente ler.
+function limparErro(msg) {
+  const s = String(msg || '');
+  if (s.includes('Turma lotada'))    return 'Essa turma já está com as 4 vagas ocupadas nessa data.';
+  if (s.includes('Data bloqueada'))  return 'Essa data está bloqueada na agenda.';
+  if (s.includes('não pode ser remarcado')) return 'Este agendamento não pode ser remarcado.';
+  return 'Não foi possível concluir. Confira os dados e tente de novo.';
 }
 
 // =====================================================================
