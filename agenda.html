@@ -246,8 +246,10 @@ function janelaAgendar(turmaId, data) {
       <p class="sub">${nomeDia(data)}, ${dataBR(data)}</p>
       <div class="campo"><label for="cn">Nome da criança</label><input id="cn" autofocus></div>
       <div class="campo"><label for="ci">Idade</label><input id="ci" type="number" min="4" max="17"></div>
-      <div class="campo"><label for="rn">Responsável (WhatsApp)</label>
-        <input id="rn" placeholder="92 99999-9999"></div>
+      <div class="campo"><label for="rp">Nome do responsável</label><input id="rp"></div>
+      <div class="campo"><label for="rn">WhatsApp do responsável</label>
+        <input id="rn" inputmode="tel" placeholder="92 99999-9999"></div>
+      <p class="sub" style="margin-top:8px">O WhatsApp é o que permite mandar a confirmação da véspera.</p>
       <div id="err"></div>
       <div class="janela-fim">
         <button class="btn g" onclick="fechar()">Cancelar</button>
@@ -262,7 +264,9 @@ function janelaAgendar(turmaId, data) {
       await api('agendar', {
         turma_id: turmaId, data,
         crianca_nome: document.getElementById('cn').value.trim() || null,
-        crianca_idade: Number(document.getElementById('ci').value) || null
+        crianca_idade: Number(document.getElementById('ci').value) || null,
+        responsavel: document.getElementById('rp').value.trim() || null,
+        contato: document.getElementById('rn').value.trim() || null
       });
       fechar(); carregar();
     } catch (e) {
