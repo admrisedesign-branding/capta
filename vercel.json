@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/capta-whatsapp",
+      "schedule": "0 12 * * *"
+    }
+  ]
+}
