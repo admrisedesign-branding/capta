@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Funil — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#2E5BFF; --brand-deep:#1E44D6; --brand-2:#5B8DEF;
+  --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
+  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
+  --ink:#141A2E; --muted:#697089; --faint:#9AA1B4;
+  --quente:#E03127; --quente-bg:rgba(224,49,39,.12);
+  --morno:#C47A08;  --morno-bg:rgba(224,147,15,.14);
+  --frio:#3E6FD6;   --frio-bg:rgba(91,141,239,.15);
+  --verde:#16A34A;  --verde-bg:rgba(22,163,74,.12);
+  --gray-bg:rgba(105,112,137,.12);
+  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;font-size:14px}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;
+  background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px;font-weight:700}
+.voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;
+  padding:7px 13px;border-radius:10px;text-decoration:none;transition:.14s}
+.voltar:hover{border-color:var(--brand);color:var(--brand)}
+.dica{margin-left:auto;color:var(--faint);font-size:12.5px}
+@media(max-width:760px){.dica{display:none}}
+
+.raia-area{padding:20px 26px 40px;overflow-x:auto}
+.raias{display:flex;gap:14px;min-height:60vh;align-items:flex-start}
+
+.raia{flex:0 0 258px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow);display:flex;flex-direction:column;max-height:76vh}
+.raia.alvo{border-color:var(--brand);background:var(--brand-softer)}
+.raia-cab{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.raia-cor{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.raia-nome{font-weight:700;font-size:13.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.raia-qtd{font-size:12px;font-weight:700;color:var(--muted);background:var(--gray-bg);border-radius:99px;padding:2px 8px}
+.raia-corpo{padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;flex:1}
+
+.lead{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--card);cursor:grab;transition:.14s}
+.lead:hover{border-color:var(--brand-2);box-shadow:0 2px 8px rgba(20,26,46,.06)}
+.lead.arrastando{opacity:.4}
+.lead-nome{font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lead-sub{color:var(--muted);font-size:12px;margin-top:2px}
+.lead-fim{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap}
+
+.tag{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:99px;text-transform:uppercase;letter-spacing:.03em}
+.t-Quente{background:var(--quente-bg);color:var(--quente)}
+.t-Morno{background:var(--morno-bg);color:var(--morno)}
+.t-Frio{background:var(--frio-bg);color:var(--frio)}
+.parado{font-size:11px;color:var(--faint)}
+.parado.alerta{color:var(--morno);font-weight:600}
+.parado.grave{color:var(--quente);font-weight:700}
+
+.vazia{color:var(--faint);font-size:12.5px;text-align:center;padding:18px 8px;line-height:1.6}
+.aviso{margin:20px 26px 0;border:1px dashed var(--line);border-radius:var(--r);padding:36px;text-align:center;
+  color:var(--faint);font-size:13.5px;line-height:1.7}
+
+.fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
+.janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:400px;
+  box-shadow:0 20px 50px rgba(20,26,46,.2)}
+.janela h3{font-size:16px;font-weight:700}
+.janela p{color:var(--muted);font-size:12.5px;line-height:1.6;margin-top:4px}
+.campo{margin-top:14px}
+.campo label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:5px}
+.campo select,.campo input{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;
+  font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--card)}
+.janela-fim{display:flex;gap:9px;justify-content:flex-end;margin-top:20px}
+.btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:9px}
+.btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
+  <h1>Funil</h1>
+  <span class="dica">Arraste o card para mudar de etapa</span>
+</div>
+
+<div id="raiz" class="aviso">Carregando…</div>
+<div id="modal"></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+
+let etapas = [], leads = [], motivos = [], arrastado = null;
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ acao, slug: SLUG, token: TOKEN, ...extra })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`);
+  return d;
+}
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+// "Parado há X dias" é o dado que o Kommo não dá sem abrir card por card.
+function parado(iso) {
+  if (!iso) return { txt: '', cls: '' };
+  const dias = Math.floor((Date.now() - new Date(iso)) / 864e5);
+  if (dias < 1)  return { txt: 'hoje', cls: '' };
+  if (dias === 1) return { txt: 'ontem', cls: '' };
+  const txt = `parado há ${dias} dias`;
+  if (dias >= 14) return { txt, cls: 'grave' };
+  if (dias >= 7)  return { txt, cls: 'alerta' };
+  return { txt, cls: '' };
+}
+
+async function carregar() {
+  try {
+    const d = await api('funil');
+    etapas = d.etapas; leads = d.leads; motivos = d.motivos || [];
+    if (!etapas.length) {
+      document.getElementById('raiz').className = 'aviso';
+      document.getElementById('raiz').innerHTML =
+        'Nenhuma etapa cadastrada ainda.<br>Cadastre as etapas do seu funil para começar.';
+      return;
+    }
+    desenhar();
+  } catch (e) {
+    document.getElementById('raiz').className = 'aviso';
+    document.getElementById('raiz').textContent = e.message;
+  }
+}
+
+function desenhar() {
+  const raiz = document.getElementById('raiz');
+  raiz.className = 'raia-area';
+
+  const semEtapa = leads.filter(l => !l.etapa_id);
+  const colunas = etapas.map(e => ({ e, itens: leads.filter(l => l.etapa_id === e.id) }));
+  if (semEtapa.length) colunas.unshift({ e: { id: '', nome: 'Sem etapa', cor: '#9AA1B4' }, itens: semEtapa });
+
+  raiz.innerHTML = `<div class="raias">${colunas.map(c => `
+    <section class="raia" data-etapa="${c.e.id}">
+      <div class="raia-cab">
+        <span class="raia-cor" style="background:${esc(c.e.cor || '#2E5BFF')}"></span>
+        <span class="raia-nome">${esc(c.e.nome)}</span>
+        <span class="raia-qtd">${c.itens.length}</span>
+      </div>
+      <div class="raia-corpo">
+        ${c.itens.length ? c.itens.map(cartao).join('') : '<div class="vazia">Nenhum lead aqui</div>'}
+      </div>
+    </section>`).join('')}</div>`;
+
+  ligar();
+}
+
+function cartao(l) {
+  const pd = parado(l.etapa_em || l.criado_em);
+  return `<article class="lead" draggable="true" data-lead="${l.id}">
+    <div class="lead-nome">${esc(l.nome || 'Sem nome')}</div>
+    <div class="lead-sub">${esc(l.contato || '')}${l.origem ? ' · ' + esc(l.origem) : ''}</div>
+    <div class="lead-fim">
+      ${l.temperatura ? `<span class="tag t-${esc(l.temperatura)}">${esc(l.temperatura)}</span>` : ''}
+      <span class="parado ${pd.cls}">${pd.txt}</span>
+    </div>
+  </article>`;
+}
+
+function ligar() {
+  document.querySelectorAll('.lead').forEach(el => {
+    el.addEventListener('dragstart', e => {
+      arrastado = el.dataset.lead;
+      el.classList.add('arrastando');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', () => { el.classList.remove('arrastando'); arrastado = null; });
+  });
+
+  document.querySelectorAll('.raia').forEach(r => {
+    r.addEventListener('dragover', e => { e.preventDefault(); r.classList.add('alvo'); });
+    r.addEventListener('dragleave', () => r.classList.remove('alvo'));
+    r.addEventListener('drop', async e => {
+      e.preventDefault();
+      r.classList.remove('alvo');
+      const etapaId = r.dataset.etapa;
+      if (!arrastado || !etapaId) return;
+
+      const lead = leads.find(l => l.id === arrastado);
+      if (!lead || lead.etapa_id === etapaId) return;
+
+      const etapa = etapas.find(x => x.id === etapaId);
+      // Etapa de perda exige motivo — é o que alimenta o relatório de
+      // "por que as pessoas não fecham".
+      if (etapa && etapa.tipo === 'perdida') return janelaMotivo(lead, etapa);
+
+      await mover(lead.id, etapaId, null);
+    });
+  });
+}
+
+async function mover(leadId, etapaId, motivo) {
+  const l = leads.find(x => x.id === leadId);
+  const antes = l.etapa_id;
+  l.etapa_id = etapaId; l.etapa_em = new Date().toISOString();
+  if (motivo) l.motivo_perda = motivo;
+  desenhar();                                   // move na hora, sem esperar a rede
+  try { await api('mover', { lead_id: leadId, etapa_id: etapaId, motivo }); }
+  catch (e) { l.etapa_id = antes; desenhar(); alert(e.message); }
+}
+
+function fechar() { document.getElementById('modal').innerHTML = ''; }
+
+function janelaMotivo(lead, etapa) {
+  const lista = motivos.filter(m => m.etapa === 'nao_matriculou' || !m.etapa);
+  document.getElementById('modal').innerHTML = `
+    <div class="fundo" id="fundo"><div class="janela">
+      <h3>Por que não avançou?</h3>
+      <p>${esc(lead.nome || 'Este lead')} vai para ${esc(etapa.nome)}. O motivo é o que permite saber depois o que mais atrapalha as matrículas.</p>
+      <div class="campo"><label for="mv">Motivo</label>
+        ${lista.length
+          ? `<select id="mv">${lista.map(m => `<option>${esc(m.nome)}</option>`).join('')}</select>`
+          : `<input id="mv" placeholder="Ex.: preço acima do esperado" autofocus>`}
+      </div>
+      <div class="janela-fim">
+        <button class="btn g" onclick="fechar()">Cancelar</button>
+        <button class="btn" id="ok">Confirmar</button>
+      </div>
+    </div></div>`;
+
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fechar(); };
+  document.getElementById('ok').onclick = async () => {
+    const v = document.getElementById('mv').value.trim();
+    fechar();
+    await mover(lead.id, etapa.id, v || null);
+  };
+}
+
+if (!SLUG || !TOKEN) {
+  document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.';
+} else {
+  carregar();
+}
+</script>
+</body>
+</html>

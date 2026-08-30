@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agenda — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#2E5BFF; --brand-deep:#1E44D6; --brand-2:#5B8DEF;
+  --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
+  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
+  --ink:#141A2E; --muted:#697089; --faint:#9AA1B4;
+  --quente:#E03127; --quente-bg:rgba(224,49,39,.12);
+  --morno:#C47A08;  --morno-bg:rgba(224,147,15,.14);
+  --verde:#16A34A;  --verde-bg:rgba(22,163,74,.12);
+  --gray-bg:rgba(105,112,137,.12);
+  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;font-size:14px}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;
+  background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px;font-weight:700}
+.voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;
+  padding:7px 13px;border-radius:10px;text-decoration:none;transition:.14s}
+.voltar:hover{border-color:var(--brand);color:var(--brand)}
+
+.content{padding:22px 26px 60px;max-width:1240px;margin:0 auto}
+.grid{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;
+  box-shadow:var(--shadow);margin-bottom:18px}
+.card h2{font-size:15px;font-weight:700;margin-bottom:4px}
+.sub{color:var(--muted);font-size:12.5px;line-height:1.6}
+
+/* Dias */
+.dia{border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:12px}
+.dia-cab{background:var(--brand-softer);padding:9px 14px;font-weight:700;font-size:13.5px;
+  display:flex;justify-content:space-between;align-items:center}
+.dia-cab .qtd{font-weight:600;font-size:12px;color:var(--muted)}
+.linha{display:flex;align-items:center;gap:12px;padding:11px 14px;border-top:1px solid var(--line-2)}
+.hora{font-weight:700;font-size:13.5px;flex:0 0 96px}
+.quem{flex:1;min-width:0}
+.quem b{font-size:13.5px}
+.quem span{display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
+.acoes{display:flex;gap:6px;flex-wrap:wrap}
+
+.pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;text-transform:uppercase;letter-spacing:.03em}
+.p-agendado{background:var(--gray-bg);color:var(--muted)}
+.p-confirmado{background:var(--brand-soft);color:var(--brand)}
+.p-compareceu{background:var(--verde-bg);color:var(--verde)}
+.p-faltou{background:var(--quente-bg);color:var(--quente)}
+
+.vaga{color:var(--verde);font-weight:600;font-size:13px}
+.btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:7px 13px;
+  border-radius:9px;transition:.14s}
+.btn:hover{background:var(--brand-deep)}
+.btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+.btn.g:hover{border-color:var(--brand);color:var(--brand)}
+.btn.ok{background:var(--verde)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.turma{display:flex;justify-content:space-between;align-items:center;padding:10px 0;
+  border-bottom:1px solid var(--line-2);font-size:13.5px}
+.turma:last-child{border-bottom:0}
+.turma span{color:var(--muted);font-size:12.5px}
+
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:36px 20px;text-align:center;
+  color:var(--faint);font-size:13.5px;line-height:1.7}
+
+/* Janela */
+.fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
+.janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(20,26,46,.2)}
+.janela h3{font-size:16px;font-weight:700;margin-bottom:4px}
+.campo{margin-top:14px}
+.campo label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:5px}
+.campo input,.campo select{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;
+  font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--card)}
+.campo input:focus,.campo select:focus{outline:0;border-color:var(--brand)}
+.janela-fim{display:flex;gap:9px;justify-content:flex-end;margin-top:20px}
+.erro{background:var(--quente-bg);border:1px solid rgba(224,49,39,.25);border-radius:10px;padding:9px 12px;
+  font-size:12.5px;color:#A81E17;margin-top:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
+  <h1>Agenda</h1>
+</div>
+
+<div class="content">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Próximos sábados</h2>
+        <p class="sub">Cada turma tem 4 vagas. A vaga é travada no sistema: quando enche, ninguém consegue marcar em cima.</p>
+        <div id="dias"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>Turmas</h2>
+        <p class="sub">Grade fixa da escola.</p>
+        <div id="turmas" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h2>Esta semana</h2>
+        <div id="resumo" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal"></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+
+let dados = { turmas: [], horarios: [], agendamentos: [] };
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ acao, slug: SLUG, token: TOKEN, ...extra })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`);
+  return d;
+}
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const hhmm = h => String(h || '').slice(0, 5);
+const dataBR = d => { const [a,m,x] = String(d).split('-'); return `${x}/${m}`; };
+const DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+function nomeDia(iso) {
+  const [a,m,d] = String(iso).split('-').map(Number);
+  return DIAS[new Date(a, m-1, d).getDay()];
+}
+
+async function carregar() {
+  try {
+    dados = await api('agenda', { dias: 35 });
+    desenhar();
+  } catch (e) {
+    document.getElementById('dias').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  }
+}
+
+function desenhar() {
+  // Turmas
+  document.getElementById('turmas').innerHTML = dados.turmas.length
+    ? dados.turmas.map(t => `<div class="turma">
+        <div><b>${esc(t.nome)}</b><span>${DIAS[t.dia_semana]}, ${hhmm(t.hora_inicio)} às ${hhmm(t.hora_fim)}</span></div>
+        <span>${t.capacidade} vagas</span>
+      </div>`).join('')
+    : '<p class="sub">Nenhuma turma cadastrada ainda.</p>';
+
+  // Agrupa por data: agendamentos + vagas livres
+  const porData = {};
+  dados.agendamentos.forEach(a => { (porData[a.data] ||= { ags: [], livres: [] }).ags.push(a); });
+  dados.horarios.forEach(h => { (porData[h.data] ||= { ags: [], livres: [] }).livres.push(h); });
+
+  const datas = Object.keys(porData).sort();
+  document.getElementById('dias').innerHTML = datas.length
+    ? datas.map(d => bloco(d, porData[d])).join('')
+    : '<div class="empty">Nenhuma turma disponível nas próximas semanas.<br>Cadastre uma turma para começar.</div>';
+
+  // Resumo dos próximos 7 dias
+  const hoje = new Date().toISOString().slice(0,10);
+  const limite = new Date(Date.now() + 7*864e5).toISOString().slice(0,10);
+  const semana = dados.agendamentos.filter(a => a.data >= hoje && a.data <= limite);
+  const conf = semana.filter(a => a.status === 'confirmado').length;
+  const semConf = semana.filter(a => a.status === 'agendado').length;
+  document.getElementById('resumo').innerHTML = `
+    <div class="turma"><div><b>${semana.length}</b><span>aulas marcadas</span></div></div>
+    <div class="turma"><div><b>${conf}</b><span>confirmadas pela família</span></div></div>
+    <div class="turma"><div><b>${semConf}</b><span>sem confirmação — é aqui que se age</span></div></div>`;
+
+  ligarBotoes();
+}
+
+function bloco(data, o) {
+  const linhas = [];
+
+  o.ags.forEach(a => {
+    const nome = a.crianca_nome || a.lead?.nome || 'Sem nome';
+    const idade = a.crianca_idade ? `${a.crianca_idade} anos` : '';
+    const contato = a.lead?.contato || '';
+    linhas.push(`<div class="linha">
+      <span class="hora">${hhmm(a.hora_inicio)}</span>
+      <span class="quem"><b>${esc(nome)}</b><span>${esc([idade, contato].filter(Boolean).join(' · '))}</span></span>
+      <span class="pill p-${a.status}">${a.status}</span>
+      <span class="acoes">
+        ${['agendado','confirmado'].includes(a.status) ? `
+          <button class="btn ok" data-presenca="${a.id}" data-st="compareceu">Veio</button>
+          <button class="btn g" data-presenca="${a.id}" data-st="faltou">Faltou</button>
+          <button class="btn g" data-remarcar="${a.id}">Remarcar</button>` : ''}
+      </span>
+    </div>`);
+  });
+
+  o.livres.forEach(h => {
+    linhas.push(`<div class="linha">
+      <span class="hora">${hhmm(h.hora_inicio)}</span>
+      <span class="quem"><span class="vaga">${h.vagas} de ${h.capacidade} vagas livres</span></span>
+      <span class="acoes"><button class="btn" data-agendar="${h.turma_id}" data-data="${h.data}">Agendar</button></span>
+    </div>`);
+  });
+
+  const total = o.ags.length;
+  return `<div class="dia">
+    <div class="dia-cab"><span>${nomeDia(data)}, ${dataBR(data)}</span>
+      <span class="qtd">${total} ${total === 1 ? 'aula' : 'aulas'}</span></div>
+    ${linhas.join('')}
+  </div>`;
+}
+
+function ligarBotoes() {
+  document.querySelectorAll('[data-presenca]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { await api('presenca', { agendamento_id: b.dataset.presenca, status: b.dataset.st }); await carregar(); }
+    catch (e) { alert(e.message); b.disabled = false; }
+  });
+  document.querySelectorAll('[data-agendar]').forEach(b => b.onclick = () =>
+    janelaAgendar(b.dataset.agendar, b.dataset.data));
+  document.querySelectorAll('[data-remarcar]').forEach(b => b.onclick = () =>
+    janelaRemarcar(b.dataset.remarcar));
+}
+
+function fechar() { document.getElementById('modal').innerHTML = ''; }
+
+function janelaAgendar(turmaId, data) {
+  document.getElementById('modal').innerHTML = `
+    <div class="fundo" id="fundo"><div class="janela">
+      <h3>Nova aula experimental</h3>
+      <p class="sub">${nomeDia(data)}, ${dataBR(data)}</p>
+      <div class="campo"><label for="cn">Nome da criança</label><input id="cn" autofocus></div>
+      <div class="campo"><label for="ci">Idade</label><input id="ci" type="number" min="4" max="17"></div>
+      <div class="campo"><label for="rn">Responsável (WhatsApp)</label>
+        <input id="rn" placeholder="92 99999-9999"></div>
+      <div id="err"></div>
+      <div class="janela-fim">
+        <button class="btn g" onclick="fechar()">Cancelar</button>
+        <button class="btn" id="ok">Agendar</button>
+      </div>
+    </div></div>`;
+
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fechar(); };
+  document.getElementById('ok').onclick = async () => {
+    const b = document.getElementById('ok'); b.disabled = true; b.textContent = 'Agendando…';
+    try {
+      await api('agendar', {
+        turma_id: turmaId, data,
+        crianca_nome: document.getElementById('cn').value.trim() || null,
+        crianca_idade: Number(document.getElementById('ci').value) || null
+      });
+      fechar(); carregar();
+    } catch (e) {
+      document.getElementById('err').innerHTML = `<div class="erro">${esc(e.message)}</div>`;
+      b.disabled = false; b.textContent = 'Agendar';
+    }
+  };
+}
+
+function janelaRemarcar(agId) {
+  const opcoes = dados.horarios.map(h =>
+    `<option value="${h.turma_id}|${h.data}">${nomeDia(h.data)} ${dataBR(h.data)} — ${hhmm(h.hora_inicio)} (${h.vagas} livres)</option>`
+  ).join('');
+
+  document.getElementById('modal').innerHTML = `
+    <div class="fundo" id="fundo"><div class="janela">
+      <h3>Remarcar</h3>
+      <p class="sub">O agendamento antigo não some: fica registrado como remarcado, com o motivo.</p>
+      <div class="campo"><label for="nv">Novo horário</label>
+        <select id="nv">${opcoes || '<option value="">Sem vagas disponíveis</option>'}</select></div>
+      <div class="campo"><label for="mt">Motivo</label>
+        <input id="mt" placeholder="Ex.: imprevisto da família"></div>
+      <div id="err"></div>
+      <div class="janela-fim">
+        <button class="btn g" onclick="fechar()">Cancelar</button>
+        <button class="btn" id="ok" ${opcoes ? '' : 'disabled'}>Remarcar</button>
+      </div>
+    </div></div>`;
+
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fechar(); };
+  document.getElementById('ok').onclick = async () => {
+    const [turma_id, data] = document.getElementById('nv').value.split('|');
+    const b = document.getElementById('ok'); b.disabled = true; b.textContent = 'Remarcando…';
+    try {
+      await api('remarcar', { agendamento_id: agId, turma_id, data,
+        motivo: document.getElementById('mt').value.trim() || null });
+      fechar(); carregar();
+    } catch (e) {
+      document.getElementById('err').innerHTML = `<div class="erro">${esc(e.message)}</div>`;
+      b.disabled = false; b.textContent = 'Remarcar';
+    }
+  };
+}
+
+if (!SLUG || !TOKEN) {
+  document.getElementById('dias').innerHTML = '<div class="empty">Abra esta página pelo painel do seu negócio.</div>';
+} else {
+  carregar();
+}
+</script>
+</body>
+</html>
