@@ -13,7 +13,8 @@
 //   acao: 'mensagens'   -> { mensagens[] }    { conversa_id }
 //   acao: 'midia'       -> { url }            { mensagem_id } — link assinado 5 min
 //   acao: 'agenda'      -> { turmas[], horarios[], agendamentos[] }
-//   acao: 'agendar'     -> { ok, id }          { lead_id|conversa_id, turma_id, data, crianca_nome, crianca_idade }
+//   acao: 'agendar'     -> { ok, id }          { turma_id, data, crianca_nome, crianca_idade,
+//                                                 responsavel + contato | lead_id | conversa_id }
 //   acao: 'remarcar'    -> { ok, id }          { agendamento_id, data, turma_id, motivo }
 //   acao: 'presenca'    -> { ok }              { agendamento_id, status }
 //   acao: 'funil'       -> { etapas[], leads[] }
@@ -347,9 +348,17 @@ async function acaoAgendar(tenant, body, res) {
   if (!turma_id || !data) return res.status(400).json({ erro: 'Informe turma e data.' });
 
   let leadId = body.lead_id || null;
+
   if (!leadId && body.conversa_id) {
     const c = await sb(`capta_conversas?id=eq.${body.conversa_id}&tenant_id=eq.${tenant.id}&select=lead_id&limit=1`);
     leadId = c?.[0]?.lead_id || null;
+  }
+
+  // Agendamento feito na mão, com o telefone do responsável: acha o lead
+  // existente ou cria um novo. Sem lead vinculado não há para quem mandar
+  // o lembrete de véspera, e o agendamento não aparece no funil.
+  if (!leadId && body.contato) {
+    leadId = await acharOuCriarLead(tenant.id, body.contato, body.responsavel, crianca_nome);
   }
 
   const t = await sb(`capta_turmas?id=eq.${turma_id}&tenant_id=eq.${tenant.id}&select=hora_inicio,hora_fim&limit=1`);
@@ -451,6 +460,50 @@ async function acaoMover(tenant, body, res) {
 
   await moverLead(tenant.id, lead_id, etapa_id, body.motivo || null);
   return res.status(200).json({ ok: true });
+}
+
+// Casa o telefone com um lead existente (comparação normalizada pela
+// capta_fone) ou cria um novo. Nunca duplica pessoa.
+async function acharOuCriarLead(tenantId, contato, responsavel, criancaNome) {
+  const fone = String(contato || '').replace(/\D/g, '');
+  if (fone.length < 10) return null;
+
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/capta_lead_por_fone`, {
+      method: 'POST',
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_tenant: tenantId, p_fone: fone })
+    });
+    if (r.ok) {
+      const achado = await r.json();
+      if (achado) return achado;
+    }
+  } catch { /* segue e cria */ }
+
+  const nome = (responsavel || '').trim()
+    || (criancaNome ? `Responsável de ${criancaNome}` : 'Contato do agendamento');
+
+  // O insert dispara trg_capta_unificar: se a pessoa já existir dentro da
+  // janela de 30 dias, o insert é cancelado e nada é criado. Por isso a
+  // busca é refeita depois.
+  await sb('capta_leads', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      tenant_id: tenantId, nome, contato: fone,
+      origem: 'agendamento', status: 'novo'
+    })
+  }).catch(() => null);
+
+  try {
+    const r2 = await fetch(`${SUPABASE_URL}/rest/v1/rpc/capta_lead_por_fone`, {
+      method: 'POST',
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_tenant: tenantId, p_fone: fone })
+    });
+    if (r2.ok) return await r2.json();
+  } catch { /* ignora */ }
+
+  return null;
 }
 
 // etapa_em é o que permite dizer "parado há X dias" — o dado que o Kommo
