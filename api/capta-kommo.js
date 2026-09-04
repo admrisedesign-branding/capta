@@ -212,7 +212,11 @@ async function gravar(t, rows) {
 
 async function migrar(req, res) {
   const q = req.query || {};
-  if (!process.env.CRON_SECRET || q.secret !== process.env.CRON_SECRET) return res.status(401).json({ erro: 'secret' });
+  const esperado = (process.env.CRON_SECRET || '').trim();
+  const recebido = String(q.secret || '').trim();
+  let dec = recebido; try { dec = decodeURIComponent(recebido); } catch {}
+  const bate = esperado && (recebido === esperado || dec === esperado);
+  if (!bate) return res.status(401).json({ erro: 'secret', recebido_len: recebido.length, esperado_len: esperado.length, ambiente: process.env.VERCEL_ENV || null });
   if (!SRC.url || !SRC.key || !DST.url || !DST.key) return res.status(500).json({ erro: 'faltam MIG_SRC_* / MIG_DST_*' });
 
   const lista = q.so ? [q.so] : TABELAS;
