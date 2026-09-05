@@ -3,7 +3,7 @@
 //   ?acao=espelho  (padrão)  → espelho Kommo → Capta. Webhook do Kommo aponta pra cá:
 //                              https://capta.riseagencia.com/api/capta-kommo   (lead adicionado/alterado/etapa alterada)
 //                              backfill: ...?acao=espelho&lead_id=123456
-//   ?acao=migrar&secret=<CRON_SECRET>[&dry=1][&so=tabela] → migração one-off rise-leads → capta-dev (remover depois)
+//   ?acao=migrar&secret=<MIG_SECRET ou CRON_SECRET>[&dry=1][&so=tabela] → migração one-off rise-leads → capta-dev (remover depois)
 //
 // Variáveis: KOMMO_TOKEN · SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · CRON_SECRET
 //            (migração) MIG_SRC_URL · MIG_SRC_KEY · MIG_DST_URL · MIG_DST_KEY
@@ -212,7 +212,7 @@ async function gravar(t, rows) {
 
 async function migrar(req, res) {
   const q = req.query || {};
-  const esperado = (process.env.CRON_SECRET || '').trim();
+  const esperado = (process.env.MIG_SECRET || process.env.CRON_SECRET || '').trim(); // MIG_SECRET: senha simples só pra migração
   const recebido = String(q.secret || '').trim();
   let dec = recebido; try { dec = decodeURIComponent(recebido); } catch {}
   const bate = esperado && (recebido === esperado || dec === esperado);
