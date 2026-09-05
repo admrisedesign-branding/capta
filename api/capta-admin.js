@@ -15,7 +15,7 @@
 //
 // Env: SUPABASE_SERVICE_ROLE_KEY
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://oaezsozoriqnkurxncjs.supabase.co';
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const STATUS_OK    = ['novo', 'contatado', 'fechado', 'perdido'];
 const PLANOS_OK    = ['free', 'pro', 'business', 'gestao'];

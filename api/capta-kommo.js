@@ -12,7 +12,7 @@
 
 const KOMMO = `https://${process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com'}`;
 const H_KOMMO = { Authorization: `Bearer ${process.env.KOMMO_TOKEN}` };
-const SB_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
+const SB_URL = process.env.SUPABASE_URL || 'https://oaezsozoriqnkurxncjs.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
 const TENANT_SLUG = process.env.CAPTA_TENANT_SLUG || 'my-robot-manaus';
 const H_SB = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };

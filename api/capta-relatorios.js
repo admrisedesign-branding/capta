@@ -10,7 +10,7 @@
 //   SUPABASE_SERVICE_ROLE_KEY  (secreta) — já configurada
 //   SUPABASE_URL               (opcional, default abaixo)
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://oaezsozoriqnkurxncjs.supabase.co';
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 async function sb(path, opts = {}) {

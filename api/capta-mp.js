@@ -9,7 +9,7 @@
 //
 // Env: MP_ACCESS_TOKEN, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, SITE_URL
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://oaezsozoriqnkurxncjs.supabase.co';
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const MP_TOKEN     = process.env.MP_ACCESS_TOKEN;
 const SITE         = process.env.SITE_URL || 'https://capta.riseagencia.com';

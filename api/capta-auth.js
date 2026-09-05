@@ -11,9 +11,9 @@
 //
 // Env: SUPABASE_SERVICE_ROLE_KEY (setada). SUPABASE_ANON_KEY opcional.
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://oaezsozoriqnkurxncjs.supabase.co';
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const ANON_KEY     = process.env.SUPABASE_ANON_KEY || 'sb_publishable_S4eWNjOtaiXTo5sr9Hek0A_42NzE4jf';
+const ANON_KEY     = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hZXpzb3pvcmlxbmt1cnhuY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwMDM4ODAsImV4cCI6MjEwMzU3OTg4MH0.Slsu1W-GY7MbpQGE4R3GxuPkyLrGRfZpexdQfTEQEK0';
 
 async function sbRest(path, opts = {}) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {

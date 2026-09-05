@@ -9,7 +9,7 @@
 //   CAPTA_FROM_EMAIL           (opcional) -> remetente verificado no Resend (ex: "Capta <capta@riseagencia.com>")
 //   SUPABASE_URL               (opcional, default abaixo)
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://oaezsozoriqnkurxncjs.supabase.co';
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_KEY   = process.env.RESEND_API_KEY;
 const FROM         = process.env.CAPTA_FROM_EMAIL || 'Capta <onboarding@resend.dev>';
