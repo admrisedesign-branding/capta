@@ -123,6 +123,12 @@ h2{font-size:16px;font-weight:700}
 .av{width:38px;height:38px;border-radius:10px;color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700;flex:0 0 auto}
 .av.sm{width:34px;height:34px;border-radius:9px;font-size:12px}
 .score-cell{font-weight:700;font-variant-numeric:tabular-nums}
+.tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--brand-softer,#eef2ff);color:var(--muted);border:1px solid var(--line)}
+.kommo-box{background:var(--gray-bg,#f6f7f9);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 14px}
+.kommo-box .kb-t{font-size:12px;font-weight:700;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:4px}
+.kommo-box .kb-r{display:flex;justify-content:space-between;font-size:13px;padding:2px 0}
+
 .locked-cell{display:flex;align-items:center;gap:10px;color:var(--faint);font-size:13px;justify-content:center}
 .tbadge{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:99px}
 .tbadge.q{background:var(--quente-bg);color:var(--quente)}
@@ -3074,6 +3080,15 @@ function zapHref(l){
   return `https://wa.me/${n}?text=${msg}`;
 }
 
+function tagsHtml(l){
+  const t = Array.isArray(l.tags) ? l.tags.filter(Boolean) : [];
+  return t.length ? `<div class="tags">${t.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div>` : '';
+}
+function kommoHtml(l){
+  if(!l.kommo_lead_id) return '';
+  const it = [['Etapa',l.etapa_nome],['Fonte',l.fonte],['Porta',l.porta],['Quem atendeu',l.atendente]].filter(x=>x[1]);
+  return `<div class="kommo-box"><div class="kb-t">Kommo <a href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener" onclick="event.stopPropagation()">abrir ↗</a></div>${it.map(x=>`<div class="kb-r"><span>${x[0]}</span><b>${esc(x[1])}</b></div>`).join('')}</div>`;
+}
 function leadRow(l,i){
   const free=isFree();
   if(l._locked){
@@ -3083,7 +3098,7 @@ function leadRow(l,i){
   const score = free ? `<span class="lockmini">🔒</span>` : `${l.score??'–'}`;
   const zap = zapHref(l);
   return `<tr data-i="${i}">
-    <td><div class="cell-lead"><span class="av sm" style="background:${color(l.nome)}">${ini(l.nome)}</span><div><div class="nm">${esc(l.nome)}${l.notas?'<span class="nota-dot" title="Tem anotação">📝</span>':''}</div><div class="sub">${esc(l.contato||'')}</div></div></div></td>
+    <td><div class="cell-lead"><span class="av sm" style="background:${color(l.nome)}">${ini(l.nome)}</span><div><div class="nm">${esc(l.nome)}${l.notas?'<span class="nota-dot" title="Tem anotação">📝</span>':''}${tagsHtml(l)}</div><div class="sub">${esc(l.contato||'')}</div></div></div></td>
     <td>${l.origem?esc(l.origem):'—'}</td>
     <td>${timeAgo(l.criado_em)}</td>
     <td>${temp}</td>
@@ -3110,6 +3125,7 @@ function leadCard(l, i){
     <div class="mid">
       <div class="nm">${esc(l.nome)}${l.notas?'<span class="nota-dot" title="Tem anotação">📝</span>':''}</div>
       <div class="meta">${l.origem?'<span>'+esc(l.origem)+'</span>·':''}<span>${timeAgo(l.criado_em)}</span>${l.status&&l.status!=='novo'?'·<span class="stbadge">'+esc(l.status)+'</span>':''}</div>
+      ${tagsHtml(l)}
     </div>
     <div class="right">${right}${zap?`<a class="zap-mini" href="${zap}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Chamar no WhatsApp">💬</a>`:''}</div>
   </div>`;
@@ -3136,8 +3152,9 @@ function openLead(i){
   dbody.innerHTML = `
     <div class="d-head">
       <div class="av" style="background:${color(l.nome)}">${ini(l.nome)}</div>
-      <div><h3>${esc(l.nome)}</h3><div class="meta">${esc(l.contato||'')}${l.origem?' · '+esc(l.origem):''}</div></div>
+      <div><h3>${esc(l.nome)}</h3><div class="meta">${esc(l.contato||'')}${l.origem?' · '+esc(l.origem):''}</div>${tagsHtml(l)}</div>
     </div>
+    ${kommoHtml(l)}
     ${scorebar}
     <div class="qa">
       <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--muted)">Respostas no formulário</div>
