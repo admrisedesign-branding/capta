@@ -124,6 +124,7 @@ async function espelhar(leadId) {
     perdido_em: st.tipo === 2 ? ts(lead.closed_at) : null,      // type 2 = perdido
     motivo_perda: lead._embedded?.loss_reason?.[0]?.name || null,
     kommo_criado_em: ts(lead.created_at),
+    criado_em: ts(lead.created_at),      // data real do lead, não a hora do espelho
     espelhado_em: new Date().toISOString(),
   };
 
@@ -133,7 +134,11 @@ async function espelhar(leadId) {
     body: JSON.stringify(linha),
   });
   if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
-  return { lead_id: lead.id, etapa: linha.etapa_nome, fonte: linha.fonte, porta: linha.porta };
+  // relê o que ficou salvo (gatilhos podem alterar score/temperatura/status)
+  const g = await fetch(`${SB_URL}/rest/v1/capta_leads?tenant_id=eq.${linha.tenant_id}&kommo_lead_id=eq.${lead.id}&select=score,temperatura,status,origem,criado_em,tags`, { headers: H_SB }).then(x => x.json()).catch(() => null);
+  return { lead_id: lead.id, etapa: linha.etapa_nome, fonte: linha.fonte, porta: linha.porta,
+    enviado: { score: linha.score, temperatura: linha.temperatura, status: linha.status, origem: linha.origem },
+    salvo: Array.isArray(g) ? g[0] : g };
 }
 
 // O Kommo manda form-urlencoded com chaves tipo leads[status][0][id]
