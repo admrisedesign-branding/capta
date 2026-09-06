@@ -78,7 +78,7 @@ module.exports = async function handler(req, res) {
 
     // Funil, agenda e presença não dependem de WhatsApp: valem em qualquer
     // plano, com ou sem canal conectado.
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -87,6 +87,8 @@ module.exports = async function handler(req, res) {
         case 'presenca': return await acaoPresenca(tenant, body, res);
         case 'funil':    return await acaoFunil(tenant, res);
         case 'mover':    return await acaoMover(tenant, body, res);
+        case 'lead':     return await acaoLead(tenant, body, res);
+        case 'campos':   return await acaoCampos(tenant, body, res);
       }
     }
 
@@ -514,10 +516,17 @@ async function acaoAgendar(tenant, body, res) {
       })
     });
 
-    // Move o lead para a etapa de aula agendada, se ela existir.
+    // Move o lead para a etapa de aula agendada, se ela existir — e leva pro Kommo.
     if (leadId) {
       const e = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Aula%20agendada&select=id&limit=1`);
-      if (e?.[0]) await moverLead(tenant.id, leadId, e[0].id, null);
+      if (e?.[0]) {
+        await moverLead(tenant.id, leadId, e[0].id, null);
+        await empurrarKommo(tenant.id, leadId, e[0].id, null).catch(() => null);
+      }
+      const tt = await sb(`capta_turmas?id=eq.${turma_id}&select=dia_semana&limit=1`).catch(() => []);
+      const campos = { data_aula: `${data}T${String(t[0].hora_inicio).slice(0,5)}:00-04:00`, bloco: blocoKommo(tt?.[0]?.dia_semana, t[0].hora_inicio, t[0].hora_fim), crianca: crianca_nome || null, idade: crianca_idade ? Number(crianca_idade) : null };
+      await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos) }).catch(() => null);
+      await kommoCampos(tenant.id, leadId, { ...campos, curso: 'First' }).catch(() => null);
     }
 
     return res.status(200).json({ ok: true, id: criado[0].id });
@@ -580,7 +589,7 @@ async function acaoFunil(tenant, res) {
   const [etapas, leads, motivos] = await Promise.all([
     sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=*&order=ordem`),
     sb(`capta_leads?tenant_id=eq.${tenant.id}` +
-       `&select=id,nome,contato,temperatura,score,origem,etapa_id,etapa_em,criado_em,motivo_perda,kommo_lead_id,atendente,tags` +
+       `&select=id,nome,contato,temperatura,score,origem,etapa_id,etapa_em,criado_em,motivo_perda,kommo_lead_id,atendente,tags,fonte,porta,crianca,idade,curso,data_aula,bloco,notas,email` +
        `&order=etapa_em.desc.nullslast,criado_em.desc&limit=500`),
     sb(`capta_motivos?tenant_id=eq.${tenant.id}&ativo=is.true&select=id,nome,etapa&order=ordem`)
       .catch(() => [])
@@ -624,6 +633,69 @@ async function empurrarKommo(tenantId, leadId, etapaId, motivo) {
     }).catch(() => {});
   }
   return { etapa: etapa.nome, kommo_status_id: etapa.kommo_status_id };
+}
+
+
+// ---------------------------------------------------------------------
+// LEAD — o painel lateral do Pipeline: conversa (se houver) + agendamentos
+// ---------------------------------------------------------------------
+async function acaoLead(tenant, body, res) {
+  const id = (body.lead_id || '').trim();
+  if (!id) return res.status(400).json({ erro: 'Informe lead_id.' });
+  const [conv, ags, canais] = await Promise.all([
+    sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,telefone,agente_ativo,status,nao_lidas&order=ultima_mensagem_em.desc.nullslast&limit=1`).catch(() => []),
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,data,hora_inicio,hora_fim,status,crianca_nome,turma_id&order=data.desc&limit=10`).catch(() => []),
+    sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&select=status&limit=1`).catch(() => [])
+  ]);
+  let mensagens = [];
+  if (conv?.[0]) {
+    mensagens = await sb(`capta_mensagens?conversa_id=eq.${conv[0].id}&tenant_id=eq.${tenant.id}&select=id,direcao,autor,tipo,texto,transcricao,criado_em&order=criado_em.asc&limit=100`).catch(() => []);
+  }
+  return res.status(200).json({
+    conversa: conv?.[0] || null, mensagens: mensagens || [], agendamentos: ags || [],
+    canal: canais?.[0]?.status || null
+  });
+}
+
+// CAMPOS — Fonte / Porta / Quem atendeu / anotações; grava no Capta e no Kommo
+const KOMMO_FIELD = { fonte: 3886273, porta: 3886275, atendente: 3881999, data_aula: 3886283, bloco: 3886279, curso: 3886277 };
+async function acaoCampos(tenant, body, res) {
+  const id = (body.lead_id || '').trim();
+  if (!id) return res.status(400).json({ erro: 'Informe lead_id.' });
+  const patch = {};
+  for (const k of ['fonte', 'porta', 'atendente', 'notas', 'crianca']) if (body[k] !== undefined) patch[k] = body[k] || null;
+  if (body.idade !== undefined) patch.idade = body.idade ? Number(body.idade) : null;
+  if (!Object.keys(patch).length) return res.status(400).json({ erro: 'Nada para salvar.' });
+  await sb(`capta_leads?id=eq.${id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+  const kommo = await kommoCampos(tenant.id, id, patch).catch(e => ({ erro: e.message }));
+  return res.status(200).json({ ok: true, kommo });
+}
+
+async function kommoCampos(tenantId, leadId, valores) {
+  const token = process.env.KOMMO_TOKEN;
+  if (!token) return null;
+  const l = await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id&limit=1`);
+  if (!l?.[0]?.kommo_lead_id) return null;
+  const cfv = [];
+  for (const [k, v] of Object.entries(valores)) {
+    if (!KOMMO_FIELD[k] || v === null || v === undefined || v === '') continue;
+    cfv.push({ field_id: KOMMO_FIELD[k], values: [{ value: k === 'data_aula' ? Math.floor(new Date(v).getTime() / 1000) : String(v) }] });
+  }
+  if (!cfv.length) return null;
+  const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
+  const r = await fetch(`https://${dominio}/api/v4/leads/${l[0].kommo_lead_id}`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ custom_fields_values: cfv })
+  });
+  if (!r.ok) throw new Error(`Kommo ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return { campos: cfv.length };
+}
+
+// bloco do Kommo a partir do horário da turma ("8h–10h", "sáb 9h–11h"…)
+function blocoKommo(diaSemana, hi, hf) {
+  const h = x => String(x || '').slice(0, 2).replace(/^0/, '') + 'h';
+  const b = `${h(hi)}–${h(hf)}`;
+  return Number(diaSemana) === 6 ? `sáb ${b}` : b;
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
