@@ -78,7 +78,7 @@ module.exports = async function handler(req, res) {
 
     // Funil, agenda e presença não dependem de WhatsApp: valem em qualquer
     // plano, com ou sem canal conectado.
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -89,6 +89,8 @@ module.exports = async function handler(req, res) {
         case 'mover':    return await acaoMover(tenant, body, res);
         case 'lead':     return await acaoLead(tenant, body, res);
         case 'campos':   return await acaoCampos(tenant, body, res);
+        case 'alunos':   return await acaoAlunos(tenant, body, res);
+        case 'aluno':    return await acaoAluno(tenant, body, res);
       }
     }
 
@@ -472,7 +474,9 @@ async function acaoAgenda(tenant, body, res) {
 
   const [turmas, horarios, agendamentos] = await Promise.all([
     sb(`capta_turmas?tenant_id=eq.${tenant.id}&ativa=is.true&select=*&order=dia_semana,hora_inicio`),
-    rpc('capta_horarios_disponiveis', { p_tenant: tenant.id, p_dias: dias }),
+    rpc('capta_vagas_experimental', { p_tenant: tenant.id, p_dias: dias })
+      .then(rows => (rows || []).map(h => ({ ...h, capacidade: h.capacidade })))
+      .catch(() => rpc('capta_horarios_disponiveis', { p_tenant: tenant.id, p_dias: dias })),
     sb(`capta_agendamentos?tenant_id=eq.${tenant.id}` +
        `&status=in.(agendado,confirmado,compareceu,faltou)` +
        `&select=id,data,hora_inicio,hora_fim,status,crianca_nome,crianca_idade,turma_id,` +
@@ -696,6 +700,34 @@ function blocoKommo(diaSemana, hi, hf) {
   const h = x => String(x || '').slice(0, 2).replace(/^0/, '') + 'h';
   const b = `${h(hi)}–${h(hf)}`;
   return Number(diaSemana) === 6 ? `sáb ${b}` : b;
+}
+
+
+// ---------------------------------------------------------------------
+// ALUNOS ATIVOS — grade por turma e kit
+// ---------------------------------------------------------------------
+async function acaoAlunos(tenant, body, res) {
+  const [turmas, alunos, kits] = await Promise.all([
+    sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim,capacidade,limite_sala,kit_experimental,ativa&order=dia_semana,hora_inicio`),
+    sb(`capta_alunos?tenant_id=eq.${tenant.id}&select=id,nome,nome_curto,kit,matricula,turma_id,lead_id,status,trancado_ate,observacao&order=nome`).catch(() => []),
+    sb(`capta_kits?tenant_id=eq.${tenant.id}&select=kit,capacidade,cor`).catch(() => [])
+  ]);
+  return res.status(200).json({ turmas: turmas || [], alunos: alunos || [], kits: kits || [] });
+}
+
+// cria / edita um aluno (nome, kit, turma, status, observação)
+async function acaoAluno(tenant, body, res) {
+  const campos = {};
+  for (const k of ['nome', 'nome_curto', 'kit', 'turma_id', 'status', 'trancado_ate', 'observacao', 'lead_id']) if (body[k] !== undefined) campos[k] = body[k] || null;
+  if (body.matricula !== undefined) campos.matricula = body.matricula ? Number(body.matricula) : null;
+  if (body.id) {
+    campos.atualizado_em = new Date().toISOString();
+    await sb(`capta_alunos?id=eq.${body.id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos) });
+    return res.status(200).json({ ok: true, id: body.id });
+  }
+  if (!campos.nome) return res.status(400).json({ erro: 'Informe o nome.' });
+  const criado = await sb('capta_alunos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ tenant_id: tenant.id, status: 'ativo', ...campos }) });
+  return res.status(200).json({ ok: true, id: criado[0].id });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
