@@ -51,6 +51,25 @@ h2{font-size:16px;font-weight:700}
 .nav-item:hover{background:var(--line-2);color:var(--ink)}
 .nav-item.on{background:var(--brand-soft);color:var(--brand)}
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
+.embed{width:100%;height:calc(100vh - 60px - 44px);min-height:520px;border:0;border-radius:var(--r);background:var(--bg)}.content:has(.embed){padding-bottom:0;max-width:none}
+/* menu recolhido: só ícones */
+.side-toggle{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:10px;padding:7px 10px;font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;margin-top:8px}
+.side-toggle:hover{color:var(--brand);border-color:var(--brand)}
+.side-toggle svg{width:16px;height:16px;stroke:currentColor;flex:0 0 auto}
+@media(min-width:901px){
+  .layout.mini .side{width:64px;flex-basis:64px;padding:18px 10px}
+  .layout.mini .brand{justify-content:center;padding-left:0;padding-right:0}
+  .layout.mini .brand-c{margin:0}
+  .layout.mini .brand span:not(.brand-c),.layout.mini .store,.layout.mini .nav-lbl,.layout.mini .who,.layout.mini .nav-item .breve,.layout.mini .side-toggle .lbl{display:none}
+  .layout.mini .nav-item{justify-content:center;padding:11px 0;font-size:0;gap:0;position:relative}
+  .layout.mini .nav-item svg{width:20px;height:20px}
+  .layout.mini .nav-item.sub{padding-left:0}
+  .layout.mini .nav-item.sub svg{width:16px;height:16px;opacity:.75}
+  .layout.mini .nav-item::after{content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);background:var(--ink);color:#fff;font-size:12px;font-weight:600;padding:5px 9px;border-radius:8px;white-space:nowrap;opacity:0;pointer-events:none;transition:.12s;z-index:60}
+  .layout.mini .nav-item:hover::after{opacity:1}
+  .layout.mini .side-toggle{justify-content:center;padding:7px 0}
+}
+
 .who{display:flex;flex-direction:column;padding:4px 8px}
 .who b{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .who span{font-size:12px;color:var(--faint);text-transform:capitalize}
@@ -316,17 +335,19 @@ h2{font-size:16px;font-weight:700}
     <div class="store" id="store">—</div>
     <nav class="nav">
       <span class="nav-lbl">Menu</span>
-      <button class="nav-item on" data-t="painel"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Painel</button>
-      <button class="nav-item" data-t="leads"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>Leads</button>
-      <button class="nav-item" data-t="forms"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Formulários</button>
-      <button class="nav-item" data-t="form"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>Divulgar</button>
-      <button class="nav-item" id="nav-conversas"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>Conversas</button>
-      <button class="nav-item" id="nav-funil"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 4h18l-7 8v7l-4 2v-9z"/></svg>Funil</button>
-      <button class="nav-item" id="nav-agenda"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>Agenda</button>
-      <button class="nav-item" id="nav-whatsapp"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>Conectar WhatsApp</button>
-     <button class="nav-item" data-t="plano"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4z"/></svg>Plano</button>
+      <button class="nav-item on" data-t="painel" data-tip="Painel"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Painel</button>
+      <button class="nav-item" data-t="leads" data-tip="Leads"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>Leads</button>
+      <button class="nav-item" data-t="forms" data-tip="Formulários"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Formulários</button>
+      <button class="nav-item" data-t="form" data-tip="Seu link"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>Divulgar</button>
+      <button class="nav-item" id="nav-conversas" data-tip="Conversas"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>Conversas</button>
+      <button class="nav-item" id="nav-funil" data-tip="Funil"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 4h18l-7 8v7l-4 2v-9z"/></svg>Funil</button>
+      <button class="nav-item" id="nav-agenda" data-tip="Agenda"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>Agenda</button>
+      <button class="nav-item" id="nav-whatsapp" data-tip="Conectar WhatsApp"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>Conectar WhatsApp</button>
+     <button class="nav-item" data-t="plano" data-tip="Plano"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4z"/></svg>Plano</button>
     </nav>
-    <div class="side-foot"><div class="who"><b id="who-nome">—</b><span id="who-plan">—</span></div></div>
+    <div class="side-foot"><div class="who"><b id="who-nome">—</b><span id="who-plan">—</span></div>
+      <button class="side-toggle" id="side-toggle" title="Recolher menu"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg><span class="lbl">Recolher menu</span></button>
+    </div>
   </aside>
   <div class="scrim2" id="side-scrim"></div>
 
@@ -2716,6 +2737,14 @@ const side   = document.getElementById('side');
 const sideScrim = document.getElementById('side-scrim');
 
 function closeSide(){ side.classList.remove('open'); sideScrim.classList.remove('on'); }
+// menu recolhido (só ícones) — lembra a escolha
+(function(){
+  const lay=document.querySelector('.layout'), bt=document.getElementById('side-toggle');
+  const aplicar=m=>{ lay.classList.toggle('mini',m); bt.title=m?'Expandir menu':'Recolher menu'; bt.querySelector('.lbl').textContent=m?'Expandir':'Recolher menu'; bt.querySelector('svg path').setAttribute('d', m?'M9 6l6 6-6 6':'M15 6l-6 6 6 6'); };
+  let mini=false; try{ mini=localStorage.getItem('capta_menu_mini')==='1'; }catch(e){}
+  aplicar(mini);
+  bt.onclick=()=>{ mini=!mini; aplicar(mini); try{ localStorage.setItem('capta_menu_mini', mini?'1':'0'); }catch(e){} };
+})();
 // menu da conta (Sair)
 (function(){
   const acct=document.getElementById('acct'), menu=document.getElementById('acct-menu');
@@ -2755,14 +2784,14 @@ function montarMenuGestao(){
     alunos:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M19 8l2 2 3-3"/></svg>',
     evento:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 21l1.5-6L15 4.5l4.5 4.5L9 19.5 3 21z"/><path d="M13 6.5l4.5 4.5"/></svg>'
   };
-  const item=(icon,txt,attrs,sub,breve)=>`<button class="nav-item${sub?' sub':''}" ${attrs}>${I[icon]}${txt}${breve?'<span class="breve">em breve</span>':''}</button>`;
-  const go=(pagina)=>`onclick="location.href='${pagina}${qs}'"`;
+  const item=(icon,txt,attrs,sub,breve)=>`<button class="nav-item${sub?' sub':''}" data-tip="${txt}" ${attrs}>${I[icon]}${txt}${breve?'<span class="breve">em breve</span>':''}</button>`;
+  const go=(pagina)=>`data-page="${pagina}"`;
   nav.innerHTML=`<span class="nav-lbl">Gestão</span>
     ${item('painel','Painel Gestão',go('/gestao.html'))}
+    ${item('pipe','Pipeline',go('/funil.html'))}
     ${item('leads','Leads','data-t="leads"')}
     ${item('chat','Conversas',go('/inbox.html'),true)}
     ${item('zap','Conectar WhatsApp',go('/whatsapp.html'),true)}
-    ${item('pipe','Pipeline',go('/funil.html'))}
     ${item('cal','Agendamentos',go('/agenda.html'))}
     ${item('aula','Aula experimental','disabled',false,true)}
     ${item('alunos','Alunos ativos','disabled',false,true)}
@@ -2770,9 +2799,16 @@ function montarMenuGestao(){
   const st=document.createElement('style');
   st.textContent='.nav-item.sub{padding-left:34px;font-size:13px}.nav-item[disabled]{opacity:.55;cursor:default}.nav-item .breve{margin-left:auto;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);background:var(--line-2);border-radius:99px;padding:2px 6px}';
   document.head.appendChild(st);
-  document.querySelectorAll('.nav-item[data-t]').forEach(t => t.onclick = () => {
-    document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('on'));
-    t.classList.add('on'); render(t.dataset.t);
+  const ativar = t => { document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('on')); t.classList.add('on'); };
+  document.querySelectorAll('.nav-item[data-t]').forEach(t => t.onclick = () => { ativar(t); render(t.dataset.t); });
+  document.querySelectorAll('.nav-item[data-page]').forEach(t => t.onclick = () => {
+    ativar(t);
+    const titulo = t.textContent.replace(/em breve/,'').trim();
+    document.getElementById('page-title').textContent = titulo;
+    activeTab = 'embed';
+    view.innerHTML = `<iframe class="embed" src="${t.dataset.page}${qs}&embed=1" title="${titulo}"></iframe>`;
+    window.scrollTo(0,0);
+    if(typeof closeSide === 'function') closeSide();
   });
   // no plano Gestão a home é a lista de leads (o Painel Gestão é página própria)
   const leadsBtn=nav.querySelector('.nav-item[data-t="leads"]'); if(leadsBtn) leadsBtn.classList.add('on');
@@ -2789,7 +2825,7 @@ async function load(){
   const _po = params.get('plano'); if(_po) DATA.tenant.plano = _po;
   try { const rc = await fetch(CONFIG_API); if(rc.ok) CONFIG = await rc.json(); } catch(e){}
   applyPlanLimits();
-  if((DATA.tenant.plano||'').toLowerCase()==='gestao') montarMenuGestao();
+  if(['gestao','business'].includes((DATA.tenant.plano||'').toLowerCase())) montarMenuGestao();
   document.getElementById('store').textContent = DATA.tenant.nome;
   document.getElementById('who-nome').textContent = DATA.tenant.nome;
   document.getElementById('who-plan').textContent = 'Plano '+planoAtual();
@@ -3830,7 +3866,17 @@ function demoForms(){
   var qs = '?t=' + encodeURIComponent(q.get('t')||'') + '&k=' + encodeURIComponent(q.get('k')||'');
   var ir = function(id, pagina){
     var b = document.getElementById(id);
-    if (b) b.onclick = function(){ location.href = pagina + qs; };
+    if (!b) return;
+    b.onclick = function(){
+      document.querySelectorAll('.nav-item').forEach(function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+      var titulo = b.textContent.trim();
+      document.getElementById('page-title').textContent = titulo;
+      activeTab = 'embed';
+      view.innerHTML = '<iframe class="embed" src="' + pagina + qs + '&embed=1" title="' + titulo + '"></iframe>';
+      window.scrollTo(0,0);
+      if (typeof closeSide === 'function') closeSide();
+    };
   };
   ir('nav-conversas', '/inbox.html');
   ir('nav-funil',     '/funil.html');

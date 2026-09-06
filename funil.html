@@ -68,6 +68,48 @@ button{font-family:inherit;cursor:pointer}
 .aviso{margin:20px 26px 0;border:1px dashed var(--line);border-radius:var(--r);padding:36px;text-align:center;
   color:var(--faint);font-size:13.5px;line-height:1.7}
 
+
+/* ---- painel lateral do lead ---- */
+.tela{display:flex;align-items:flex-start}
+.tela > .raia-area,.tela > #raiz{flex:1;min-width:0}
+#painel{flex:0 0 0;width:0;overflow:hidden;transition:.18s;border-left:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;height:calc(100vh - 60px);position:sticky;top:60px}
+#painel.aberto{flex-basis:400px;width:400px}
+body.embed #painel{height:calc(100vh - 52px);top:52px}
+.p-cab{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
+.p-cab .av{width:36px;height:36px;border-radius:10px;background:var(--brand-soft);color:var(--brand);font-weight:800;display:grid;place-items:center;flex:0 0 36px}
+.p-cab h3{font-size:14.5px;font-weight:800;line-height:1.2}
+.p-cab .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.p-cab .x{margin-left:auto;border:0;background:transparent;color:var(--faint);font-size:18px;line-height:1}
+.p-abas{display:flex;border-bottom:1px solid var(--line);padding:0 8px}
+.p-abas button{border:0;background:transparent;font-weight:700;font-size:12.5px;color:var(--muted);padding:10px 10px;border-bottom:2px solid transparent}
+.p-abas button.on{color:var(--brand);border-color:var(--brand)}
+.p-corpo{flex:1;overflow-y:auto;padding:12px 16px}
+.p-sec{font-size:11px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:5px 10px;font-size:12px;font-weight:600;color:var(--muted)}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.chip.ganha.on{background:var(--verde);border-color:var(--verde)} .chip.perdida.on{background:var(--faint);border-color:var(--faint)}
+.campo select,.campo input,.campo textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);background:var(--card)}
+.campo textarea{min-height:70px;resize:vertical}
+.linha2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.msgs{display:flex;flex-direction:column;gap:6px}
+.msg{max-width:88%;padding:8px 10px;border-radius:12px;font-size:13px;line-height:1.45;background:var(--line-2);align-self:flex-start;white-space:pre-wrap}
+.msg.saida{background:var(--brand-soft);align-self:flex-end}
+.msg small{display:block;color:var(--faint);font-size:10.5px;margin-top:3px}
+.enviar{display:flex;gap:6px;padding:10px 16px;border-top:1px solid var(--line)}
+.enviar input{flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-family:inherit;font-size:13px}
+.aviso-p{border:1px dashed var(--line);border-radius:12px;padding:14px;color:var(--faint);font-size:12.5px;line-height:1.6;text-align:center}
+.vaga{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:8px;background:var(--brand-softer)}
+.vaga b{font-size:14px}
+.vaga .liv{color:var(--muted);font-size:12px;margin-top:2px}
+.vaga .acs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.filtros{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.filtros .chip{padding:4px 9px;font-size:11.5px}
+.ag-item{font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line-2);display:flex;justify-content:space-between}
+.ag-item .st{color:var(--muted)}
+.salvo{font-size:11.5px;color:var(--verde);font-weight:600;margin-left:8px}
+@media(max-width:760px){#painel.aberto{position:fixed;inset:0;top:0;width:100%;flex-basis:100%;height:100%;z-index:40}}
+
 .fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
 .janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:400px;
   box-shadow:0 20px 50px rgba(20,26,46,.2)}
@@ -90,7 +132,7 @@ button{font-family:inherit;cursor:pointer}
   <span class="dica">Arraste o card para mudar de etapa</span>
 </div>
 
-<div id="raiz" class="aviso">Carregando…</div>
+<div class="tela"><div id="raiz" class="aviso">Carregando…</div><aside id="painel"></aside></div>
 <div id="modal"></div>
 
 <script>
@@ -166,7 +208,7 @@ function desenhar() {
 
 function cartao(l) {
   const pd = parado(l.etapa_em || l.criado_em);
-  return `<article class="lead" draggable="true" data-lead="${l.id}">
+  return `<article class="lead" draggable="true" data-lead="${l.id}" onclick="abrirLead('${l.id}')">
     <div class="lead-nome">${esc(l.nome || 'Sem nome')}</div>
     <div class="lead-sub">${esc(l.contato || '')}${l.origem ? ' · ' + esc(l.origem) : ''}</div>
     <div class="lead-fim">
@@ -245,6 +287,153 @@ function janelaMotivo(lead, etapa) {
     fechar();
     await mover(lead.id, etapa.id, v || null);
   };
+}
+
+// ===================== painel lateral do lead =====================
+const DIAS_N = ['dom','seg','ter','qua','qui','sex','sáb'];
+const hhmm = t => String(t || '').slice(0, 5);
+const dataBR = d => { const [a,m,dd] = String(d).split('-'); return `${dd}/${m}`; };
+const nomeDia = d => DIAS_N[new Date(d + 'T12:00:00').getDay()];
+let P = { lead: null, aba: 'conversa', info: null, agenda: null, filtro: 'todos', idx: 0 };
+
+async function abrirLead(id) {
+  const l = leads.find(x => x.id === id); if (!l) return;
+  P = { lead: l, aba: P.lead && P.lead.id === id ? P.aba : 'conversa', info: null, agenda: null, filtro: 'todos', idx: 0 };
+  document.getElementById('painel').classList.add('aberto');
+  desenharPainel();
+  try { P.info = await api('lead', { lead_id: id }); } catch (e) { P.info = { erro: e.message }; }
+  desenharPainel();
+}
+function fecharLead() { document.getElementById('painel').classList.remove('aberto'); P.lead = null; }
+function abaP(a) { P.aba = a; desenharPainel(); if (a === 'agendar' && !P.agenda) carregarAgenda(); }
+
+function desenharPainel() {
+  const l = P.lead; if (!l) return;
+  const ini = (l.nome || '?').trim().split(/\s+/).map(x => x[0]).slice(0,2).join('').toUpperCase();
+  const et = etapas.find(e => e.id === l.etapa_id);
+  const abas = [['conversa','Conversa'],['dados','Dados'],['agendar','Agendar aula']];
+  document.getElementById('painel').innerHTML = `
+    <div class="p-cab"><div class="av">${esc(ini)}</div>
+      <div><h3>${esc(l.nome || 'Sem nome')}</h3>
+        <div class="sub">${esc(l.contato || '')}${l.temperatura ? ' · ' + esc(l.temperatura) : ''}${l.atendente ? ' · ' + esc(l.atendente) : ''}${et ? ' · ' + esc(et.nome) : ''}</div>
+        ${l.kommo_lead_id ? `<div class="sub"><a class="kommo-lnk" style="margin:0" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">abrir no Kommo ↗</a></div>` : ''}
+      </div>
+      <button class="x" onclick="fecharLead()" title="Fechar">×</button>
+    </div>
+    <div class="p-abas">${abas.map(([k,t]) => `<button class="${P.aba===k?'on':''}" onclick="abaP('${k}')">${t}</button>`).join('')}</div>
+    ${P.aba === 'conversa' ? painelConversa(l) : P.aba === 'dados' ? painelDados(l) : painelAgendar(l)}`;
+}
+
+// ---- etapa (chips): salva, move o card no kanban e vai pro Kommo ----
+function chipsEtapa(l) {
+  return `<div class="p-sec">Etapa</div><div class="chips">${etapas.map(e =>
+    `<button class="chip ${e.tipo} ${l.etapa_id===e.id?'on':''}" onclick="mudarEtapa('${e.id}')">${esc(e.nome)}</button>`).join('')}</div>`;
+}
+async function mudarEtapa(etapaId) {
+  const l = P.lead; if (!l || l.etapa_id === etapaId) return;
+  const e = etapas.find(x => x.id === etapaId);
+  if (e && e.tipo === 'perdida') return janelaMotivo(l, e);
+  await mover(l.id, etapaId, null); desenharPainel();
+}
+
+function painelConversa(l) {
+  const i = P.info;
+  let corpo;
+  if (!i) corpo = `<div class="aviso-p">Carregando…</div>`;
+  else if (i.mensagens && i.mensagens.length) corpo = `<div class="msgs">${i.mensagens.map(m =>
+      `<div class="msg ${m.direcao==='saida'?'saida':''}">${esc(m.texto || m.transcricao || '['+(m.tipo||'mídia')+']')}<small>${esc(m.autor||'')} · ${new Date(m.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div>`).join('')}</div>`;
+  else corpo = `<div class="aviso-p">${i.canal === 'conectado' ? 'Ainda não há conversa com este lead pelo WhatsApp do Capta.' :
+      'A conversa aparece aqui quando o WhatsApp da unidade estiver conectado ao Capta.'}${l.kommo_lead_id ? `<br><a class="kommo-lnk" style="margin:0" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Ver a conversa no Kommo ↗</a>` : ''}
+      ${l.contato ? `<br><a class="kommo-lnk" style="margin:0" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">Chamar no WhatsApp 💬</a>` : ''}</div>`;
+  const podeEnviar = i && i.canal === 'conectado';
+  return `<div class="p-corpo">${chipsEtapa(l)}<div class="p-sec">Conversa</div>${corpo}</div>
+    ${podeEnviar ? `<div class="enviar"><input id="p-txt" placeholder="Escreva uma mensagem…" onkeydown="if(event.key==='Enter')enviarMsg()"><button class="btn" onclick="enviarMsg()">Enviar</button></div>` : ''}`;
+}
+async function enviarMsg() {
+  const inp = document.getElementById('p-txt'); const texto = (inp.value || '').trim(); if (!texto) return;
+  inp.value = '';
+  try {
+    await api('enviar', P.info.conversa ? { conversa_id: P.info.conversa.id, texto } : { telefone: P.lead.contato, texto });
+    P.info = await api('lead', { lead_id: P.lead.id }); desenharPainel();
+  } catch (e) { alert(e.message); }
+}
+
+// ---- dados: fonte, porta, quem atendeu, criança, anotações → Capta + Kommo ----
+const FONTES = ['anúncio','instagram','google busca','google business','evento','direto','indicação'];
+const PORTAS = ['site','whatsapp-bot','whatsapp-direto','evento','my robot'];
+const ATEND  = ['Rafael','Bento','RISE'];
+const sel = (id, ops, v) => `<select id="${id}"><option value="">—</option>${ops.map(o => `<option ${o===v?'selected':''}>${o}</option>`).join('')}</select>`;
+function painelDados(l) {
+  return `<div class="p-corpo">${chipsEtapa(l)}
+    <div class="p-sec">Origem</div>
+    <div class="linha2"><div class="campo"><label>Fonte</label>${sel('d-fonte', FONTES, l.fonte)}</div><div class="campo"><label>Porta</label>${sel('d-porta', PORTAS, l.porta)}</div></div>
+    <div class="campo" style="margin-top:8px"><label>Quem atendeu</label>${sel('d-at', ATEND, l.atendente)}</div>
+    <div class="p-sec">Criança</div>
+    <div class="linha2"><div class="campo"><label>Nome</label><input id="d-cri" value="${esc(l.crianca||'')}"></div><div class="campo"><label>Idade</label><input id="d-id" type="number" min="3" max="17" value="${l.idade||''}"></div></div>
+    <div class="p-sec">Anotações</div>
+    <div class="campo"><textarea id="d-notas" placeholder="Ex.: mãe prefere sábado de manhã">${esc(l.notas||'')}</textarea></div>
+    <div style="margin-top:10px;display:flex;align-items:center"><button class="btn" onclick="salvarDados()">Salvar</button><span class="salvo" id="d-ok"></span></div>
+    ${l.tags && l.tags.length ? `<div class="p-sec">Tags</div><div class="chips">${l.tags.map(t=>`<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}
+  </div>`;
+}
+async function salvarDados() {
+  const l = P.lead;
+  const d = { lead_id: l.id, fonte: document.getElementById('d-fonte').value, porta: document.getElementById('d-porta').value,
+    atendente: document.getElementById('d-at').value, crianca: document.getElementById('d-cri').value, idade: document.getElementById('d-id').value,
+    notas: document.getElementById('d-notas').value };
+  try { await api('campos', d); Object.assign(l, { fonte: d.fonte||null, porta: d.porta||null, atendente: d.atendente||null, crianca: d.crianca||null, idade: d.idade?Number(d.idade):null, notas: d.notas||null });
+    document.getElementById('d-ok').textContent = 'salvo ✓'; setTimeout(() => { const s = document.getElementById('d-ok'); if (s) s.textContent = ''; }, 2000); desenhar(); }
+  catch (e) { alert(e.message); }
+}
+
+// ---- agendar em sequência: criança → kit First → próxima vaga livre → confirmar ----
+async function carregarAgenda() {
+  try { P.agenda = await api('agenda', { dias: 30 }); } catch (e) { P.agenda = { erro: e.message }; }
+  P.idx = 0; desenharPainel();
+}
+function vagasFiltradas() {
+  const hs = (P.agenda && P.agenda.horarios || []).filter(h => (h.vagas ?? 1) > 0);
+  const f = P.filtro;
+  return hs.filter(h => {
+    const dow = new Date(h.data + 'T12:00:00').getDay(), hi = parseInt(h.hora_inicio);
+    if (f === 'sab') return dow === 6;
+    if (f === 'manha') return dow !== 6 && hi < 12;
+    if (f === 'tarde') return dow !== 6 && hi >= 12;
+    return true;
+  }).sort((a,b) => (a.data + a.hora_inicio).localeCompare(b.data + b.hora_inicio));
+}
+function painelAgendar(l) {
+  const ag = P.info && P.info.agendamentos || [];
+  const lista = vagasFiltradas(); const v = lista[P.idx];
+  const filtro = (k, t) => `<button class="chip ${P.filtro===k?'on':''}" onclick="P.filtro='${k}';P.idx=0;desenharPainel()">${t}</button>`;
+  return `<div class="p-corpo">
+    ${ag.length ? `<div class="p-sec">Aulas deste lead</div>${ag.map(a => `<div class="ag-item"><span>${nomeDia(a.data)} ${dataBR(a.data)} · ${hhmm(a.hora_inicio)}${a.crianca_nome?' · '+esc(a.crianca_nome):''}</span><span class="st">${esc(a.status)}</span></div>`).join('')}` : ''}
+    <div class="p-sec">1 · Criança</div>
+    <div class="linha2"><div class="campo"><label>Nome</label><input id="a-cri" value="${esc(l.crianca||'')}" placeholder="Nome da criança"></div><div class="campo"><label>Idade</label><input id="a-id" type="number" min="3" max="17" value="${l.idade||''}"></div></div>
+    <div class="p-sec">2 · Kit</div>
+    <div class="chips"><span class="chip on">First</span><span class="chip" style="border:0;color:var(--faint)">a experimental é sempre no First; o nivelamento é no dia</span></div>
+    <div class="p-sec">3 · Próxima vaga livre</div>
+    <div class="filtros">${filtro('todos','Qualquer')}${filtro('manha','Manhã')}${filtro('tarde','Tarde')}${filtro('sab','Sábado')}</div>
+    ${!P.agenda ? `<div class="aviso-p" style="margin-top:8px">Buscando vagas…</div>` :
+      P.agenda.erro ? `<div class="aviso-p" style="margin-top:8px">${esc(P.agenda.erro)}</div>` :
+      !v ? `<div class="aviso-p" style="margin-top:8px">Nenhuma vaga livre nos próximos 30 dias com esse filtro.</div>` :
+      `<div class="vaga"><b>${nomeDia(v.data)} ${dataBR(v.data)} · ${hhmm(v.hora_inicio)}–${hhmm(v.hora_fim)}</b>
+        <div class="liv">${v.vagas} de ${v.capacidade} vagas livres${v.turma_nome?' · '+esc(v.turma_nome):''} · opção ${P.idx+1} de ${lista.length}</div>
+        <div class="acs"><button class="btn" onclick="confirmarAgenda('${v.turma_id}','${v.data}')">Agendar nessa</button>
+        <button class="btn g" onclick="P.idx=Math.min(P.idx+1,${lista.length-1});desenharPainel()" ${P.idx>=lista.length-1?'disabled':''}>Próxima vaga →</button>
+        ${P.idx>0?`<button class="btn g" onclick="P.idx--;desenharPainel()">←</button>`:''}</div></div>`}
+  </div>`;
+}
+async function confirmarAgenda(turmaId, data) {
+  const l = P.lead;
+  const crianca = document.getElementById('a-cri').value.trim(), idade = document.getElementById('a-id').value;
+  if (!crianca) { alert('Informe o nome da criança.'); document.getElementById('a-cri').focus(); return; }
+  try {
+    await api('agendar', { turma_id: turmaId, data, crianca_nome: crianca, crianca_idade: idade || null, lead_id: l.id });
+    l.crianca = crianca; l.idade = idade ? Number(idade) : l.idade;
+    const e = etapas.find(x => /aula agendada/i.test(x.nome)); if (e) { l.etapa_id = e.id; l.etapa_em = new Date().toISOString(); }
+    desenhar(); P.agenda = null; P.info = await api('lead', { lead_id: l.id }); P.aba = 'agendar'; desenharPainel(); carregarAgenda();
+  } catch (e) { alert(e.message); }
 }
 
 if (!SLUG || !TOKEN) {
