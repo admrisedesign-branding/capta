@@ -58,6 +58,9 @@ button{font-family:inherit;cursor:pointer}
 .t-Morno{background:var(--morno-bg);color:var(--morno)}
 .t-Frio{background:var(--frio-bg);color:var(--frio)}
 .parado{font-size:11px;color:var(--faint)}
+.t-at{background:var(--gray-bg);color:var(--muted);text-transform:none;letter-spacing:0}
+.kommo-lnk{margin-left:auto;font-size:11px;font-weight:700;color:var(--brand);text-decoration:none}
+.kommo-lnk:hover{text-decoration:underline}
 .parado.alerta{color:var(--morno);font-weight:600}
 .parado.grave{color:var(--quente);font-weight:700}
 
@@ -167,7 +170,9 @@ function cartao(l) {
     <div class="lead-sub">${esc(l.contato || '')}${l.origem ? ' · ' + esc(l.origem) : ''}</div>
     <div class="lead-fim">
       ${l.temperatura ? `<span class="tag t-${esc(l.temperatura)}">${esc(l.temperatura)}</span>` : ''}
+      ${l.atendente ? `<span class="tag t-at">${esc(l.atendente)}</span>` : ''}
       <span class="parado ${pd.cls}">${pd.txt}</span>
+      ${l.kommo_lead_id ? `<a class="kommo-lnk" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Abrir no Kommo">Kommo ↗</a>` : ''}
     </div>
   </article>`;
 }
