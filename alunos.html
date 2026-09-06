@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Alunos ativos — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#2E5BFF; --brand-deep:#1E44D6; --brand-2:#5B8DEF;
+  --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
+  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
+  --ink:#141A2E; --muted:#697089; --faint:#9AA1B4;
+  --quente:#E03127; --morno:#C47A08; --verde:#16A34A; --verde-bg:rgba(22,163,74,.12);
+  --gray-bg:rgba(105,112,137,.12);
+  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
+button,select,input{font-family:inherit}
+button{cursor:pointer}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px;font-weight:700}
+.voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;padding:7px 13px;border-radius:10px;text-decoration:none}
+.ferr{margin-left:auto;display:flex;gap:8px;align-items:center}
+.abas{display:flex;gap:4px;background:var(--line-2);padding:3px;border-radius:10px}
+.abas button{border:0;background:transparent;font-weight:700;font-size:12.5px;color:var(--muted);padding:6px 12px;border-radius:8px}
+.abas button.on{background:var(--card);color:var(--brand);box-shadow:var(--shadow)}
+.btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:9px}
+.btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+.busca{border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-size:13px;min-width:200px}
+.wrap{padding:20px 26px 48px}
+.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow);min-width:120px}
+.kpi .l{font-size:11.5px;color:var(--muted);font-weight:600}.kpi .v{font-size:20px;font-weight:800;margin-top:2px}
+.kpi .v small{font-size:12px;color:var(--faint);font-weight:600}
+
+/* grade */
+.grade{display:grid;grid-template-columns:90px repeat(6,1fr);gap:8px;min-width:900px}
+.gh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);padding:4px 6px}
+.gb{font-size:12px;font-weight:700;color:var(--muted);padding:10px 6px}
+.cel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;min-height:64px}
+.cel.vazia{background:transparent;border-style:dashed}
+.cel .t{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--faint);margin-bottom:6px}
+.cel .t b{color:var(--ink)}
+.al{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 4px;border-radius:7px;cursor:pointer}
+.al:hover{background:var(--line-2)}
+.al .k{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.al .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.al.tr{opacity:.55}.al.tr .n{text-decoration:line-through}
+.kits{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.kt{font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:var(--line-2);color:var(--muted)}
+.kt.cheio{background:rgba(224,49,39,.12);color:var(--quente)}
+.kt.alerta{background:rgba(224,147,15,.14);color:var(--morno)}
+.legenda{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0 0;font-size:12px;color:var(--muted)}
+.legenda span{display:inline-flex;align-items:center;gap:5px}
+
+/* lista */
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line-2)}
+tr:hover td{background:var(--brand-softer);cursor:pointer}
+.st{font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;background:var(--verde-bg);color:var(--verde)}
+.st.trancado{background:rgba(224,147,15,.14);color:var(--morno)}.st.cancelado{background:var(--gray-bg);color:var(--muted)}
+.obs{color:var(--faint);font-size:12px}
+
+/* janela */
+.fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
+.janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:440px;box-shadow:0 20px 50px rgba(20,26,46,.2)}
+.janela h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.campo{margin-top:12px}.campo label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.campo select,.campo input,.campo textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--ink);background:var(--card)}
+.l2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fim{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.aviso{margin:20px 0;border:1px dashed var(--line);border-radius:var(--r);padding:36px;text-align:center;color:var(--faint);line-height:1.7}
+.scroll{overflow-x:auto}
+</style>
+<style>body.embed .voltar{display:none}body.embed .topbar{height:52px;background:transparent;backdrop-filter:none;border-bottom:1px solid var(--line);padding:0 18px}</style>
+<script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+</head>
+<body>
+<div class="topbar">
+  <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
+  <h1>Alunos ativos</h1>
+  <div class="ferr">
+    <input class="busca" id="busca" placeholder="Buscar aluno…" oninput="desenhar()">
+    <div class="abas"><button class="on" id="ab-grade" onclick="modo('grade')">Grade</button><button id="ab-lista" onclick="modo('lista')">Lista</button></div>
+    <button class="btn" onclick="editar(null)">+ Aluno</button>
+  </div>
+</div>
+<div class="wrap" id="raiz"><div class="aviso">Carregando…</div></div>
+<div id="modal"></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const DIAS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const hh = t => String(t||'').slice(0,2).replace(/^0/,'') + 'h';
+let D = { turmas: [], alunos: [], kits: [] }, MODO = 'grade';
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, ...extra }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
+}
+async function carregar(){ try { D = await api('alunos'); desenhar(); } catch(e){ document.getElementById('raiz').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; } }
+function modo(m){ MODO = m; document.getElementById('ab-grade').classList.toggle('on', m==='grade'); document.getElementById('ab-lista').classList.toggle('on', m==='lista'); desenhar(); }
+const corKit = k => (D.kits.find(x => x.kit === k) || {}).cor || '#9AA1B4';
+const capKit = k => (D.kits.find(x => x.kit === k) || {}).capacidade || 0;
+
+function desenhar(){
+  const q = (document.getElementById('busca').value || '').trim().toLowerCase();
+  const ativos = D.alunos.filter(a => a.status !== 'cancelado');
+  const filtro = a => !q || (a.nome||'').toLowerCase().includes(q) || (a.nome_curto||'').toLowerCase().includes(q) || String(a.matricula||'').includes(q);
+  const kpis = `<div class="kpis">
+    <div class="kpi"><div class="l">Alunos ativos</div><div class="v">${ativos.filter(a=>a.status==='ativo').length} <small>${ativos.filter(a=>a.status==='trancado').length} trancados</small></div></div>
+    ${D.kits.map(k => `<div class="kpi"><div class="l"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${k.cor};margin-right:5px"></span>${esc(k.kit)}</div><div class="v">${ativos.filter(a=>a.kit===k.kit&&a.status==='ativo').length} <small>/ ${k.capacidade} por bloco</small></div></div>`).join('')}
+    <div class="kpi"><div class="l">Turmas</div><div class="v">${D.turmas.filter(t=>t.ativa).length}</div></div>
+  </div>`;
+  document.getElementById('raiz').innerHTML = kpis + (MODO === 'grade' ? grade(filtro) : lista(filtro));
+}
+
+function grade(filtro){
+  const blocos = [...new Set(D.turmas.map(t => `${String(t.hora_inicio).slice(0,5)}|${String(t.hora_fim).slice(0,5)}`))].sort();
+  let h = `<div class="scroll"><div class="grade"><div></div>${[1,2,3,4,5,6].map(d => `<div class="gh">${DIAS[d]}</div>`).join('')}`;
+  for (const b of blocos) {
+    const [hi,hf] = b.split('|');
+    h += `<div class="gb">${hh(hi)} – ${hh(hf)}</div>`;
+    for (const d of [1,2,3,4,5,6]) {
+      const t = D.turmas.find(x => x.dia_semana === d && String(x.hora_inicio).slice(0,5) === hi);
+      if (!t) { h += `<div class="cel vazia"></div>`; continue; }
+      const als = D.alunos.filter(a => a.turma_id === t.id && a.status !== 'cancelado' && filtro(a)).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome));
+      const total = D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo').length;
+      const porKit = {}; D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo').forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);
+      const sala = t.limite_sala || t.capacidade || 18;
+      h += `<div class="cel"><div class="t"><span><b>${total}</b>/${sala} na sala</span><span>${als.length ? '' : ''}</span></div>
+        ${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="editar('${a.id}')" title="${esc(a.nome)}${a.observacao?' · '+esc(a.observacao):''}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('')}
+        <div class="kits">${D.kits.map(k => { const u = porKit[k.kit]||0, liv = k.capacidade - u; return `<span class="kt ${liv<=0?'cheio':liv<=2?'alerta':''}" title="${esc(k.kit)}: ${u} de ${k.capacidade} kits">${esc(k.kit.replace('App Developer','App').replace('Bot',''))} ${u}/${k.capacidade}</span>`; }).join('')}</div>
+      </div>`;
+    }
+  }
+  h += `</div></div><div class="legenda">${D.kits.map(k => `<span><i style="width:8px;height:8px;border-radius:50%;background:${k.cor};display:inline-block"></i>${esc(k.kit)}</span>`).join('')}<span>· kits usados / kits do bloco — a aula experimental usa o First</span></div>`;
+  return h;
+}
+
+function lista(filtro){
+  const rows = D.alunos.filter(filtro).sort((a,b) => a.nome.localeCompare(b.nome));
+  return `<table><tr><th>Aluno</th><th>Kit</th><th>Turma</th><th>Matrícula</th><th>Situação</th><th>Obs.</th></tr>
+    ${rows.map(a => { const t = D.turmas.find(x => x.id === a.turma_id);
+      return `<tr onclick="editar('${a.id}')"><td><b>${esc(a.nome)}</b>${a.nome_curto && a.nome_curto !== a.nome ? ` <span class="obs">(${esc(a.nome_curto)})</span>` : ''}</td>
+        <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${corKit(a.kit)};margin-right:5px"></span>${esc(a.kit||'—')}</td>
+        <td>${t ? `${DIAS[t.dia_semana]} ${hh(t.hora_inicio)}–${hh(t.hora_fim)}` : '<span class="obs">sem turma</span>'}</td>
+        <td>${a.matricula ?? '—'}</td><td><span class="st ${a.status}">${a.status}</span>${a.trancado_ate ? ` <span class="obs">até ${new Date(a.trancado_ate+'T12:00').toLocaleDateString('pt-BR')}</span>` : ''}</td>
+        <td class="obs">${esc(a.observacao||'')}</td></tr>`; }).join('')}</table>`;
+}
+
+function editar(id){
+  const a = id ? D.alunos.find(x => x.id === id) : { status:'ativo' };
+  const opT = D.turmas.map(t => `<option value="${t.id}" ${a.turma_id===t.id?'selected':''}>${DIAS[t.dia_semana]} ${hh(t.hora_inicio)}–${hh(t.hora_fim)}</option>`).join('');
+  const opK = D.kits.map(k => `<option ${a.kit===k.kit?'selected':''}>${esc(k.kit)}</option>`).join('');
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela">
+    <h3>${id ? 'Editar aluno' : 'Novo aluno'}</h3>
+    <div class="campo"><label>Nome completo</label><input id="f-nome" value="${esc(a.nome||'')}"></div>
+    <div class="l2"><div class="campo"><label>Como aparece na grade</label><input id="f-curto" value="${esc(a.nome_curto||'')}"></div><div class="campo"><label>Nº matrícula</label><input id="f-mat" type="number" value="${a.matricula??''}"></div></div>
+    <div class="l2"><div class="campo"><label>Kit</label><select id="f-kit"><option value="">—</option>${opK}${a.kit && !D.kits.find(k=>k.kit===a.kit) ? `<option selected>${esc(a.kit)}</option>` : ''}</select></div>
+      <div class="campo"><label>Turma</label><select id="f-turma"><option value="">sem turma</option>${opT}</select></div></div>
+    <div class="l2"><div class="campo"><label>Situação</label><select id="f-st">${['ativo','trancado','cancelado'].map(s=>`<option ${a.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="campo"><label>Trancado até</label><input id="f-tr" type="date" value="${a.trancado_ate||''}"></div></div>
+    <div class="campo"><label>Observação</label><input id="f-obs" value="${esc(a.observacao||'')}"></div>
+    <div class="fim"><button class="btn g" onclick="fechar()">Cancelar</button><button class="btn" onclick="salvar('${id||''}')">Salvar</button></div>
+  </div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fechar(); };
+}
+function fechar(){ document.getElementById('modal').innerHTML = ''; }
+async function salvar(id){
+  const g = x => document.getElementById(x).value;
+  const d = { id: id || undefined, nome: g('f-nome').trim(), nome_curto: g('f-curto').trim(), matricula: g('f-mat'), kit: g('f-kit'), turma_id: g('f-turma'), status: g('f-st'), trancado_ate: g('f-tr'), observacao: g('f-obs').trim() };
+  if (!d.nome) return alert('Informe o nome.');
+  try { await api('aluno', d); fechar(); await carregar(); } catch(e){ alert(e.message); }
+}
+if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
+</script>
+</body>
+</html>
