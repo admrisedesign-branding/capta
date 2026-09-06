@@ -12,7 +12,7 @@
 
 const KOMMO = `https://${process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com'}`;
 const H_KOMMO = { Authorization: `Bearer ${process.env.KOMMO_TOKEN}` };
-const SB_URL = process.env.SUPABASE_URL || 'https://oaezsozoriqnkurxncjs.supabase.co';
+const SB_URL = process.env.SUPABASE_URL || 'https://wpoeigoledhzyvomudgf.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
 const TENANT_SLUG = process.env.CAPTA_TENANT_SLUG || 'my-robot-manaus';
 const H_SB = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
@@ -21,7 +21,15 @@ const H_SB = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type'
 const CAMPOS = {
   fonte: 'Fonte', porta: 'Porta', atendente: 'Quem atendeu', crianca: 'Filho',
   curso: 'Curso', data_aula: 'Data da aula', bloco: 'Bloco', pagamento: 'Pagamento',
+  score: 'Score', categoria: 'Categoria', origem: 'Origem', bairro: 'Bairro',
 };
+// etapa do Kommo → status do Capta (novo · contatado · fechado · perdido)
+function statusDe(st) {
+  if (st.tipo === 1) return 'fechado';
+  if (st.tipo === 2) return 'perdido';
+  return /novo lead|incoming/i.test(st.nome || '') ? 'novo' : 'contatado';
+}
+const cap = s => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1).toLowerCase() : null);
 // no CONTATO (não no lead): idade da criança
 const CAMPO_IDADE_CONTATO = 'Idade da criança';
 
@@ -96,7 +104,11 @@ async function espelhar(leadId) {
     etapa_nome: st.nome || null,
     nome: contato?.name || lead.name || null,
     contato: telefoneContato(contato),
-    origem: valorCampo(lead, CAMPOS.porta) || 'kommo',
+    origem: valorCampo(lead, CAMPOS.porta) || valorCampo(lead, CAMPOS.origem) || 'kommo',
+    score: valorCampo(lead, CAMPOS.score) != null ? Number(valorCampo(lead, CAMPOS.score)) : null,
+    temperatura: cap(valorCampo(lead, CAMPOS.categoria)),   // Quente · Morno · Frio
+    status: statusDe(st),
+    notas: [valorCampo(lead, CAMPOS.bairro) ? 'Bairro: ' + valorCampo(lead, CAMPOS.bairro) : null].filter(Boolean).join('\n') || null,
     fonte: valorCampo(lead, CAMPOS.fonte),
     porta: valorCampo(lead, CAMPOS.porta),
     atendente: valorCampo(lead, CAMPOS.atendente),
