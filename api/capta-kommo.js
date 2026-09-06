@@ -33,7 +33,7 @@ const cap = s => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1).toL
 // no CONTATO (não no lead): idade da criança
 const CAMPO_IDADE_CONTATO = 'Idade da criança';
 
-let cache = { fields: null, statuses: null, tenant: null, at: 0 };
+let cache = { fields: null, statuses: null, tenant: null, etapas: null, at: 0 };
 
 async function kget(path) {
   const r = await fetch(KOMMO + path, { headers: H_KOMMO });
@@ -54,6 +54,16 @@ async function carregarMeta() {
   for (const p of pipes?._embedded?.pipelines || [])
     for (const s of p._embedded?.statuses || []) cache.statuses[s.id] = { nome: s.name, tipo: s.type, pipeline: p.id };
   cache.at = Date.now();
+}
+
+// etapas do Capta ligadas às do Kommo (capta_etapas.kommo_status_id)
+async function etapaDoKommo(tenant, statusId) {
+  if (!cache.etapas || Date.now() - cache.at > 10 * 60 * 1000) {
+    const r = await fetch(`${SB_URL}/rest/v1/capta_etapas?tenant_id=eq.${tenant}&kommo_status_id=not.is.null&select=id,kommo_status_id`, { headers: H_SB });
+    const rows = r.ok ? await r.json() : [];
+    cache.etapas = Object.fromEntries(rows.map(e => [String(e.kommo_status_id), e.id]));
+  }
+  return cache.etapas[String(statusId)] || null;
 }
 
 async function tenantId() {
@@ -102,6 +112,8 @@ async function espelhar(leadId) {
     kommo_pipeline: lead.pipeline_id,
     kommo_status: lead.status_id,
     etapa_nome: st.nome || null,
+    etapa_id: await etapaDoKommo(await tenantId(), lead.status_id),
+    etapa_em: ts(lead.updated_at) || new Date().toISOString(),
     nome: contato?.name || lead.name || null,
     contato: telefoneContato(contato),
     origem: valorCampo(lead, CAMPOS.porta) || valorCampo(lead, CAMPOS.origem) || 'kommo',
