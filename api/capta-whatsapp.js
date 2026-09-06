@@ -566,7 +566,7 @@ async function acaoFunil(tenant, res) {
   const [etapas, leads, motivos] = await Promise.all([
     sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=*&order=ordem`),
     sb(`capta_leads?tenant_id=eq.${tenant.id}` +
-       `&select=id,nome,contato,temperatura,score,origem,etapa_id,etapa_em,criado_em,motivo_perda` +
+       `&select=id,nome,contato,temperatura,score,origem,etapa_id,etapa_em,criado_em,motivo_perda,kommo_lead_id,atendente,tags` +
        `&order=etapa_em.desc.nullslast,criado_em.desc&limit=500`),
     sb(`capta_motivos?tenant_id=eq.${tenant.id}&ativo=is.true&select=id,nome,etapa&order=ordem`)
       .catch(() => [])
@@ -582,7 +582,34 @@ async function acaoMover(tenant, body, res) {
   if (!l?.[0]) return res.status(404).json({ erro: 'Lead não encontrado.' });
 
   await moverLead(tenant.id, lead_id, etapa_id, body.motivo || null);
-  return res.status(200).json({ ok: true });
+  const kommo = await empurrarKommo(tenant.id, lead_id, etapa_id, body.motivo || null).catch(e => ({ erro: e.message }));
+  return res.status(200).json({ ok: true, kommo });
+}
+
+// Lead espelhado do Kommo: a etapa nova vai pra lá também (o espelho volta pelo webhook e confirma).
+async function empurrarKommo(tenantId, leadId, etapaId, motivo) {
+  const token = process.env.KOMMO_TOKEN;
+  if (!token) return null;
+  const [l, e] = await Promise.all([
+    sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id,kommo_pipeline&limit=1`),
+    sb(`capta_etapas?id=eq.${etapaId}&tenant_id=eq.${tenantId}&select=kommo_status_id,nome&limit=1`)
+  ]);
+  const lead = l?.[0], etapa = e?.[0];
+  if (!lead?.kommo_lead_id || !etapa?.kommo_status_id) return null;
+  const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
+  const r = await fetch(`https://${dominio}/api/v4/leads/${lead.kommo_lead_id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status_id: Number(etapa.kommo_status_id), ...(lead.kommo_pipeline ? { pipeline_id: Number(lead.kommo_pipeline) } : {}) })
+  });
+  if (!r.ok) throw new Error(`Kommo ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  if (motivo) {
+    await fetch(`https://${dominio}/api/v4/leads/${lead.kommo_lead_id}/notes`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ note_type: 'common', params: { text: `Capta · movido para "${etapa.nome}": ${motivo}` } }])
+    }).catch(() => {});
+  }
+  return { etapa: etapa.nome, kommo_status_id: etapa.kommo_status_id };
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
