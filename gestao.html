@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Painel Gestão — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#2E5BFF; --brand-deep:#1E44D6; --brand-2:#5B8DEF;
+  --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
+  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
+  --ink:#141A2E; --muted:#697089; --faint:#9AA1B4;
+  --quente:#E03127; --quente-bg:rgba(224,49,39,.12);
+  --morno:#C47A08;  --morno-bg:rgba(224,147,15,.14);
+  --frio:#3E6FD6;   --frio-bg:rgba(91,141,239,.15);
+  --verde:#16A34A;  --verde-bg:rgba(22,163,74,.12);
+  --gray-bg:rgba(105,112,137,.12);
+  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
+button,select{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;
+  background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px;font-weight:700}
+.voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;padding:7px 13px;border-radius:10px;text-decoration:none;transition:.14s}
+.voltar:hover{border-color:var(--brand);color:var(--brand)}
+.ferr{margin-left:auto;display:flex;gap:8px;align-items:center}
+.sel{border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:13px;font-weight:600;padding:7px 10px;border-radius:10px}
+.btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:9px}
+.btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+
+.wrap{padding:22px 26px 48px;max-width:1180px;margin:0 auto}
+.cab{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.cab h2{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.cab .sub{color:var(--muted);font-size:13px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 16px}
+.kpi .l{font-size:12px;font-weight:600;color:var(--muted)}
+.kpi .v{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:11.5px;color:var(--faint);margin-top:2px}
+.kpi .d.up{color:var(--verde)} .kpi .d.down{color:var(--quente)}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px;min-width:0}
+.card.full{grid-column:1/-1}
+.card h3{font-size:14px;font-weight:700;margin-bottom:2px}
+.card .h{font-size:12px;color:var(--muted);margin-bottom:12px}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:700;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:8px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+.bar{height:8px;border-radius:99px;background:var(--line-2);overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--brand);border-radius:99px}
+.bar i.v{background:var(--verde)}
+.pct{color:var(--faint);font-size:11.5px;margin-left:6px}
+.tot td{font-weight:700;border-top:1px solid var(--line)}
+
+.funil{display:flex;flex-direction:column;gap:7px}
+.fe{display:grid;grid-template-columns:150px 1fr 60px;align-items:center;gap:10px;font-size:13px}
+.fe .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fe .bar{height:20px}
+.fe .bar i{background:var(--brand-2)}
+.fe.ganho .bar i{background:var(--verde)} .fe.perda .bar i{background:var(--faint)}
+.fe .q{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+
+.vazio{color:var(--faint);text-align:center;padding:22px;font-size:13px;line-height:1.6}
+.aviso{margin:20px 26px 0;border:1px dashed var(--line);border-radius:var(--r);padding:36px;text-align:center;color:var(--faint);font-size:13.5px;line-height:1.7}
+.nota{font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.5}
+
+@media print{
+  .topbar,.nota{display:none}
+  body{background:#fff}
+  .wrap{padding:0;max-width:none}
+  .card,.kpi{box-shadow:none;break-inside:avoid}
+  .grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
+  <h1>Painel Gestão</h1>
+  <div class="ferr">
+    <select class="sel" id="mes" title="Mês"></select>
+    <button class="btn g" onclick="window.print()">Imprimir / PDF</button>
+  </div>
+</div>
+
+<div class="wrap" id="raiz"><div class="aviso">Carregando…</div></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const brl = v => (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
+const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const chave = d => { const x = new Date(d); return isNaN(x) ? null : `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`; };
+const rotulo = k => { const [a,m] = k.split('-'); return `${MESES[+m-1]}/${a}`; };
+
+// Ordem canônica das etapas (as do Kommo); qualquer outra vai depois, na ordem em que aparecer
+const ORDEM = ['Incoming leads','Novo Lead','Em Contato','Qualificado','Aula Agendada','Matrícula em Andamento','Aluno Ativo (matriculado)','Remarketing','Closed - lost'];
+
+let TODOS = [], TENANT = {};
+
+async function carregar(){
+  try{
+    const r = await fetch(`/api/capta-leads?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`);
+    if(!r.ok) throw new Error('api '+r.status);
+    const d = await r.json();
+    TODOS = d.leads || []; TENANT = d.tenant || {};
+    document.title = `Painel Gestão — ${TENANT.nome || 'Capta'}`;
+    montarMeses(); render();
+  }catch(e){
+    document.getElementById('raiz').innerHTML = `<div class="aviso">Não consegui carregar os leads.<br>${esc(e.message)}</div>`;
+  }
+}
+
+function dataLead(l){ return l.kommo_criado_em || l.criado_em; }
+
+function montarMeses(){
+  const sel = document.getElementById('mes');
+  const ks = [...new Set(TODOS.map(l => chave(dataLead(l))).filter(Boolean))].sort().reverse();
+  const atual = chave(new Date());
+  if(!ks.includes(atual)) ks.unshift(atual);
+  sel.innerHTML = `<option value="">Todo o período</option>` + ks.map(k => `<option value="${k}">${rotulo(k)}</option>`).join('');
+  sel.value = atual;
+  sel.onchange = render;
+}
+
+function conta(arr, fn){ const m = new Map(); for(const x of arr){ const k = fn(x) || '—'; m.set(k,(m.get(k)||0)+1); } return m; }
+const ganhou = l => !!l.ganho_em || l.status === 'fechado';
+const agendou = l => !!l.data_aula || /aula agendada|matr[ií]cula|aluno/i.test(l.etapa_nome||'') || ganhou(l);
+
+function render(){
+  const k = document.getElementById('mes').value;
+  const doMes = k ? TODOS.filter(l => chave(dataLead(l)) === k) : TODOS;
+  // mês anterior, pra comparação
+  let ant = null;
+  if(k){ const [a,m] = k.split('-').map(Number); const pk = `${m===1?a-1:a}-${String(m===1?12:m-1).padStart(2,'0')}`; ant = TODOS.filter(l => chave(dataLead(l)) === pk); }
+
+  const leads = doMes.length;
+  const aulas = doMes.filter(agendou).length;
+  const mat   = doMes.filter(ganhou).length;
+  const rec   = doMes.filter(ganhou).reduce((s,l) => s + (Number(l.valor)||0), 0);
+  const delta = (a,b) => { if(!ant) return ''; const d = a - b; if(!d) return '<span class="d">igual ao mês anterior</span>'; return `<span class="d ${d>0?'up':'down'}">${d>0?'+':''}${d} vs. mês anterior</span>`; };
+
+  const kpis = `
+    <div class="kpi"><div class="l">Leads</div><div class="v">${leads}</div>${delta(leads, ant?ant.length:0)}</div>
+    <div class="kpi"><div class="l">Aulas experimentais</div><div class="v">${aulas}</div>${delta(aulas, ant?ant.filter(agendou).length:0)}</div>
+    <div class="kpi"><div class="l">Matrículas</div><div class="v">${mat}</div><span class="d">${leads?Math.round(mat/leads*100):0}% dos leads</span></div>
+    <div class="kpi"><div class="l">Receita (matrículas)</div><div class="v">${brl(rec)}</div><span class="d">${mat?'ticket '+brl(rec/mat):''}</span></div>`;
+
+  // canais: fonte × porta
+  const porFonte = conta(doMes, l => l.fonte || (l.origem && l.origem !== 'kommo' ? l.origem : null) || 'não informado');
+  const porPorta = conta(doMes, l => l.porta || 'não informado');
+  const tabela = (m, titulo, sub) => {
+    const linhas = [...m.entries()].sort((a,b) => b[1]-a[1]);
+    const max = Math.max(1, ...linhas.map(x => x[1]));
+    return `<div class="card"><h3>${titulo}</h3><div class="h">${sub}</div>
+      ${linhas.length ? `<table><tr><th>${titulo}</th><th>Leads</th><th class="n">Matr.</th></tr>
+      ${linhas.map(([nome,q]) => {
+        const mq = doMes.filter(l => ((titulo==='Fonte' ? (l.fonte || (l.origem && l.origem!=='kommo' ? l.origem : null) || 'não informado') : (l.porta || 'não informado')) === nome) && ganhou(l)).length;
+        return `<tr><td>${esc(nome)}</td><td><div style="display:flex;align-items:center"><div class="bar" style="flex:1"><i style="width:${q/max*100}%"></i></div><span class="pct">${q}</span></div></td><td class="n">${mq}</td></tr>`;
+      }).join('')}
+      <tr class="tot"><td>Total</td><td class="n">${leads}</td><td class="n">${mat}</td></tr></table>` : `<div class="vazio">Sem leads neste período.</div>`}
+    </div>`;
+  };
+
+  // funil por etapa
+  const porEtapa = conta(doMes, l => l.etapa_nome || 'Sem etapa');
+  const etapas = [...porEtapa.keys()].sort((a,b) => { const ia = ORDEM.indexOf(a), ib = ORDEM.indexOf(b); return (ia<0?99:ia) - (ib<0?99:ib); });
+  const maxE = Math.max(1, ...porEtapa.values());
+  const funil = `<div class="card full"><h3>Funil por etapa</h3><div class="h">Onde os leads do período estão hoje, na etapa do Kommo</div>
+    ${etapas.length ? `<div class="funil">${etapas.map(e => `<div class="fe ${/aluno ativo/i.test(e)?'ganho':/lost|remarketing/i.test(e)?'perda':''}"><span class="nm" title="${esc(e)}">${esc(e)}</span><div class="bar"><i style="width:${porEtapa.get(e)/maxE*100}%"></i></div><span class="q">${porEtapa.get(e)}</span></div>`).join('')}</div>` : `<div class="vazio">Sem leads neste período.</div>`}
+  </div>`;
+
+  // quem atendeu
+  const porAt = conta(doMes, l => l.atendente || 'não informado');
+  const at = [...porAt.entries()].sort((a,b) => b[1]-a[1]);
+  const quem = `<div class="card"><h3>Quem atendeu</h3><div class="h">Leads e matrículas por atendente — base da comissão</div>
+    ${at.length ? `<table><tr><th>Atendente</th><th class="n">Leads</th><th class="n">Aulas</th><th class="n">Matr.</th><th class="n">Conv.</th></tr>
+    ${at.map(([n,q]) => { const ls = doMes.filter(l => (l.atendente||'não informado')===n); const a = ls.filter(agendou).length, m = ls.filter(ganhou).length;
+      return `<tr><td>${esc(n)}</td><td class="n">${q}</td><td class="n">${a}</td><td class="n">${m}</td><td class="n">${q?Math.round(m/q*100):0}%</td></tr>`; }).join('')}</table>` : `<div class="vazio">Sem leads neste período.</div>`}
+  </div>`;
+
+  // temperatura
+  const porT = conta(doMes, l => l.temperatura || 'Sem pontuação');
+  const temp = `<div class="card"><h3>Temperatura</h3><div class="h">Pontuação do bot / formulário</div>
+    <table>${['Quente','Morno','Frio','Sem pontuação'].filter(t => porT.has(t)).map(t => `<tr><td>${t}</td><td class="n">${porT.get(t)}</td><td class="n">${leads?Math.round(porT.get(t)/leads*100):0}%</td></tr>`).join('')}</table>
+  </div>`;
+
+  // evolução mensal (últimos 6 meses)
+  const ks = [...new Set(TODOS.map(l => chave(dataLead(l))).filter(Boolean))].sort().slice(-6);
+  const maxM = Math.max(1, ...ks.map(k2 => TODOS.filter(l => chave(dataLead(l))===k2).length));
+  const evol = `<div class="card full"><h3>Evolução</h3><div class="h">Leads e matrículas por mês</div>
+    <table><tr><th>Mês</th><th>Leads</th><th class="n">Aulas</th><th class="n">Matr.</th><th class="n">Receita</th></tr>
+    ${ks.map(k2 => { const ls = TODOS.filter(l => chave(dataLead(l))===k2); const g = ls.filter(ganhou);
+      return `<tr${k2===k?' style="background:var(--brand-softer)"':''}><td>${rotulo(k2)}</td><td><div style="display:flex;align-items:center"><div class="bar" style="flex:1"><i style="width:${ls.length/maxM*100}%"></i></div><span class="pct">${ls.length}</span></div></td><td class="n">${ls.filter(agendou).length}</td><td class="n">${g.length}</td><td class="n">${brl(g.reduce((s,l)=>s+(Number(l.valor)||0),0))}</td></tr>`; }).join('')}</table>
+  </div>`;
+
+  document.getElementById('raiz').innerHTML = `
+    <div class="cab"><div><h2>${esc(TENANT.nome||'')}</h2><div class="sub">${k ? rotulo(k) : 'Todo o período'} · gerado ${new Date().toLocaleDateString('pt-BR')}</div></div></div>
+    <div class="kpis">${kpis}</div>
+    <div class="grid">
+      ${tabela(porFonte,'Fonte','De onde o lead veio: anúncio, Instagram, Google, evento, indicação…')}
+      ${tabela(porPorta,'Porta','Por onde entrou: site, WhatsApp (bot), WhatsApp direto, evento…')}
+      ${funil}
+      ${quem}
+      ${temp}
+      ${evol}
+    </div>
+    <div class="nota">Fonte e Porta vêm dos campos preenchidos no Kommo; "não informado" são leads sem esses campos. Matrícula = lead ganho no Kommo. Aulas = leads com aula marcada ou além dessa etapa.</div>`;
+}
+carregar();
+</script>
+</body>
+</html>
