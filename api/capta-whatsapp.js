@@ -76,6 +76,20 @@ module.exports = async function handler(req, res) {
     const tenant = tenants && tenants[0];
     if (!tenant) return res.status(403).json({ erro: 'Acesso negado.' });
 
+    // Funil, agenda e presença não dependem de WhatsApp: valem em qualquer
+    // plano, com ou sem canal conectado.
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca'];
+    if (SEM_WHATS.includes(acao)) {
+      switch (acao) {
+        case 'agenda':   return await acaoAgenda(tenant, body, res);
+        case 'agendar':  return await acaoAgendar(tenant, body, res);
+        case 'remarcar': return await acaoRemarcar(tenant, body, res);
+        case 'presenca': return await acaoPresenca(tenant, body, res);
+        case 'funil':    return await acaoFunil(tenant, res);
+        case 'mover':    return await acaoMover(tenant, body, res);
+      }
+    }
+
     // WhatsApp conectado é recurso do Business: é onde sai o custo da
     // instância. A trava fica no servidor, nunca no navegador.
     const planos = await sb(
