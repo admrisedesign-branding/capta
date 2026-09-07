@@ -123,6 +123,29 @@ button,select,input,textarea{font-family:inherit}button{cursor:pointer}
 .msg{max-width:88%;padding:8px 10px;border-radius:12px;font-size:13px;line-height:1.45;background:var(--line-2);align-self:flex-start;white-space:pre-wrap}
 .msg.saida{background:var(--brand-soft);align-self:flex-end}.msg small{display:block;color:var(--faint);font-size:10.5px;margin-top:3px}
 .aviso-p{border:1px dashed var(--line);border-radius:12px;padding:14px;color:var(--faint);font-size:12.5px;line-height:1.6;text-align:center}
+
+/* ---- linha do tempo do dia (protótipo) ---- */
+.tl{display:grid;grid-template-columns:120px 1fr;border-left:0}
+.tl .h{padding:14px 10px 14px 0;text-align:right;border-right:2px solid var(--line);position:relative}
+.tl .h.tem{border-right-color:var(--exp)}
+.tl .h b{font-size:17px;font-weight:800;color:var(--ink)}.tl .h .vg{font-size:12.5px;font-weight:700;color:var(--verde);margin-top:2px}.tl .h .vg.z{color:var(--quente)}.tl .h .vg.n{color:var(--faint);font-weight:600}
+.tl .h .kf{font-size:11.5px;font-weight:700;color:var(--muted);margin-top:8px}.tl .h .kf.alerta{color:var(--morno);background:rgba(224,147,15,.14);display:inline-block;padding:1px 6px;border-radius:6px}.tl .h .kf.cheio{color:var(--quente)}
+.tl .c{padding:10px 0 10px 16px;min-height:74px}
+.tl .c .livre{color:var(--faint);font-size:13.5px;padding:14px 0}
+.tl .c.dois{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+@media(max-width:900px){.tl .c.dois{grid-template-columns:1fr}}
+.cardx.win{background:#F2FAF4;border-color:#BFE3C9}.cardx.lost{background:#FCF3F2;border-color:#F0C6C3}.cardx.hold{background:#FDF8EC;border-color:#EAD7A5}
+.cardx.gone{border-style:dashed;opacity:.85}.cardx.gone .kid{text-decoration:line-through}
+.rot{font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:99px}
+.rot.q{color:var(--quente)}.rot.m{color:var(--morno);background:rgba(224,147,15,.12)}.rot.f{color:var(--muted);background:var(--line-2);border:1px solid var(--line)}
+.org{font-size:11.5px;padding:3px 9px;border-radius:20px;font-weight:600;background:var(--line-2);color:var(--muted)}
+.o-ads{background:#F0ECFB;color:#6543BC}.o-org{background:#FDEDF4;color:#B7276B}.o-site{background:#EAF0FF;color:#2E5BFF}.o-wpp{background:#E8F7EE;color:#1E7A45}.o-evt{background:#FFF3E0;color:#B35C00}
+.rea{font-size:11.5px;padding:3px 9px;border-radius:20px;background:var(--line-2);color:var(--muted)}
+.sinal{border-left:3px solid var(--line);padding:2px 10px;margin-top:10px;font-size:13px;color:var(--muted);line-height:1.5;background:transparent}
+.done{background:var(--card)!important;border:1px solid var(--line);align-items:flex-start}
+.done.win b,.done.win .cor{color:var(--verde)}.done.lost b,.done.lost .cor{color:var(--quente)}.done.hold b,.done.hold .cor{color:var(--morno)}
+.done i{display:block;font-style:italic;margin-top:2px}
+.done .undo.alt{font-weight:800;text-decoration:none;color:var(--ink)}
 </style>
 <style>body.embed .voltar{display:none}body.embed .topbar{height:52px;background:transparent;backdrop-filter:none;border-bottom:1px solid var(--line);padding:0 18px}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -197,7 +220,13 @@ function desenhar(){
   const kits = KITS_T.length ? KITS_T : [{kit:'First',capacidade:8},{kit:'OneBot',capacidade:6},{kit:'TechBot',capacidade:5},{kit:'Autobot',capacidade:4},{kit:'App Developer',capacidade:4},{kit:'GameBot',capacidade:2}];
   let grade;
   if (MODO === 'dia') {
-    grade = base.length ? `<div class="dia-lista">${base.sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio))).map(cartao).join('')}</div>` : `<div class="vazio">Sem aulas experimentais neste dia.</div>`;
+    const horas = [8,9,10,11,14,15,16,17];
+    const vg = h => VAGAS ? VAGAS.filter(v => v.data === SELDIA && parseInt(v.hora_inicio) <= h && h < parseInt(v.hora_fim)) : [];
+    grade = `<div class="tl">${horas.map(h => {
+      const its = base.filter(a => parseInt(a.hora_inicio) === h).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+      const v = vg(h)[0]; const liv = v ? v.vagas : null;
+      return `<div class="h ${its.length?'tem':''}"><b>${String(h).padStart(2,'0')}:00</b><div class="vg ${liv==null?'n':liv<=0?'z':''}">${liv==null?'sem turma':liv<=0?'sem vaga':liv+' vaga'+(liv>1?'s':'')}</div>${v?`<div class="kf ${liv<=0?'cheio':liv<=2?'alerta':''}">FIRST ${liv} livre${liv===1?'':'s'}</div>`:''}</div>
+        <div class="c ${its.length>1?'dois':''}">${its.length ? its.map(cartao).join('') : '<div class="livre">livre</div>'}</div>`; }).join('')}</div>`;
   } else {
     grade = `<div class="scrollx"><div class="semana">${dias.map(d => { const its = base.filter(a => a.data === d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
       return `<div class="colw ${d===hoje?'hoje':''}"><h4>${DIAS[new Date(d+'T12:00').getDay()]} ${new Date(d+'T12:00').getDate()}</h4>${its.length ? its.map(ev).join('') : '<div class="nada">sem aulas</div>'}</div>`; }).join('')}</div></div>`;
@@ -231,20 +260,35 @@ let ABERTO = null;   // {id, tipo}
 let VAGAS3 = null;   // vagas pro reagendar
 
 function desfechoDe(a){ const m = /desfecho:\s*(matriculou|nao|andamento|faltou)(?:\s*·\s*(.*))?/i.exec(a.observacao||''); return m ? { t: m[1].toLowerCase(), obs: (m[2]||'').trim() } : null; }
+const ROT = { quente: ['Quer fechar','q'], morno: ['Considerando','m'], frio: ['Só conhecendo','f'] };
+function origemTag(l){
+  const f = (l.fonte||'').toLowerCase(), pt = (l.porta||'').toLowerCase(), o = (l.origem||'').toLowerCase();
+  if (f.includes('anúncio') || f.includes('anuncio') || o.includes('anuncio')) return ['Anúncio' + (pt||o ? (o.includes('insta')||f.includes('insta') ? ' Instagram' : '') : ''), 'o-ads'];
+  if (f.includes('instagram') || o === 'instagram') return ['Instagram orgânico', 'o-org'];
+  if (f.includes('evento') || pt === 'evento') return ['Evento', 'o-evt'];
+  if (f.includes('google')) return ['Google', 'o-site'];
+  if (pt === 'site' || o === 'site') return ['Site', 'o-site'];
+  if (pt.includes('whatsapp') || o.includes('whatsapp')) return ['WhatsApp', 'o-wpp'];
+  if (f.includes('indica')) return ['Indicação', 'o-evt'];
+  return null;
+}
+function remarcacoes(a){ let n = 0, cur = a; const seen = new Set(); while (cur && cur.remarcado_de && !seen.has(cur.id)) { seen.add(cur.id); n++; cur = D.agendamentos.find(x => x.id === cur.remarcado_de); } return n; }
 function cartao(a){
   const l = leadDe(a), t = turmaDe(a); const D_ = desfechoDe(a); const temp = (l.temperatura||'').toLowerCase();
-  const badge = temp ? `<span class="badge ${temp==='quente'?'q':temp==='morno'?'m':'f'}">${temp==='quente'?'chega querendo fechar':temp==='morno'?'morno':'frio'}</span>` : '';
+  const rot = ROT[temp] ? `<span class="rot ${ROT[temp][1]}">${ROT[temp][0]}</span>` : '';
+  const org = origemTag(l); const rea = remarcacoes(a);
+  const sinal = (!D_ && a.observacao) ? a.observacao : (l.notas || '');
   let est = '', pe = '';
   if (a.status === 'faltou' || (D_ && D_.t === 'faltou')) {
     est = ' gone';
     const menu = ABERTO && ABERTO.id === a.id && ABERTO.tipo === 'reagendar' ? menuReagendar(a) : '';
-    pe = `<div class="done neutral"><span><b>Faltou.</b> Continua em Aula agendada no Kommo, com a tag <i>reagendar devido falta</i>.</span>
-      <span><button class="undo" onclick="abrirMenu('${a.id}','reagendar')">reagendar</button> <button class="undo" onclick="desfazer('${a.id}')">desfazer</button></span></div>${menu}`;
+    pe = `<div class="done neutral"><span><b>Faltou.</b> Continua em Aula agendada no Kommo, com a tag <i>reagendar devido falta</i></span>
+      <span><button class="undo alt" onclick="abrirMenu('${a.id}','reagendar')">opções</button> <button class="undo" onclick="desfazer('${a.id}')">desfazer</button></span></div>${menu}`;
   } else if (D_) {
     est = D_.t === 'matriculou' ? ' win' : D_.t === 'nao' ? ' lost' : ' hold';
-    const txt = D_.t === 'matriculou' ? `<b>Matriculou${D_.obs?' · '+esc(D_.obs):''}.</b> Baixa no Kommo como ganho: Aluno ativo, e já entrou em Alunos ativos.`
-      : D_.t === 'nao' ? `<b>Não fechou${D_.obs?' · '+esc(D_.obs):''}.</b> ${/vai pensar/i.test(D_.obs)?'Foi para Remarketing':'Foi para Perdido'} no Kommo, com o motivo no card.`
-      : `<b>Em andamento.</b> Foi para Matrícula em andamento no Kommo.${D_.obs?` <i>“${esc(D_.obs)}”</i>`:''}`;
+    const txt = D_.t === 'matriculou' ? `<b>Matriculou${D_.obs?' · '+esc(D_.obs.split(' · ')[0]):''}.</b> Baixa no Kommo como ganho: vai para Aluno ativo com a tag <i>pagamento: ${esc((D_.obs.split(' · ')[0]||'').toLowerCase())}</i>`
+      : D_.t === 'nao' ? `<b>Não fechou${D_.obs?' · '+esc(D_.obs):''}.</b> Vai para Remarketing no Kommo com a tag <i>motivo: ${esc(D_.obs.toLowerCase())}</i>`
+      : `<b>Em andamento.</b> Continua na coluna de Aula agendada, com a tag <i>em andamento</i>. A observação abaixo vai como nota no Kommo. <i>“${esc(D_.obs||'sem observação')}”</i>`;
     pe = `<div class="done ${D_.t==='matriculou'?'win':D_.t==='nao'?'lost':'hold'}"><span>${txt}</span>${D_.t==='matriculou'?'':`<button class="undo" onclick="desfazer('${a.id}')">desfazer</button>`}</div>`;
   } else {
     const menu = ABERTO && ABERTO.id === a.id ? menuDesfecho(a) : '';
@@ -254,21 +298,21 @@ function cartao(a){
         <button class="yes" onclick="abrirMenu('${a.id}','matriculou')">Matriculou</button>
         <button class="nope" onclick="abrirMenu('${a.id}','nao')">Não matriculou</button>
         <button onclick="abrirMenu('${a.id}','andamento')">Em andamento</button>
-        <button onclick="registrar('${a.id}','faltou',{})">Faltou</button>
-        <button onclick="abrirMenu('${a.id}','reagendar')">Reagendar</button></div>${menu}`;
+        <button onclick="registrar('${a.id}','faltou',{})">Faltou</button></div>${menu}`;
   }
   return `<div class="cardx${est}">
     <button class="scriptbtn" onclick="script('${a.id}')" title="Ver a conversa">script</button>
-    <div class="top"><span class="hora">${hh(a.hora_inicio)}</span><span class="kid">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade?`<em>${a.crianca_idade} anos</em>`:''}</span>${badge}${a.status==='confirmado'?'<span class="badge">confirmou</span>':''}</div>
-    <div class="guard">com ${esc(l.nome||'responsável')}${l.contato?' · '+esc(l.contato):''}${l.fonte||l.porta?' · '+esc([l.fonte,l.porta].filter(Boolean).join(' / ')):''}${l.atendente?' · atendido por '+esc(l.atendente):''}${t.nome?' · '+esc(t.nome):''}</div>
-    ${a.observacao && !D_ ? `<div class="sinal">${esc(a.observacao)}</div>` : ''}
+    <div class="top"><span class="kid">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade?`<em>${a.crianca_idade} anos</em>`:''}</span>${rot}</div>
+    <div class="guard">com ${esc(l.nome||'responsável')}${l.atendente?' · atendido por '+esc(l.atendente):''}</div>
+    <div class="top" style="margin-top:8px">${org?`<span class="org ${org[1]}">${esc(org[0])}</span>`:''}${rea?`<span class="rea">remarcou ${rea}×</span>`:''}${a.status==='confirmado'?'<span class="rea">confirmou</span>':''}</div>
+    ${sinal ? `<div class="sinal">${esc(sinal)}</div>` : ''}
     ${pe}</div>`;
 }
 function menuDesfecho(a){
   const tp = ABERTO.tipo;
   if (tp === 'reagendar') return menuReagendar(a);
   if (tp === 'andamento') return `<div class="menu"><p>Situação da família</p><textarea id="m-obs" placeholder="Ex.: precisa esperar a fatura do cartão virar, falar com o marido"></textarea>
-    <div class="acts save"><button class="yes" onclick="registrar('${a.id}','andamento',{observacao:document.getElementById('m-obs').value})">Salvar</button><button onclick="fecharMenu()">cancelar</button></div></div>`;
+    <div class="acts save"><button class="yes" onclick="registrar('${a.id}','andamento',{observacao:document.getElementById('m-obs').value,situacao:document.getElementById('m-obs').value})">Salvar</button><button onclick="fecharMenu()">cancelar</button></div></div>`;
   if (tp === 'nao') return `<div class="menu"><p>Motivo</p><div class="chips">${MOTIVOS.map(v=>`<button class="chip" onclick="registrar('${a.id}','nao',{motivo:'${v}'})">${v}</button>`).join('')}</div></div>`;
   if (tp === 'matriculou') return `<div class="menu"><p>Forma de pagamento</p><div class="chips">${PAGTOS.map(v=>`<button class="chip ${ESC.pagamento===v?'on':''}" onclick="ESC.pagamento='${v}';desenhar()">${v}</button>`).join('')}</div>
     <div class="l2 linha2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><p>Valor (R$)</p><input id="m-valor" type="number" min="0" step="10" placeholder="397" value="${ESC.valor||''}"></div><div><p>Kit</p><select id="m-curso">${KITS.map(k=>`<option ${k===(ESC.curso||'First')?'selected':''}>${k}</option>`).join('')}</select></div></div>
