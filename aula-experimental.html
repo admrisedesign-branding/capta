@@ -113,6 +113,11 @@ button,select,input,textarea{font-family:inherit}button{cursor:pointer}
 .vg button{margin-top:6px;width:100%}
 .badge{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;background:var(--line-2);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .badge.q{background:rgba(224,49,39,.12);color:var(--quente)}.badge.m{background:rgba(224,147,15,.14);color:var(--morno)}.badge.f{background:var(--brand-soft);color:var(--brand)}
+.acts.quatro{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.acts.quatro button{padding:14px 12px;font-size:15px;font-weight:700;border-radius:12px}
+.acts.quatro .yes{background:#3C8C5A;border-color:#3C8C5A}
+.acts.quatro .nope{background:#FCF1EF;border-color:#F1CFC9;color:#C5392E}
+.acts.mini{margin-top:6px;gap:12px}.acts.mini button{border:0;background:transparent;padding:2px 0;font-size:12px;color:var(--faint);text-decoration:underline}
 /* drawer da conversa */
 #drawer{position:fixed;top:0;right:0;bottom:0;width:380px;max-width:100%;background:var(--card);border-left:1px solid var(--line);box-shadow:-10px 0 30px rgba(20,26,46,.08);transform:translateX(100%);transition:.18s;z-index:45;display:flex;flex-direction:column}
 #drawer.aberto{transform:none}
@@ -292,13 +297,13 @@ function cartao(a){
     pe = `<div class="done ${D_.t==='matriculou'?'win':D_.t==='nao'?'lost':'hold'}"><span>${txt}</span>${D_.t==='matriculou'?'':`<button class="undo" onclick="desfazer('${a.id}')">desfazer</button>`}</div>`;
   } else {
     const menu = ABERTO && ABERTO.id === a.id ? menuDesfecho(a) : '';
-    pe = a.data > hoje
-      ? `<div class="acts"><button onclick="abrirMenu('${a.id}','reagendar')">Reagendar</button><button onclick="cancelar('${a.id}')">Cancelar aula</button></div>${ABERTO && ABERTO.id === a.id && ABERTO.tipo === 'reagendar' ? menuReagendar(a) : ''}`
-      : `<div class="acts">
+    // as quatro opções sempre visíveis, como no protótipo (a recepção dá baixa no dia; aula futura também pode ser remarcada/cancelada)
+    pe = `<div class="acts quatro">
         <button class="yes" onclick="abrirMenu('${a.id}','matriculou')">Matriculou</button>
         <button class="nope" onclick="abrirMenu('${a.id}','nao')">Não matriculou</button>
         <button onclick="abrirMenu('${a.id}','andamento')">Em andamento</button>
-        <button onclick="registrar('${a.id}','faltou',{})">Faltou</button></div>${menu}`;
+        <button onclick="registrar('${a.id}','faltou',{})">Faltou</button></div>
+      <div class="acts mini"><button onclick="abrirMenu('${a.id}','reagendar')">reagendar</button><button onclick="cancelar('${a.id}')">cancelar aula</button></div>${menu}`;
   }
   return `<div class="cardx${est}">
     <button class="scriptbtn" onclick="script('${a.id}')" title="Ver a conversa">script</button>
