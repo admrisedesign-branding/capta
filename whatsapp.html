@@ -158,12 +158,27 @@ function desenhar(estado) {
           ? `<div class="qr-moldura"><span class="qr-vazio">Tudo certo.<br>Não precisa ler o código.</span></div>
              <p class="qr-legenda">Para trocar de número, desconecte primeiro.</p>`
           : `<div class="qr-moldura" id="qr"><span class="qr-vazio">Gerando código…</span></div>
-             <p class="qr-legenda">O código muda a cada minuto. Se demorar para ler, ele se renova sozinho.</p>`}
+             <p class="qr-legenda">O código muda a cada minuto. Se demorar para ler, ele se renova sozinho.</p>
+             <div class="pareamento">
+               <p class="qr-legenda" style="margin-top:14px"><b>Celular está com outra pessoa?</b> Gere um código e mande pra ela digitar em WhatsApp → Aparelhos conectados → Conectar aparelho → <b>Conectar com número de telefone</b>.</p>
+               <div style="display:flex;gap:8px;margin-top:8px"><input id="num-par" placeholder="Número com DDD, ex.: 92999999999" style="flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-family:inherit;font-size:13px"><button class="btn" id="btn-par" type="button">Gerar código</button></div>
+               <div id="cod-par" style="margin-top:10px"></div>
+             </div>`}
       </div>
     </div>`;
 
   const bd = document.getElementById('btn-desconectar');
   if (bd) bd.onclick = desconectar;
+  const bp = document.getElementById('btn-par');
+  if (bp) bp.onclick = async () => {
+    const alvo = document.getElementById('cod-par'); alvo.innerHTML = '<span class="qr-vazio">Gerando…</span>';
+    try {
+      const d = await api('codigo', { numero: document.getElementById('num-par').value });
+      alvo.innerHTML = d.codigo
+        ? `<div style="font-size:30px;font-weight:800;letter-spacing:.18em;font-variant-numeric:tabular-nums;text-align:center;padding:12px;border:1px dashed var(--line);border-radius:12px">${d.codigo}</div><p class="qr-legenda">Vale por alguns minutos. A pessoa digita no celular e a conexão aparece aqui sozinha.</p>`
+        : '<span class="qr-vazio">Não consegui gerar o código agora. Tenta de novo.</span>';
+    } catch (e) { alvo.innerHTML = `<span class="qr-vazio">${e.message}</span>`; }
+  };
 }
 
 function formatarFone(n) {
