@@ -294,17 +294,17 @@ const DIAS_N = ['dom','seg','ter','qua','qui','sex','sáb'];
 const hhmm = t => String(t || '').slice(0, 5);
 const dataBR = d => { const [a,m,dd] = String(d).split('-'); return `${dd}/${m}`; };
 const nomeDia = d => DIAS_N[new Date(d + 'T12:00:00').getDay()];
-let P = { lead: null, aba: 'conversa', info: null, agenda: null, filtro: 'todos', idx: 0 };
+let P = { lead: null, aba: 'conversa', info: null, agenda: null, idx: { manha: 0, tarde: 0, sab: 0 } };
 
 async function abrirLead(id) {
   const l = leads.find(x => x.id === id); if (!l) return;
-  P = { lead: l, aba: P.lead && P.lead.id === id ? P.aba : 'conversa', info: null, agenda: null, filtro: 'todos', idx: 0 };
+  P = { lead: l, aba: P.lead && P.lead.id === id ? P.aba : 'conversa', info: null, agenda: null, idx: { manha: 0, tarde: 0, sab: 0 } };
   document.getElementById('painel').classList.add('aberto');
   desenharPainel();
   try { P.info = await api('lead', { lead_id: id }); } catch (e) { P.info = { erro: e.message }; }
   desenharPainel();
 }
-function fecharLead() { document.getElementById('painel').classList.remove('aberto'); P.lead = null; }
+function fecharLead() { document.getElementById('painel').classList.remove('aberto'); P.lead = null; clearTimeout(AG_TIMER); }
 function abaP(a) { P.aba = a; desenharPainel(); if (a === 'agendar' && !P.agenda) carregarAgenda(); }
 
 function desenharPainel() {
@@ -386,42 +386,51 @@ async function salvarDados() {
   catch (e) { alert(e.message); }
 }
 
-// ---- agendar em sequência: criança → kit First → próxima vaga livre → confirmar ----
-async function carregarAgenda() {
-  try { P.agenda = await api('agenda', { dias: 30 }); } catch (e) { P.agenda = { erro: e.message }; }
-  P.idx = 0; desenharPainel();
+// ---- agendar em sequência: criança → kit First → próximas vagas (manhã · tarde · sábado) → confirmar ----
+let AG_TIMER = null;
+async function carregarAgenda(silencioso) {
+  try { const r = await api('agenda', { dias: 30 }); P.agenda = r; } catch (e) { if (!silencioso) P.agenda = { erro: e.message }; }
+  if (!silencioso) P.idx = { manha: 0, tarde: 0, sab: 0 };
+  desenharPainel();
+  clearTimeout(AG_TIMER); AG_TIMER = setTimeout(() => { if (P.lead && P.aba === 'agendar') carregarAgenda(true); }, 60000); // estoque ao vivo
 }
-function vagasFiltradas() {
-  const hs = (P.agenda && P.agenda.horarios || []).filter(h => (h.vagas ?? 1) > 0);
-  const f = P.filtro;
+function vagasPor(tipo) {
+  const hs = (P.agenda && P.agenda.horarios || []).filter(h => (h.vagas ?? 1) > 0 && h.data > new Date().toISOString().slice(0,10));
   return hs.filter(h => {
     const dow = new Date(h.data + 'T12:00:00').getDay(), hi = parseInt(h.hora_inicio);
-    if (f === 'sab') return dow === 6;
-    if (f === 'manha') return dow !== 6 && hi < 12;
-    if (f === 'tarde') return dow !== 6 && hi >= 12;
-    return true;
+    if (tipo === 'sab') return dow === 6;
+    if (tipo === 'manha') return dow !== 6 && hi < 12;
+    return dow !== 6 && hi >= 12;
   }).sort((a,b) => (a.data + a.hora_inicio).localeCompare(b.data + b.hora_inicio));
 }
+function cardVaga(tipo, rotulo) {
+  const lista = vagasPor(tipo); const idx = (P.idx && P.idx[tipo]) || 0; const v = lista[idx];
+  if (!v) return `<div class="vaga"><div class="p-sec" style="margin:0 0 4px">${rotulo}</div><div class="liv">Sem vaga livre nos próximos 30 dias.</div></div>`;
+  return `<div class="vaga"><div class="p-sec" style="margin:0 0 4px">${rotulo}</div>
+    <b>${nomeDia(v.data)} ${dataBR(v.data)} · ${hhmm(v.hora_inicio)}–${hhmm(v.hora_fim)}</b>
+    <div class="liv">${v.vagas} de ${v.capacidade} kits First livres${v.sala_livre!=null?' · sala '+v.sala_livre:''} · opção ${idx+1} de ${lista.length}</div>
+    <div class="acs"><button class="btn" onclick="confirmarAgenda('${v.turma_id}','${v.data}')">Agendar nessa</button>
+      <button class="btn g" onclick="P.idx.${tipo}=Math.min(${idx+1},${lista.length-1});desenharPainel()" ${idx>=lista.length-1?'disabled':''}>Outra →</button>
+      ${idx>0?`<button class="btn g" onclick="P.idx.${tipo}=${idx-1};desenharPainel()">←</button>`:''}</div></div>`;
+}
+async function cancelarAula(id) {
+  if (!confirm('Cancelar esta aula experimental?')) return;
+  try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pelo atendente' }); P.info = await api('lead', { lead_id: P.lead.id }); carregarAgenda(true); }
+  catch (e) { alert(e.message); }
+}
 function painelAgendar(l) {
-  const ag = P.info && P.info.agendamentos || [];
-  const lista = vagasFiltradas(); const v = lista[P.idx];
-  const filtro = (k, t) => `<button class="chip ${P.filtro===k?'on':''}" onclick="P.filtro='${k}';P.idx=0;desenharPainel()">${t}</button>`;
+  if (!P.idx) P.idx = { manha: 0, tarde: 0, sab: 0 };
+  const ag = (P.info && P.info.agendamentos || []).filter(a => a.status !== 'cancelado');
   return `<div class="p-corpo">
-    ${ag.length ? `<div class="p-sec">Aulas deste lead</div>${ag.map(a => `<div class="ag-item"><span>${nomeDia(a.data)} ${dataBR(a.data)} · ${hhmm(a.hora_inicio)}${a.crianca_nome?' · '+esc(a.crianca_nome):''}</span><span class="st">${esc(a.status)}</span></div>`).join('')}` : ''}
+    ${ag.length ? `<div class="p-sec">Aulas deste lead</div>${ag.map(a => `<div class="ag-item"><span>${nomeDia(a.data)} ${dataBR(a.data)} · ${hhmm(a.hora_inicio)}${a.crianca_nome?' · '+esc(a.crianca_nome):''}</span><span class="st">${esc(a.status)}${['agendado','confirmado'].includes(a.status)?` <a href="#" onclick="cancelarAula('${a.id}');return false" style="color:var(--quente);margin-left:6px">cancelar</a>`:''}</span></div>`).join('')}` : ''}
     <div class="p-sec">1 · Criança</div>
     <div class="linha2"><div class="campo"><label>Nome</label><input id="a-cri" value="${esc(l.crianca||'')}" placeholder="Nome da criança"></div><div class="campo"><label>Idade</label><input id="a-id" type="number" min="3" max="17" value="${l.idade||''}"></div></div>
     <div class="p-sec">2 · Kit</div>
     <div class="chips"><span class="chip on">First</span><span class="chip" style="border:0;color:var(--faint)">a experimental é sempre no First; o nivelamento é no dia</span></div>
-    <div class="p-sec">3 · Próxima vaga livre</div>
-    <div class="filtros">${filtro('todos','Qualquer')}${filtro('manha','Manhã')}${filtro('tarde','Tarde')}${filtro('sab','Sábado')}</div>
-    ${!P.agenda ? `<div class="aviso-p" style="margin-top:8px">Buscando vagas…</div>` :
-      P.agenda.erro ? `<div class="aviso-p" style="margin-top:8px">${esc(P.agenda.erro)}</div>` :
-      !v ? `<div class="aviso-p" style="margin-top:8px">Nenhuma vaga livre nos próximos 30 dias com esse filtro.</div>` :
-      `<div class="vaga"><b>${nomeDia(v.data)} ${dataBR(v.data)} · ${hhmm(v.hora_inicio)}–${hhmm(v.hora_fim)}</b>
-        <div class="liv">${v.vagas} de ${v.capacidade} vagas livres${v.turma_nome?' · '+esc(v.turma_nome):''} · opção ${P.idx+1} de ${lista.length}</div>
-        <div class="acs"><button class="btn" onclick="confirmarAgenda('${v.turma_id}','${v.data}')">Agendar nessa</button>
-        <button class="btn g" onclick="P.idx=Math.min(P.idx+1,${lista.length-1});desenharPainel()" ${P.idx>=lista.length-1?'disabled':''}>Próxima vaga →</button>
-        ${P.idx>0?`<button class="btn g" onclick="P.idx--;desenharPainel()">←</button>`:''}</div></div>`}
+    <div class="p-sec">3 · Ofereça duas opções</div>
+    ${!P.agenda ? `<div class="aviso-p">Buscando vagas…</div>` : P.agenda.erro ? `<div class="aviso-p">${esc(P.agenda.erro)}</div>` :
+      cardVaga('manha','Manhã') + cardVaga('tarde','Tarde') + cardVaga('sab','Sábado')}
+    <div class="aviso-p" style="margin-top:10px;border:0;padding:6px 0;text-align:left">Estoque atualiza sozinho a cada minuto e a cada aula marcada.</div>
   </div>`;
 }
 async function confirmarAgenda(turmaId, data) {
@@ -432,7 +441,7 @@ async function confirmarAgenda(turmaId, data) {
     await api('agendar', { turma_id: turmaId, data, crianca_nome: crianca, crianca_idade: idade || null, lead_id: l.id });
     l.crianca = crianca; l.idade = idade ? Number(idade) : l.idade;
     const e = etapas.find(x => /aula agendada/i.test(x.nome)); if (e) { l.etapa_id = e.id; l.etapa_em = new Date().toISOString(); }
-    desenhar(); P.agenda = null; P.info = await api('lead', { lead_id: l.id }); P.aba = 'agendar'; desenharPainel(); carregarAgenda();
+    desenhar(); P.info = await api('lead', { lead_id: l.id }); P.aba = 'agendar'; carregarAgenda(true);
   } catch (e) { alert(e.message); }
 }
 
