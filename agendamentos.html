@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agendamentos — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#2E5BFF; --brand-2:#5B8DEF; --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
+  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
+  --ink:#141A2E; --muted:#697089; --faint:#9AA1B4;
+  --quente:#E03127; --morno:#C47A08; --verde:#16A34A; --verde-bg:rgba(22,163,74,.12);
+  --exp:#E8734A; --exp-bg:#FDEFE7;
+  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
+button,select{font-family:inherit}button{cursor:pointer}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px;font-weight:700}
+.voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;padding:7px 13px;border-radius:10px;text-decoration:none}
+.ferr{margin-left:auto;display:flex;gap:8px;align-items:center}
+.abas{display:flex;gap:4px;background:var(--line-2);padding:3px;border-radius:10px}
+.abas button{border:0;background:transparent;font-weight:700;font-size:12.5px;color:var(--muted);padding:6px 12px;border-radius:8px}
+.abas button.on{background:var(--card);color:var(--brand);box-shadow:var(--shadow)}
+.wrap{padding:20px 26px 48px}
+.barra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.nav{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 12px;font-weight:700;color:var(--muted)}
+.periodo{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 14px;font-weight:700;font-size:13.5px;text-transform:capitalize}
+.tally{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 18px;display:flex;gap:26px;margin-bottom:14px;flex-wrap:wrap}
+.tally b{font-size:22px;font-weight:800;margin-right:6px}.tally small{color:var(--muted);font-weight:600;font-size:12.5px}.tally .hot b{color:var(--morno)}
+.corpo{display:grid;grid-template-columns:1fr 240px;gap:14px;align-items:start}
+@media(max-width:980px){.corpo{grid-template-columns:1fr}}
+.lado{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+.lado h5{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.lado .k{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line-2)}.lado .k:last-child{border:0}
+.leg{display:flex;flex-direction:column;gap:6px;margin-top:12px;font-size:11.5px;color:var(--faint)}
+.leg span{display:flex;gap:8px;align-items:center}.leg i{width:6px;height:20px;border-radius:3px;display:inline-block}
+
+/* DIA */
+.dia{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.dia .cab{display:grid;grid-template-columns:110px 1fr 1fr;font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:10px 14px;border-bottom:1px solid var(--line)}
+.linha{display:grid;grid-template-columns:110px 1fr 1fr;min-height:74px;border-bottom:1px solid var(--line-2)}
+.linha:last-child{border-bottom:0}
+.hora{padding:10px 14px}.hora b{font-size:15px;font-weight:700;color:var(--muted)}.hora .v{font-size:12px;font-weight:700;color:var(--verde);margin-top:2px}.hora .v.z{color:var(--quente)}.hora .v.n{color:var(--faint);font-weight:600}
+.cel{padding:6px 8px;border-left:1px solid var(--line-2)}
+.bloco{border-left:4px solid var(--brand-2);background:var(--brand-softer);border-radius:10px;padding:8px 10px;height:100%}
+.bloco.exp{border-left-color:var(--exp);background:var(--exp-bg)}
+.bloco .t{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}.bloco .t b{color:var(--brand)}.bloco.exp .t b{color:var(--exp)}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:5px 9px;font-size:12.5px;font-weight:700;line-height:1.2}
+.pill small{display:block;font-size:10px;color:var(--faint);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.bloco.exp .pill{color:var(--exp)}.bloco.exp .pill small{color:var(--exp);opacity:.75;text-transform:none;letter-spacing:0}
+.pill.cont{cursor:pointer}
+.interv{color:var(--faint);font-size:12.5px;padding:10px 8px}
+
+/* SEMANA */
+.sem{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;min-width:760px}
+.col{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;box-shadow:var(--shadow);min-height:260px}
+.col.hoje{border-color:var(--brand)}
+.col h4{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.mini{border-left:3px solid var(--brand-2);background:var(--brand-softer);border-radius:8px;padding:6px 8px;margin-bottom:6px;font-size:12px}
+.mini.exp{border-left-color:var(--exp);background:var(--exp-bg)}
+.mini b{display:block;font-size:12.5px}.mini .v{font-weight:700;color:var(--verde)}.mini .v.z{color:var(--quente)}
+.scrollx{overflow-x:auto}
+
+/* MÊS */
+.mes{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;min-width:760px}
+.mes .hd{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:2px 6px}
+.dcell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;min-height:84px;cursor:pointer}
+.dcell:hover{border-color:var(--brand)}
+.dcell.hoje{border-color:var(--brand)}.dcell.fora{opacity:.4}
+.dcell .n{font-weight:800;font-size:13px}
+.dcell .i{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.5}
+.dcell .i b{color:var(--ink)}.dcell .i .e{color:var(--exp);font-weight:700}.dcell .i .z{color:var(--quente);font-weight:700}
+.vazio{border:1px dashed var(--line);border-radius:var(--r);padding:32px;text-align:center;color:var(--faint);line-height:1.7}
+</style>
+<style>body.embed .voltar{display:none}body.embed .topbar{height:52px;background:transparent;backdrop-filter:none;border-bottom:1px solid var(--line);padding:0 18px}</style>
+<script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+</head>
+<body>
+<div class="topbar">
+  <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
+  <h1>Agendamentos</h1>
+  <div class="ferr"><div class="abas"><button class="on" id="ab-dia" onclick="modo('dia')">Dia</button><button id="ab-semana" onclick="modo('semana')">Semana</button><button id="ab-mes" onclick="modo('mes')">Mês</button></div></div>
+</div>
+<div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'], DIAS3 = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const hoje = new Date().toISOString().slice(0,10);
+const iso = d => d.toISOString().slice(0,10);
+const addDias = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return iso(x); };
+const segunda = d => { const x = new Date(d + 'T12:00:00'); const w = x.getDay(); x.setDate(x.getDate() - (w === 0 ? 6 : w - 1)); return iso(x); };
+const dow = d => new Date(d + 'T12:00:00').getDay();
+const hh = t => String(t||'').slice(0,5);
+const hN = t => parseInt(String(t||'0').slice(0,2), 10);
+const fmt = (d, o) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', o);
+const KITCUR = k => (k||'').replace('App Developer','APP').replace('Bot','').toUpperCase();
+
+let MODO = 'dia', SEL = hoje, D = { turmas: [], alunos: [], kits: [] }, EXP = [], LEADS = [], VAGAS = [], carregadoDe = null, carregadoAte = null;
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, ...extra }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
+}
+async function carregar(){
+  try {
+    const de = addDias(segunda(SEL), -35), ate = addDias(segunda(SEL), 42);
+    const [al, ex, ag] = await Promise.all([api('alunos'), api('experimentais', { de, ate }), api('agenda', { dias: 60 }).catch(() => ({ horarios: [] }))]);
+    D = al; EXP = ex.agendamentos || []; LEADS = ex.leads || []; VAGAS = ag.horarios || []; carregadoDe = de; carregadoAte = ate; desenhar();
+  } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
+}
+function modo(m){ MODO = m; ['dia','semana','mes'].forEach(x => document.getElementById('ab-'+x).classList.toggle('on', x===m)); desenhar(); }
+function mover(n){
+  if (MODO === 'dia') SEL = addDias(SEL, n); else if (MODO === 'semana') SEL = addDias(SEL, 7*n);
+  else { const x = new Date(SEL + 'T12:00:00'); x.setMonth(x.getMonth() + n, 1); SEL = iso(x); }
+  if (SEL < carregadoDe || SEL > carregadoAte) carregar(); else desenhar();
+}
+function irDia(d){ SEL = d; modo('dia'); }
+const turmasDo = d => D.turmas.filter(t => t.ativa !== false && t.dia_semana === dow(d));
+const alunosDa = t => D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo');
+const expDo = d => EXP.filter(a => a.data === d && a.status !== 'cancelado');
+const leadDe = a => LEADS.find(l => l.id === a.lead_id) || {};
+const vagaDe = (t, d) => VAGAS.find(v => v.turma_id === t.id && v.data === d);
+function vagasHora(d, h){ // turma que cobre a hora h no dia d
+  const t = turmasDo(d).find(t => hN(t.hora_inicio) <= h && h < hN(t.hora_fim)); if (!t) return null;
+  const v = vagaDe(t, d); if (v) return { n: v.vagas, t };
+  // sem cálculo do servidor (data passada): estima pelo kit First
+  const cap = (D.kits.find(k => k.kit === 'First') || {}).capacidade || 8;
+  return { n: Math.max(0, cap - alunosDa(t).filter(a => a.kit === 'First').length - expDo(d).filter(e => e.turma_id === t.id).length), t };
+}
+
+function tally(dias){
+  const emAula = dias.reduce((s, d) => s + turmasDo(d).reduce((x, t) => x + alunosDa(t).length, 0), 0);
+  const exps = dias.reduce((s, d) => s + expDo(d).length, 0);
+  let semVaga = 0; dias.forEach(d => turmasDo(d).forEach(t => { const v = vagasHora(d, hN(t.hora_inicio)); if (v && v.n <= 0) semVaga++; }));
+  return `<div class="tally"><div><b>${emAula}</b><small>alunos ativos em aula</small></div><div><b>${exps}</b><small>aulas experimentais</small></div><div class="hot"><b>${semVaga}</b><small>horários sem vaga</small></div></div>`;
+}
+function lado(){
+  const kits = D.kits.length ? D.kits : [{kit:'First',capacidade:8},{kit:'OneBot',capacidade:6},{kit:'TechBot',capacidade:5},{kit:'Autobot',capacidade:4},{kit:'App Developer',capacidade:4},{kit:'GameBot',capacidade:2}];
+  return `<div class="lado"><h5>Kits disponíveis</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
+    <div class="leg"><span><i style="background:var(--brand-2)"></i>Turma de aluno ativo ocupa 2 horas</span><span><i style="background:var(--exp)"></i>Aula experimental ocupa 1 hora</span></div></div>`;
+}
+
+function vDia(d){
+  const ts = turmasDo(d), ex = expDo(d);
+  const horas = [8,9,10,11,12,13,14,15,16,17];
+  let rows = ''; let i = 0;
+  while (i < horas.length) {
+    const h = horas[i];
+    const tIni = ts.find(t => hN(t.hora_inicio) === h);
+    const exH = ex.filter(e => hN(e.hora_inicio) === h);
+    const v = vagasHora(d, h);
+    const horaCel = hh => { const vv = vagasHora(d, hh); return `<div class="hora"><b>${String(hh).padStart(2,'0')}:00</b><div class="v ${!vv?'n':vv.n<=0?'z':''}">${!vv ? (hh===12||hh===13?'':'sem turma') : vv.n <= 0 ? 'sem vaga' : vv.n + ' vaga' + (vv.n>1?'s':'')}</div></div>`; };
+    if (tIni) {
+      const als = alunosDa(tIni); const porKit = {}; als.forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);
+      const ex2 = ex.filter(e => hN(e.hora_inicio) === h + 1);
+      rows += `<div class="linha" style="min-height:150px">
+        <div>${horaCel(h)}${horaCel(h+1)}</div>
+        <div class="cel"><div class="bloco"><div class="t">${hh(tIni.hora_inicio)}–${hh(tIni.hora_fim)} · <b>${als.length} em aula</b>${Object.entries(porKit).map(([k,n])=>' · '+KITCUR(k)+' '+n).join('')}</div>
+          <div class="pills">${als.map(a=>`<span class="pill">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('') || '<span class="interv">sem alunos</span>'}</div></div></div>
+        <div class="cel">${expBloco(exH, h)}${expBloco(ex2, h+1)}</div></div>`;
+      i += 2; continue;
+    }
+    rows += `<div class="linha"><div>${horaCel(h)}</div><div class="cel">${h===12||h===13?'<div class="interv">intervalo</div>':''}</div><div class="cel">${expBloco(exH, h)}</div></div>`;
+    i++;
+  }
+  return `<div class="dia"><div class="cab"><div></div><div>Turmas · alunos ativos · 2h</div><div>Aulas experimentais · 1h</div></div>${rows}</div>`;
+}
+function expBloco(list, h){
+  if (!list.length) return '';
+  return `<div class="bloco exp" style="margin-bottom:6px"><div class="t"><b>${list.length} em aula</b> · ${String(h).padStart(2,'0')}:00</div>
+    <div class="pills">${list.map(e => { const l = leadDe(e); return `<span class="pill cont" title="${esc(l.nome||'')}">${esc(e.crianca_nome||l.nome||'Criança')}${e.crianca_idade?', '+e.crianca_idade:''}<small>${esc(l.nome||'')}</small></span>`; }).join('')}</div></div>`;
+}
+
+function vSemana(){
+  const seg = segunda(SEL), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
+  return `<div class="scrollx"><div class="sem">${dias.map(d => {
+    const ts = turmasDo(d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+    const itens = [...ts.map(t => ({ h: hN(t.hora_inicio), html: (() => { const als = alunosDa(t), v = vagasHora(d, hN(t.hora_inicio)); return `<div class="mini"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)} · ${als.length} em aula</b>First: <span class="v ${v&&v.n<=0?'z':''}">${v ? (v.n<=0?'sem vaga':v.n+' vaga'+(v.n>1?'s':'')) : '—'}</span></div>`; })() })),
+      ...expDo(d).map(e => ({ h: hN(e.hora_inicio) + 0.5, html: `<div class="mini exp"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||leadDe(e).nome||'')}</b>experimental${e.crianca_idade?' · '+e.crianca_idade+' anos':''}</div>` }))].sort((a,b)=>a.h-b.h);
+    return `<div class="col ${d===hoje?'hoje':''}"><h4 style="cursor:pointer" onclick="irDia('${d}')">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}</h4>${itens.map(x=>x.html).join('') || '<div class="interv">sem turmas</div>'}</div>`; }).join('')}</div></div>`;
+}
+
+function vMes(){
+  const x = new Date(SEL + 'T12:00:00'); const ano = x.getFullYear(), m = x.getMonth();
+  const ini = segunda(iso(new Date(ano, m, 1, 12))); const fim = iso(new Date(ano, m + 1, 0, 12));
+  const dias = []; for (let d = ini; d <= addDias(fim, 6 - (dow(fim)||7)); d = addDias(d, 1)) if (dow(d) !== 0) dias.push(d);
+  return `<div class="scrollx"><div class="mes">${DIAS3.slice(1).map(n=>`<div class="hd">${n}</div>`).join('')}${dias.map(d => {
+    const ts = turmasDo(d), al = ts.reduce((s,t)=>s+alunosDa(t).length,0), ex = expDo(d).length;
+    const sem = ts.filter(t => { const v = vagasHora(d, hN(t.hora_inicio)); return v && v.n <= 0; }).length;
+    const fora = new Date(d+'T12:00').getMonth() !== m;
+    return `<div class="dcell ${d===hoje?'hoje':''} ${fora?'fora':''}" onclick="irDia('${d}')"><div class="n">${new Date(d+'T12:00').getDate()}</div>
+      <div class="i">${ts.length ? `<b>${ts.length}</b> turma${ts.length>1?'s':''} · ${al} alunos` : '<span style="color:var(--faint)">sem turmas</span>'}${ex ? `<br><span class="e">${ex} experimental${ex>1?'is':''}</span>` : ''}${sem ? `<br><span class="z">${sem} sem vaga</span>` : ''}</div></div>`; }).join('')}</div></div>`;
+}
+
+function desenhar(){
+  let periodo, dias, corpo;
+  if (MODO === 'dia') { periodo = fmt(SEL, { weekday:'long', day:'numeric', month:'long' }); dias = [SEL]; corpo = vDia(SEL); }
+  else if (MODO === 'semana') { const s = segunda(SEL); dias = [0,1,2,3,4,5].map(n => addDias(s, n)); periodo = `${fmt(dias[0],{day:'numeric',month:'long'})} a ${fmt(dias[5],{day:'numeric',month:'long'})}`; corpo = vSemana(); }
+  else { const x = new Date(SEL+'T12:00:00'); periodo = x.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); const f = iso(new Date(x.getFullYear(), x.getMonth()+1, 0, 12)); dias = []; for (let d = iso(new Date(x.getFullYear(), x.getMonth(), 1, 12)); d <= f; d = addDias(d,1)) dias.push(d); corpo = vMes(); }
+  document.getElementById('raiz').innerHTML = `
+    <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span></div>
+    ${tally(dias)}
+    <div class="corpo"><div>${corpo}</div>${lado()}</div>`;
+}
+if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
+</script>
+</body>
+</html>
