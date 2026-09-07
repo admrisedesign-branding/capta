@@ -55,6 +55,15 @@ async function obterQr(canal) {
   return valor.startsWith('data:') ? valor : `data:image/png;base64,${valor}`;
 }
 
+// Código de pareamento (8 caracteres) — alternativa ao QR quando o celular
+// está com outra pessoa: ela digita o código em Aparelhos conectados →
+// Conectar com número de telefone.
+async function obterCodigo(canal, numero) {
+  const n = comDDI(numero);
+  const r = await zapiFetch(canal, `phone-code/${n}`);
+  return r.code || r.value || r.pairingCode || null;
+}
+
 // ---------------------------------------------------------------------
 // 2. STATUS DA CONEXÃO
 //
@@ -230,8 +239,7 @@ module.exports = {
   enviarTexto,
   normalizarWebhook,
   configurarWebhooks,
-  comDDI
-};
+  comDDI, obterCodigo };
 
 // =====================================================================
 // NOTAS
