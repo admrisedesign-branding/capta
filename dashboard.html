@@ -51,6 +51,10 @@ h2{font-size:16px;font-weight:700}
 .nav-item:hover{background:var(--line-2);color:var(--ink)}
 .nav-item.on{background:var(--brand-soft);color:var(--brand)}
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
+.btn-zap{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-weight:700;font-size:12.5px;padding:7px 12px;border-radius:10px;cursor:pointer;margin-right:8px}
+.btn-zap:hover{color:var(--brand);border-color:var(--brand)}.btn-zap svg{width:15px;height:15px}
+.btn-zap.on{background:var(--verde-bg,rgba(22,163,74,.12));color:var(--verde,#16A34A);border-color:transparent}
+@media(max-width:640px){.btn-zap span{display:none}}
 .embed{width:100%;height:calc(100vh - 60px - 44px);min-height:520px;border:0;border-radius:var(--r);background:var(--bg)}.content:has(.embed){padding-bottom:0;max-width:none}
 /* menu recolhido: só ícones */
 .side-toggle{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:10px;padding:7px 10px;font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;margin-top:8px}
@@ -356,6 +360,7 @@ h2{font-size:16px;font-weight:700}
       <button class="burger" id="burger">☰</button>
       <div class="crumb" id="page-title">Painel</div>
       <div class="top-right">
+        <button class="btn-zap" id="btn-zap" style="display:none" title="Conectar o WhatsApp da unidade ao Capta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg><span>Conectar WhatsApp</span></button>
         <div class="demo-tag" id="demo-tag" style="display:none">Demonstração</div>
         <div class="acct-wrap" style="position:relative">
           <div class="acct" id="acct" style="cursor:pointer" title="Conta">—</div>
@@ -2789,9 +2794,8 @@ function montarMenuGestao(){
   nav.innerHTML=`<span class="nav-lbl">Gestão</span>
     ${item('painel','Painel Gestão',go('/gestao.html'))}
     ${item('pipe','Pipeline',go('/funil.html'))}
+    ${item('chat','Conversas',go('/inbox.html'))}
     ${item('leads','Leads','data-t="leads"')}
-    ${item('chat','Conversas',go('/inbox.html'),true)}
-    ${item('zap','Conectar WhatsApp',go('/whatsapp.html'),true)}
     ${item('cal','Agendamentos',go('/agendamentos.html'))}
     ${item('aula','Aula experimental',go('/aula-experimental.html'))}
     ${item('alunos','Alunos ativos',go('/alunos.html'))}
@@ -2813,6 +2817,11 @@ function montarMenuGestao(){
   // no plano Gestão a home é a lista de leads (o Painel Gestão é página própria)
   const leadsBtn=nav.querySelector('.nav-item[data-t="leads"]'); if(leadsBtn) leadsBtn.classList.add('on');
   window.__gestao=true;
+  // Conectar WhatsApp vira botão no canto superior direito (abre a tela embutida)
+  const bz=document.getElementById('btn-zap');
+  if(bz){ bz.style.display='inline-flex'; bz.onclick=()=>{ document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('on')); document.getElementById('page-title').textContent='Conectar WhatsApp'; activeTab='embed'; view.innerHTML=`<iframe class="embed" src="/whatsapp.html${qs}&embed=1" title="Conectar WhatsApp"></iframe>`; window.scrollTo(0,0); };
+    fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'status',slug:SLUG,token:TOKEN})}).then(r=>r.json()).then(j=>{ if(j&&(j.status==='conectado'||j.conectado)){ bz.classList.add('on'); bz.querySelector('span').textContent='WhatsApp conectado'; } }).catch(()=>{});
+  }
 }
 async function load(){
   if(SLUG && TOKEN){
