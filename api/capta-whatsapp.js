@@ -771,11 +771,11 @@ async function acaoExperimentais(tenant, body, res) {
   const de = body.de || new Date(Date.now() - 14*864e5).toISOString().slice(0,10);
   const ate = body.ate || new Date(Date.now() + 30*864e5).toISOString().slice(0,10);
   const [ags, turmas] = await Promise.all([
-    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&data=gte.${de}&data=lte.${ate}&select=id,lead_id,turma_id,data,hora_inicio,hora_fim,crianca_nome,crianca_idade,status,compareceu_em,observacao,criado_em,motivo_id&order=data,hora_inicio`),
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&data=gte.${de}&data=lte.${ate}&select=id,lead_id,turma_id,data,hora_inicio,hora_fim,crianca_nome,crianca_idade,status,compareceu_em,observacao,criado_em,motivo_id,remarcado_de,remarcado_para&order=data,hora_inicio`),
     sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim`)
   ]);
   const ids = [...new Set((ags || []).map(a => a.lead_id).filter(Boolean))];
-  const leads = ids.length ? await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${ids.join(',')})&select=id,nome,contato,temperatura,atendente,fonte,porta,etapa_id,kommo_lead_id,valor,pagamento,curso`) : [];
+  const leads = ids.length ? await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${ids.join(',')})&select=id,nome,contato,temperatura,atendente,fonte,porta,origem,etapa_id,kommo_lead_id,valor,pagamento,curso,notas`) : [];
   return res.status(200).json({ agendamentos: ags || [], turmas: turmas || [], leads: leads || [] });
 }
 
@@ -792,10 +792,12 @@ async function acaoDesfecho(tenant, body, res) {
 
   if (desfecho === 'faltou') { Object.assign(patchAg, { status: 'faltou' }); etapaNome = 'Aula agendada'; }
   if (desfecho === 'compareceu') { Object.assign(patchAg, { status: 'compareceu', compareceu_em: agora }); }
-  if (desfecho === 'andamento') { Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora }); etapaNome = 'Matrícula em andamento'; }
+  // Em andamento: continua em Aula agendada, ganha a tag "em andamento" e a observação vira nota no Kommo
+  if (desfecho === 'andamento') { Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora }); }
+  // Não fechou: vai pra Remarketing com a tag "motivo: …"
   if (desfecho === 'nao') {
     Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora });
-    etapaNome = body.motivo === 'Vai pensar' ? 'Remarketing' : 'Perdido';
+    etapaNome = 'Remarketing';
     leadPatch.motivo_perda = body.motivo || null;
   }
   if (desfecho === 'matriculou') {
@@ -826,11 +828,25 @@ async function acaoDesfecho(tenant, body, res) {
     if (desfecho === 'matriculou') {
       await kommoCampos(tenant.id, a.lead_id, { ...kommoExtra, ...(body.pagamento ? { pagamento: body.pagamento } : {}) }).catch(() => null);
       if (body.valor) await kommoPreco(tenant.id, a.lead_id, Number(body.valor)).catch(() => null);
+      if (body.pagamento) await kommoTag(tenant.id, a.lead_id, 'pagamento: ' + String(body.pagamento).toLowerCase()).catch(() => null);
+    }
+    if (desfecho === 'nao' && body.motivo) await kommoTag(tenant.id, a.lead_id, 'motivo: ' + String(body.motivo).toLowerCase()).catch(() => null);
+    if (desfecho === 'andamento') {
+      await kommoTag(tenant.id, a.lead_id, 'em andamento').catch(() => null);
+      if (body.situacao) await kommoNota(tenant.id, a.lead_id, 'Aula experimental · em andamento: ' + body.situacao).catch(() => null);
     }
     if (desfecho === 'faltou') await kommoTag(tenant.id, a.lead_id, 'reagendar devido falta').catch(() => null);
   }
   return res.status(200).json({ ok: true, kommo });
 }
+
+async function kommoNota(tenantId, leadId, texto) {
+  const token = process.env.KOMMO_TOKEN; if (!token) return null;
+  const l = await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id&limit=1`); if (!l?.[0]?.kommo_lead_id) return null;
+  const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
+  await fetch(`https://${dominio}/api/v4/leads/${l[0].kommo_lead_id}/notes`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify([{ note_type: 'common', params: { text: texto } }]) });
+}
+
 async function kommoPreco(tenantId, leadId, valor) {
   const token = process.env.KOMMO_TOKEN; if (!token) return null;
   const l = await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id&limit=1`); if (!l?.[0]?.kommo_lead_id) return null;
