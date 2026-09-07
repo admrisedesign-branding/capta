@@ -248,6 +248,7 @@ async function acaoEnviar(tenant, canal, body, res) {
   }
 
   const envio = await prov.enviarTexto(canal, telefone, texto);
+  if (body.autor !== 'bot') { const cl = await sb(`capta_conversas?id=eq.${conversa.id}&select=lead_id&limit=1`).catch(() => []); contatoHumano(tenant.id, cl?.[0]?.lead_id).catch(() => null); }
 
   await sb('capta_mensagens', {
     method: 'POST', headers: { Prefer: 'return=minimal' },
@@ -526,6 +527,8 @@ async function acaoAgendar(tenant, body, res) {
     if (leadId) {
       const e = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Aula%20agendada&select=id&limit=1`);
       if (e?.[0]) {
+        const atual = (await sb(`capta_leads?id=eq.${leadId}&select=etapa_id&limit=1`).catch(() => []))?.[0]?.etapa_id || null;
+        if (atual && atual !== e[0].id) await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ etapa_anterior_id: atual }) }).catch(() => null);
         await moverLead(tenant.id, leadId, e[0].id, null);
         await empurrarKommo(tenant.id, leadId, e[0].id, null).catch(() => null);
       }
@@ -583,6 +586,20 @@ async function acaoPresenca(tenant, body, res) {
   if (status === 'compareceu' && a[0].lead_id) {
     const e = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Compareceu&select=id&limit=1`);
     if (e?.[0]) await moverLead(tenant.id, a[0].lead_id, e[0].id, null);
+  }
+  if (status === 'cancelado' && a[0].lead_id) {
+    const ativas = await sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&lead_id=eq.${a[0].lead_id}&status=in.(agendado,confirmado)&select=id&limit=1`).catch(() => []);
+    if (!ativas?.length) {
+      const l = (await sb(`capta_leads?id=eq.${a[0].lead_id}&select=etapa_id,etapa_anterior_id&limit=1`))?.[0] || {};
+      const ag = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Aula%20agendada&select=id&limit=1`);
+      if (ag?.[0] && l.etapa_id === ag[0].id) {
+        let volta = l.etapa_anterior_id;
+        if (!volta) volta = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=ilike.em%20contato&select=id&limit=1`))?.[0]?.id;
+        if (volta) { await moverLead(tenant.id, a[0].lead_id, volta, null); await empurrarKommo(tenant.id, a[0].lead_id, volta, null).catch(() => null); }
+        await sb(`capta_leads?id=eq.${a[0].lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ data_aula: null, bloco: null }) }).catch(() => null);
+        await kommoLimparAula(tenant.id, a[0].lead_id).catch(() => null);
+      }
+    }
   }
 
   return res.status(200).json({ ok: true });
@@ -812,6 +829,31 @@ async function kommoTag(tenantId, leadId, tag) {
   const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
   const tags = [...new Set([...(l[0].tags || []), tag])].map(name => ({ name }));
   await fetch(`https://${dominio}/api/v4/leads/${l[0].kommo_lead_id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ _embedded: { tags } }) });
+}
+
+
+// Primeiro contato humano: lead em "Novo lead" vai pra "Em contato" (Capta + Kommo). Bot não conta.
+async function contatoHumano(tenantId, leadId) {
+  if (!leadId) return null;
+  const l = (await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=etapa_id&limit=1`))?.[0];
+  if (!l) return null;
+  const [novo, contato] = await Promise.all([
+    sb(`capta_etapas?tenant_id=eq.${tenantId}&nome=ilike.novo%20lead&select=id&limit=1`),
+    sb(`capta_etapas?tenant_id=eq.${tenantId}&nome=ilike.em%20contato&select=id&limit=1`)
+  ]);
+  if (!contato?.[0]) return null;
+  if (l.etapa_id && novo?.[0] && l.etapa_id !== novo[0].id) return null; // já saiu de Novo lead
+  await moverLead(tenantId, leadId, contato[0].id, null);
+  return empurrarKommo(tenantId, leadId, contato[0].id, null).catch(() => null);
+}
+
+
+async function kommoLimparAula(tenantId, leadId) {
+  const token = process.env.KOMMO_TOKEN; if (!token) return null;
+  const l = await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id&limit=1`); if (!l?.[0]?.kommo_lead_id) return null;
+  const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
+  await fetch(`https://${dominio}/api/v4/leads/${l[0].kommo_lead_id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ custom_fields_values: [{ field_id: KOMMO_FIELD.data_aula, values: [] }, { field_id: KOMMO_FIELD.bloco, values: [] }] }) });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela

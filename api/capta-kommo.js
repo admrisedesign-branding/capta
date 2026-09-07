@@ -94,6 +94,22 @@ function telefoneContato(contato) {
   return f?.values?.[0]?.value?.replace(/\D/g, '') || null;
 }
 
+
+// Contato humano no chat do Kommo. O WhatsApp Lite não diz quem enviou (created_by = 0 sempre),
+// então a regra é de tempo: resposta do bot sai em segundos depois da mensagem do lead;
+// mensagem enviada SEM mensagem recebida nos últimos N segundos foi uma pessoa.
+const JANELA_BOT = Number(process.env.KOMMO_BOT_JANELA_SEG || 120);
+async function houveContatoHumano(contatoId) {
+  if (!contatoId) return false;
+  const ev = await kget(`/api/v4/events?filter[entity]=contact&filter[entity_id]=${contatoId}&filter[type][]=incoming_chat_message&filter[type][]=outgoing_chat_message&limit=100`);
+  const lista = (ev?._embedded?.events || []).map(e => ({ t: e.type, at: e.created_at })).sort((a, b) => a.at - b.at);
+  let ultimaEntrada = -1e12;
+  for (const e of lista) {
+    if (e.t === 'incoming_chat_message') { ultimaEntrada = e.at; continue; }
+    if (e.at - ultimaEntrada > JANELA_BOT) return true; // saída sem entrada recente = pessoa
+  }
+  return false;
+}
 const ts = s => (s ? new Date(s * 1000).toISOString() : null);
 
 async function espelhar(leadId) {
@@ -103,8 +119,20 @@ async function espelhar(leadId) {
 
   const contatoId = lead._embedded?.contacts?.find(c => c.is_main)?.id || lead._embedded?.contacts?.[0]?.id;
   const contato = contatoId ? await kget(`/api/v4/contacts/${contatoId}`) : null;
-  const st = cache.statuses[lead.status_id] || {};
+  let st = cache.statuses[lead.status_id] || {};
   const dataAula = valorCampo(lead, CAMPOS.data_aula);
+
+  // Novo lead + já houve mensagem enviada por PESSOA (não pelo bot) → Em contato, no Kommo e aqui
+  if (/novo lead/i.test(st.nome || '')) {
+    const humano = await houveContatoHumano(contatoId).catch(() => false);
+    if (humano) {
+      const alvo = Object.entries(cache.statuses).find(([id, x]) => /em contato/i.test(x.nome || '') && x.pipeline === lead.pipeline_id);
+      if (alvo) {
+        const r = await fetch(`${KOMMO}/api/v4/leads/${lead.id}`, { method: 'PATCH', headers: { ...H_KOMMO, 'Content-Type': 'application/json' }, body: JSON.stringify({ status_id: Number(alvo[0]) }) });
+        if (r.ok) { lead.status_id = Number(alvo[0]); st = cache.statuses[lead.status_id]; }
+      }
+    }
+  }
 
   const linha = {
     tenant_id: await tenantId(),
