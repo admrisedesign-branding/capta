@@ -83,6 +83,46 @@ button,select,input,textarea{font-family:inherit}button{cursor:pointer}
 .nota b{color:var(--ink)}
 .dia-lista .aula{grid-template-columns:70px 1fr auto}
 .scrollx{overflow-x:auto}
+
+/* ---- card do dia (rotina da recepção) ---- */
+.cardx{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px;position:relative}
+.cardx.win{border-color:rgba(22,163,74,.4)}.cardx.lost{border-color:rgba(224,49,39,.35)}.cardx.hold{border-color:rgba(224,147,15,.4)}.cardx.gone{opacity:.8}
+.cardx .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cardx .hora{font-weight:800;font-size:15px;color:var(--muted);min-width:52px}
+.cardx .kid{font-weight:800;font-size:15px}.cardx .kid em{font-style:normal;font-weight:600;color:var(--faint);font-size:12.5px;margin-left:4px}
+.cardx .guard{font-size:12.5px;color:var(--muted);margin-top:2px}
+.cardx .sinal{font-size:12.5px;color:var(--ink);background:var(--line-2);border-radius:10px;padding:8px 10px;margin-top:8px;line-height:1.5}
+.cardx .scriptbtn{position:absolute;right:14px;top:12px;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:11.5px;font-weight:700;color:var(--muted);padding:4px 9px}
+.cardx .scriptbtn:hover{color:var(--brand);border-color:var(--brand)}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.acts button{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:7px 12px;font-weight:700;font-size:12.5px;color:var(--muted)}
+.acts button.yes{background:var(--verde);border-color:var(--verde);color:#fff}.acts button.nope{background:rgba(224,49,39,.1);border-color:rgba(224,49,39,.25);color:var(--quente)}
+.menu{margin-top:8px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
+.menu p{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.menu .chips{margin-top:4px}
+.menu textarea,.menu input,.menu select{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--card)}
+.menu .l2{margin-top:8px}
+.menu .save{margin-top:8px}
+.done{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5}
+.done.win{background:var(--verde-bg)}.done.lost{background:rgba(224,49,39,.1)}.done.hold{background:rgba(224,147,15,.14)}.done.neutral{background:var(--line-2)}
+.done .undo{border:0;background:transparent;font-weight:700;color:var(--muted);text-decoration:underline;white-space:nowrap}
+.vagas3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+@media(max-width:760px){.vagas3{grid-template-columns:1fr}}
+.vg{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px}
+.vg b{display:block;font-size:13px}.vg small{color:var(--muted)}
+.vg button{margin-top:6px;width:100%}
+.badge{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;background:var(--line-2);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.badge.q{background:rgba(224,49,39,.12);color:var(--quente)}.badge.m{background:rgba(224,147,15,.14);color:var(--morno)}.badge.f{background:var(--brand-soft);color:var(--brand)}
+/* drawer da conversa */
+#drawer{position:fixed;top:0;right:0;bottom:0;width:380px;max-width:100%;background:var(--card);border-left:1px solid var(--line);box-shadow:-10px 0 30px rgba(20,26,46,.08);transform:translateX(100%);transition:.18s;z-index:45;display:flex;flex-direction:column}
+#drawer.aberto{transform:none}
+#drawer .dh{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+#drawer .dh h3{font-size:14px;font-weight:800}#drawer .dh .x{margin-left:auto;border:0;background:transparent;font-size:18px;color:var(--faint)}
+#drawer .dc{flex:1;overflow-y:auto;padding:12px 16px}
+.msgs{display:flex;flex-direction:column;gap:6px}
+.msg{max-width:88%;padding:8px 10px;border-radius:12px;font-size:13px;line-height:1.45;background:var(--line-2);align-self:flex-start;white-space:pre-wrap}
+.msg.saida{background:var(--brand-soft);align-self:flex-end}.msg small{display:block;color:var(--faint);font-size:10.5px;margin-top:3px}
+.aviso-p{border:1px dashed var(--line);border-radius:12px;padding:14px;color:var(--faint);font-size:12.5px;line-height:1.6;text-align:center}
 </style>
 <style>body.embed .voltar{display:none}body.embed .topbar{height:52px;background:transparent;backdrop-filter:none;border-bottom:1px solid var(--line);padding:0 18px}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -97,6 +137,7 @@ button,select,input,textarea{font-family:inherit}button{cursor:pointer}
 </div>
 <div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
 <div id="modal"></div>
+<aside id="drawer"></aside>
 
 <script>
 const p = new URLSearchParams(location.search);
@@ -139,13 +180,14 @@ function estoque(a){
   const liv = v.vagas ?? 0, cap = v.capacidade ?? 0;
   return `<span class="estoque"><span class="etq ${liv<=0?'cheio':liv<=2?'alerta':''}">First ${liv}/${cap}</span>${v.sala_livre!=null?`<span class="etq">sala ${v.sala_livre}</span>`:''}</span>`;
 }
-function ev(a){
+function ev0(a){
   const l = leadDe(a); const q = (l.temperatura||'').toLowerCase() === 'quente';
   return `<div class="ev ${a.status} ${q?'quente':''}" onclick="abrir('${a.id}')">
     <div class="t">${hh(a.hora_inicio)} ${esc(a.crianca_nome || l.nome || 'Criança')}${a.status!=='agendado'?`<span class="st ${a.status}">${a.status}</span>`:''}</div>
     <div class="m">${a.crianca_idade ? a.crianca_idade + ' anos · ' : ''}${esc(l.nome||'')}${l.atendente?' · '+esc(l.atendente):''}</div>
     ${estoque(a)}</div>`;
 }
+function ev(a){ return ev0(a).replace(`onclick="abrir('${a.id}')"`, `onclick="SELDIA='${a.data}';modo('dia')"`); }
 function desenhar(){
   const seg = segunda(SELDIA), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
   const base = D.agendamentos.filter(viva).filter(a => MODO === 'dia' ? a.data === SELDIA : dias.includes(a.data));
@@ -185,52 +227,94 @@ function abrir(id){
     <div class="fim"><button class="btn g" onclick="fechar()">Fechar</button></div></div></div>`;
   document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fechar(); };
 }
+let ABERTO = null;   // {id, tipo}
+let VAGAS3 = null;   // vagas pro reagendar
+
+function desfechoDe(a){ const m = /desfecho:\s*(matriculou|nao|andamento|faltou)(?:\s*·\s*(.*))?/i.exec(a.observacao||''); return m ? { t: m[1].toLowerCase(), obs: (m[2]||'').trim() } : null; }
 function cartao(a){
-  const l = leadDe(a), t = turmaDe(a);
-  return `<div class="aula">
-    <div class="h">${hh(a.hora_inicio)}<small>${hh(a.hora_fim)}${t.nome?' · '+esc(t.nome):''}</small></div>
-    <div><div class="n">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade ? ` <span class="et">${a.crianca_idade} anos</span>` : ''} <span class="st ${a.status}">${a.status}</span> ${estoque(a)}</div>
-      <div class="s">${esc(l.nome||'')}${l.contato?' · '+esc(l.contato):''}${l.temperatura?' · '+esc(l.temperatura):''}${l.atendente?' · '+esc(l.atendente):''}${a.observacao?' · '+esc(a.observacao):''}</div></div>
-    <div class="acs">
-      ${a.data > hoje ? `<button class="btn g" onclick="desfecho('${a.id}','faltou')">Faltou</button>` : `
-      <button class="btn v" onclick="desfecho('${a.id}','matriculou')">Matriculou</button>
-      <button class="btn a" onclick="desfecho('${a.id}','andamento')">Em andamento</button>
-      <button class="btn x" onclick="desfecho('${a.id}','nao')">Não matriculou</button>
-      <button class="btn g" onclick="desfecho('${a.id}','faltou')">Faltou</button>`}
-      ${l.kommo_lead_id ? `<a class="btn g" style="text-decoration:none" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Kommo ↗</a>` : ''}
-    </div></div>`;
+  const l = leadDe(a), t = turmaDe(a); const D_ = desfechoDe(a); const temp = (l.temperatura||'').toLowerCase();
+  const badge = temp ? `<span class="badge ${temp==='quente'?'q':temp==='morno'?'m':'f'}">${temp==='quente'?'chega querendo fechar':temp==='morno'?'morno':'frio'}</span>` : '';
+  let est = '', pe = '';
+  if (a.status === 'faltou' || (D_ && D_.t === 'faltou')) {
+    est = ' gone';
+    const menu = ABERTO && ABERTO.id === a.id && ABERTO.tipo === 'reagendar' ? menuReagendar(a) : '';
+    pe = `<div class="done neutral"><span><b>Faltou.</b> Continua em Aula agendada no Kommo, com a tag <i>reagendar devido falta</i>.</span>
+      <span><button class="undo" onclick="abrirMenu('${a.id}','reagendar')">reagendar</button> <button class="undo" onclick="desfazer('${a.id}')">desfazer</button></span></div>${menu}`;
+  } else if (D_) {
+    est = D_.t === 'matriculou' ? ' win' : D_.t === 'nao' ? ' lost' : ' hold';
+    const txt = D_.t === 'matriculou' ? `<b>Matriculou${D_.obs?' · '+esc(D_.obs):''}.</b> Baixa no Kommo como ganho: Aluno ativo, e já entrou em Alunos ativos.`
+      : D_.t === 'nao' ? `<b>Não fechou${D_.obs?' · '+esc(D_.obs):''}.</b> ${/vai pensar/i.test(D_.obs)?'Foi para Remarketing':'Foi para Perdido'} no Kommo, com o motivo no card.`
+      : `<b>Em andamento.</b> Foi para Matrícula em andamento no Kommo.${D_.obs?` <i>“${esc(D_.obs)}”</i>`:''}`;
+    pe = `<div class="done ${D_.t==='matriculou'?'win':D_.t==='nao'?'lost':'hold'}"><span>${txt}</span>${D_.t==='matriculou'?'':`<button class="undo" onclick="desfazer('${a.id}')">desfazer</button>`}</div>`;
+  } else {
+    const menu = ABERTO && ABERTO.id === a.id ? menuDesfecho(a) : '';
+    pe = a.data > hoje
+      ? `<div class="acts"><button onclick="abrirMenu('${a.id}','reagendar')">Reagendar</button><button onclick="cancelar('${a.id}')">Cancelar aula</button></div>${ABERTO && ABERTO.id === a.id && ABERTO.tipo === 'reagendar' ? menuReagendar(a) : ''}`
+      : `<div class="acts">
+        <button class="yes" onclick="abrirMenu('${a.id}','matriculou')">Matriculou</button>
+        <button class="nope" onclick="abrirMenu('${a.id}','nao')">Não matriculou</button>
+        <button onclick="abrirMenu('${a.id}','andamento')">Em andamento</button>
+        <button onclick="registrar('${a.id}','faltou',{})">Faltou</button>
+        <button onclick="abrirMenu('${a.id}','reagendar')">Reagendar</button></div>${menu}`;
+  }
+  return `<div class="cardx${est}">
+    <button class="scriptbtn" onclick="script('${a.id}')" title="Ver a conversa">script</button>
+    <div class="top"><span class="hora">${hh(a.hora_inicio)}</span><span class="kid">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade?`<em>${a.crianca_idade} anos</em>`:''}</span>${badge}${a.status==='confirmado'?'<span class="badge">confirmou</span>':''}</div>
+    <div class="guard">com ${esc(l.nome||'responsável')}${l.contato?' · '+esc(l.contato):''}${l.fonte||l.porta?' · '+esc([l.fonte,l.porta].filter(Boolean).join(' / ')):''}${l.atendente?' · atendido por '+esc(l.atendente):''}${t.nome?' · '+esc(t.nome):''}</div>
+    ${a.observacao && !D_ ? `<div class="sinal">${esc(a.observacao)}</div>` : ''}
+    ${pe}</div>`;
+}
+function menuDesfecho(a){
+  const tp = ABERTO.tipo;
+  if (tp === 'reagendar') return menuReagendar(a);
+  if (tp === 'andamento') return `<div class="menu"><p>Situação da família</p><textarea id="m-obs" placeholder="Ex.: precisa esperar a fatura do cartão virar, falar com o marido"></textarea>
+    <div class="acts save"><button class="yes" onclick="registrar('${a.id}','andamento',{observacao:document.getElementById('m-obs').value})">Salvar</button><button onclick="fecharMenu()">cancelar</button></div></div>`;
+  if (tp === 'nao') return `<div class="menu"><p>Motivo</p><div class="chips">${MOTIVOS.map(v=>`<button class="chip" onclick="registrar('${a.id}','nao',{motivo:'${v}'})">${v}</button>`).join('')}</div></div>`;
+  if (tp === 'matriculou') return `<div class="menu"><p>Forma de pagamento</p><div class="chips">${PAGTOS.map(v=>`<button class="chip ${ESC.pagamento===v?'on':''}" onclick="ESC.pagamento='${v}';desenhar()">${v}</button>`).join('')}</div>
+    <div class="l2 linha2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><p>Valor (R$)</p><input id="m-valor" type="number" min="0" step="10" placeholder="397" value="${ESC.valor||''}"></div><div><p>Kit</p><select id="m-curso">${KITS.map(k=>`<option ${k===(ESC.curso||'First')?'selected':''}>${k}</option>`).join('')}</select></div></div>
+    <div class="l2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><p>Turma do aluno</p><select id="m-turma">${D.turmas.map(t=>`<option value="${t.id}" ${t.id===a.turma_id?'selected':''}>${esc(t.nome)}</option>`).join('')}</select></div><div><p>Nome completo</p><input id="m-aluno" value="${esc(a.crianca_nome||'')}"></div></div>
+    <div class="acts save"><button class="yes" onclick="confirmarMatricula('${a.id}')">Confirmar matrícula</button><button onclick="fecharMenu()">cancelar</button></div></div>`;
+  return '';
+}
+function menuReagendar(a){
+  if (!VAGAS3) { carregarVagas(); return `<div class="menu"><p>Reagendar</p><div class="aviso-p">Buscando vagas…</div></div>`; }
+  const hs = VAGAS3.filter(h => (h.vagas ?? 1) > 0 && h.data > hoje).sort((x,y)=>(x.data+x.hora_inicio).localeCompare(y.data+y.hora_inicio));
+  const pick = f => hs.find(h => { const w = new Date(h.data+'T12:00').getDay(), hi = parseInt(h.hora_inicio); return f==='sab'?w===6:f==='manha'?(w!==6&&hi<12):(w!==6&&hi>=12); });
+  const vg = (rot, v) => `<div class="vg"><small>${rot}</small>${v?`<b>${DIAS[new Date(v.data+'T12:00').getDay()].slice(0,3)} ${new Date(v.data+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} · ${hh(v.hora_inicio)}</b><small>${v.vagas} First livres</small><button class="btn" onclick="reagendar('${a.id}','${v.turma_id}','${v.data}')">Reagendar</button>`:'<b>—</b><small>sem vaga em 30 dias</small>'}</div>`;
+  return `<div class="menu"><p>Reagendar ${esc(a.crianca_nome||'')} — ofereça duas opções</p><div class="vagas3">${vg('Manhã',pick('manha'))}${vg('Tarde',pick('tarde'))}${vg('Sábado',pick('sab'))}</div><div class="acts save"><button onclick="fecharMenu()">cancelar</button></div></div>`;
+}
+async function carregarVagas(){ try { VAGAS3 = (await api('agenda', { dias: 30 })).horarios || []; } catch(e){ VAGAS3 = []; } desenhar(); }
+function abrirMenu(id, tipo){ ABERTO = { id, tipo }; ESC = {}; desenhar(); }
+function fecharMenu(){ ABERTO = null; desenhar(); }
+async function registrar(id, tipo, extra){
+  try { await api('desfecho', { agendamento_id: id, desfecho: tipo, observacao: `desfecho: ${tipo}${extra.motivo?' · '+extra.motivo:''}${extra.observacao?' · '+extra.observacao:''}`, ...extra }); ABERTO = null; await carregar(); }
+  catch(e){ alert(e.message); }
+}
+async function confirmarMatricula(id){
+  const g = x => document.getElementById(x).value;
+  if (!ESC.pagamento) return alert('Escolha a forma de pagamento.');
+  try { await api('desfecho', { agendamento_id: id, desfecho: 'matriculou', valor: g('m-valor'), curso: g('m-curso'), pagamento: ESC.pagamento, turma_id: g('m-turma'), aluno_nome: g('m-aluno'), observacao: `desfecho: matriculou · ${ESC.pagamento}${g('m-valor')?' · R$ '+g('m-valor'):''}` }); ABERTO = null; await carregar(); }
+  catch(e){ alert(e.message); }
+}
+async function desfazer(id){ try { await api('desfazer', { agendamento_id: id }); await carregar(); } catch(e){ alert(e.message); } }
+async function cancelar(id){ if (!confirm('Cancelar esta aula?')) return; try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pela recepção' }); await carregar(); } catch(e){ alert(e.message); } }
+async function reagendar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'reagendado pela recepção' }); ABERTO = null; VAGAS3 = null; await carregar(); } catch(e){ alert(e.message); } }
+
+// conversa do lead (drawer à direita)
+async function script(id){
+  const a = D.agendamentos.find(x => x.id === id); const l = leadDe(a);
+  const dr = document.getElementById('drawer'); dr.classList.add('aberto');
+  dr.innerHTML = `<div class="dh"><h3>${esc(l.nome||a.crianca_nome||'')}</h3><button class="x" onclick="document.getElementById('drawer').classList.remove('aberto')">×</button></div><div class="dc"><div class="aviso-p">Carregando…</div></div>`;
+  let corpo;
+  try {
+    const i = await api('lead', { lead_id: a.lead_id });
+    corpo = i.mensagens && i.mensagens.length ? `<div class="msgs">${i.mensagens.map(m=>`<div class="msg ${m.direcao==='saida'?'saida':''}">${esc(m.texto||m.transcricao||'['+(m.tipo||'mídia')+']')}<small>${esc(m.autor||'')} · ${new Date(m.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div>`).join('')}</div>`
+      : `<div class="aviso-p">A conversa aparece aqui quando o WhatsApp da unidade estiver conectado ao Capta.${l.kommo_lead_id?`<br><a href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700">Ver a conversa no Kommo ↗</a>`:''}${l.contato?`<br><a href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700">Chamar no WhatsApp 💬</a>`:''}</div>`;
+  } catch(e){ corpo = `<div class="aviso-p">${esc(e.message)}</div>`; }
+  dr.querySelector('.dc').innerHTML = `<div class="guard" style="margin-bottom:10px">${esc(l.contato||'')}${l.temperatura?' · '+esc(l.temperatura):''}${l.atendente?' · '+esc(l.atendente):''}</div>${corpo}`;
 }
 
 let ESC = {};
-function desfecho(id, tipo){
-  const a = D.agendamentos.find(x => x.id === id); const l = leadDe(a);
-  SEL = { id, tipo }; ESC = {};
-  const titulo = { matriculou:'Matriculou 🎉', andamento:'Matrícula em andamento', nao:'Não matriculou', faltou:'Faltou' }[tipo];
-  const corpo = tipo === 'matriculou' ? `
-      <div class="l2"><div class="campo"><label>Valor da matrícula (R$)</label><input id="f-valor" type="number" min="0" step="10" placeholder="ex.: 397"></div>
-        <div class="campo"><label>Kit / curso</label><select id="f-curso">${KITS.map(k=>`<option ${k==='First'?'selected':''}>${k}</option>`).join('')}</select></div></div>
-      <div class="campo"><label>Pagamento</label><div class="chips">${PAGTOS.map(v=>`<button class="chip" onclick="pick('pagamento','${v}',this)">${v}</button>`).join('')}</div></div>
-      <div class="campo"><label>Turma do aluno</label><select id="f-turma">${D.turmas.map(t=>`<option value="${t.id}" ${t.id===a.turma_id?'selected':''}>${esc(t.nome)}</option>`).join('')}</select></div>
-      <div class="campo"><label>Nome completo do aluno</label><input id="f-aluno" value="${esc(a.crianca_nome||'')}"></div>`
-    : tipo === 'nao' ? `<div class="campo"><label>Motivo</label><div class="chips">${MOTIVOS.map(v=>`<button class="chip" onclick="pick('motivo','${v}',this)">${v}</button>`).join('')}</div></div>`
-    : tipo === 'faltou' ? `<p>O lead continua em "Aula agendada" e recebe a tag <b>reagendar devido falta</b> no Kommo. Reagende pelo Pipeline → Agendar aula.</p>` : `<p>O lead vai para <b>Matrícula em andamento</b> no Pipeline e no Kommo.</p>`;
-  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela">
-    <h3>${titulo}</h3><p>${esc(a.crianca_nome||l.nome||'')} · ${new Date(a.data+'T12:00').toLocaleDateString('pt-BR')} ${hh(a.hora_inicio)}</p>
-    ${corpo}
-    <div class="campo"><label>Observação</label><input id="f-obs" placeholder="opcional"></div>
-    <div class="fim"><button class="btn g" onclick="fechar()">Cancelar</button><button class="btn" onclick="confirmar()">Confirmar</button></div>
-  </div></div>`;
-  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fechar(); };
-}
-function pick(k, v, el){ ESC[k] = v; el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('on')); el.classList.add('on'); }
-function fechar(){ document.getElementById('modal').innerHTML = ''; SEL = null; }
-async function confirmar(){
-  const g = x => { const e = document.getElementById(x); return e ? e.value : undefined; };
-  const d = { agendamento_id: SEL.id, desfecho: SEL.tipo, observacao: `desfecho: ${SEL.tipo}${g('f-obs') ? ' · ' + g('f-obs') : ''}` };
-  if (SEL.tipo === 'matriculou') Object.assign(d, { valor: g('f-valor'), curso: g('f-curso'), pagamento: ESC.pagamento || null, turma_id: g('f-turma'), aluno_nome: g('f-aluno') });
-  if (SEL.tipo === 'nao') { if (!ESC.motivo) return alert('Escolha o motivo.'); d.motivo = ESC.motivo; }
-  try { const b = document.querySelector('.janela .btn:not(.g)'); b.disabled = true; await api('desfecho', d); fechar(); await carregar(); } catch(e){ alert(e.message); }
-}
 if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
 </script>
 </body>
