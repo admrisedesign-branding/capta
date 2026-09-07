@@ -123,6 +123,7 @@ module.exports = async function handler(req, res) {
     switch (acao) {
       case 'status':      return await acaoStatus(canal, res);
       case 'qr':          return await acaoQr(canal, res);
+      case 'codigo':      return await acaoCodigo(canal, body, res);
       case 'desconectar': return await acaoDesconectar(canal, res);
       case 'webhooks':    return await acaoWebhooks(canal, res);
       case 'enviar':      return await acaoEnviar(tenant, canal, body, res);
@@ -194,6 +195,18 @@ async function acaoQr(canal, res) {
   });
 
   return res.status(200).json({ status: 'aguardando_qr', qr });
+}
+
+
+async function acaoCodigo(canal, body, res) {
+  const numero = String(body.numero || '').replace(/\D/g, '');
+  if (numero.length < 10) return res.status(400).json({ erro: 'Informe o número com DDD.' });
+  const s = await prov.obterStatus(canal);
+  if (s.status === 'conectado') return res.status(200).json({ status: 'conectado', codigo: null });
+  const codigo = await prov.obterCodigo(canal, numero);
+  if (!codigo) return res.status(200).json({ status: s.status, codigo: null });
+  await sb(`capta_canais?id=eq.${canal.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'aguardando_qr', numero, atualizado_em: new Date().toISOString() }) });
+  return res.status(200).json({ status: 'aguardando_qr', codigo });
 }
 
 async function acaoDesconectar(canal, res) {
