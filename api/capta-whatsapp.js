@@ -78,7 +78,7 @@ module.exports = async function handler(req, res) {
 
     // Funil, agenda e presença não dependem de WhatsApp: valem em qualquer
     // plano, com ou sem canal conectado.
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -93,6 +93,7 @@ module.exports = async function handler(req, res) {
         case 'aluno':    return await acaoAluno(tenant, body, res);
         case 'experimentais': return await acaoExperimentais(tenant, body, res);
         case 'desfecho': return await acaoDesfecho(tenant, body, res);
+        case 'desfazer': return await acaoDesfazer(tenant, body, res);
       }
     }
 
@@ -557,6 +558,19 @@ async function acaoRemarcar(tenant, body, res) {
       p_agendamento: agendamento_id, p_nova_data: data, p_nova_turma: turma_id,
       p_motivo: body.motivo || null, p_ator: body.usuario_email || 'painel'
     });
+    // lead volta a "Aula agendada" e o Kommo recebe nova data, bloco e a tag reagendado
+    const ag = (await sb(`capta_agendamentos?id=eq.${agendamento_id}&select=lead_id&limit=1`).catch(() => []))?.[0];
+    const t = (await sb(`capta_turmas?id=eq.${turma_id}&select=dia_semana,hora_inicio,hora_fim&limit=1`).catch(() => []))?.[0];
+    if (ag?.lead_id) {
+      const e = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Aula%20agendada&select=id&limit=1`))?.[0];
+      if (e) { await moverLead(tenant.id, ag.lead_id, e.id, null); await empurrarKommo(tenant.id, ag.lead_id, e.id, null).catch(() => null); }
+      if (t) {
+        const campos = { data_aula: `${data}T${String(t.hora_inicio).slice(0,5)}:00-04:00`, bloco: blocoKommo(t.dia_semana, t.hora_inicio, t.hora_fim) };
+        await sb(`capta_leads?id=eq.${ag.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos) }).catch(() => null);
+        await kommoCampos(tenant.id, ag.lead_id, campos).catch(() => null);
+      }
+      await kommoTag(tenant.id, ag.lead_id, 'reagendado').catch(() => null);
+    }
     return res.status(200).json({ ok: true, id: novo });
   } catch (e) {
     return res.status(409).json({ erro: limparErro(e.message) });
@@ -854,6 +868,21 @@ async function kommoLimparAula(tenantId, leadId) {
   const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
   await fetch(`https://${dominio}/api/v4/leads/${l[0].kommo_lead_id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ custom_fields_values: [{ field_id: KOMMO_FIELD.data_aula, values: [] }, { field_id: KOMMO_FIELD.bloco, values: [] }] }) });
+}
+
+
+// desfaz um desfecho (não / em andamento / faltou): aula volta a "agendado", lead volta pra "Aula agendada"
+async function acaoDesfazer(tenant, body, res) {
+  const a = (await sb(`capta_agendamentos?id=eq.${body.agendamento_id}&tenant_id=eq.${tenant.id}&select=id,lead_id,status,observacao&limit=1`))?.[0];
+  if (!a) return res.status(404).json({ erro: 'Aula não encontrada.' });
+  if (/desfecho: matriculou/i.test(a.observacao || '')) return res.status(409).json({ erro: 'Matrícula não se desfaz por aqui — ajuste em Alunos ativos e no Kommo.' });
+  await sb(`capta_agendamentos?id=eq.${a.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'agendado', compareceu_em: null, observacao: null }) });
+  if (a.lead_id) {
+    const e = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Aula%20agendada&select=id&limit=1`))?.[0];
+    if (e) { await moverLead(tenant.id, a.lead_id, e.id, null); await empurrarKommo(tenant.id, a.lead_id, e.id, null).catch(() => null); }
+    await sb(`capta_leads?id=eq.${a.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ motivo_perda: null }) }).catch(() => null);
+  }
+  return res.status(200).json({ ok: true });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
