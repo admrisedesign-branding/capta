@@ -53,6 +53,36 @@ button,select,input,textarea{font-family:inherit}button{cursor:pointer}
 .chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 11px;font-size:12.5px;font-weight:600;color:var(--muted)}
 .chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .fim{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+
+.barra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.nav{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 12px;font-weight:700;color:var(--muted)}
+.periodo{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 14px;font-weight:700;font-size:13.5px}
+.tally{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 18px;display:flex;gap:26px;margin-bottom:14px}
+.tally b{font-size:22px;font-weight:800;margin-right:6px}.tally small{color:var(--muted);font-weight:600;font-size:12.5px}.tally .hot b{color:var(--quente)}
+.corpo{display:grid;grid-template-columns:1fr 250px;gap:14px;align-items:start}
+@media(max-width:980px){.corpo{grid-template-columns:1fr}}
+.semana{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;min-width:720px}
+.colw{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:220px;box-shadow:var(--shadow)}
+.colw.hoje{border-color:var(--brand)}
+.colw h4{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+.colw .nada{color:var(--faint);font-size:12.5px}
+.ev{background:var(--brand-softer);border-left:3px solid var(--brand-2);border-radius:10px;padding:8px 10px;margin-bottom:8px;cursor:pointer}
+.ev:hover{background:var(--brand-soft)}
+.ev.faltou{border-left-color:var(--quente);opacity:.75}.ev.compareceu{border-left-color:var(--verde)}.ev.quente{border-left-color:var(--quente)}
+.ev .t{font-weight:800;font-size:13px}.ev .m{font-size:12px;color:var(--muted);margin-top:2px}
+.ev .st{margin-left:6px}
+.estoque{display:inline-flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.etq{font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:var(--line-2);color:var(--muted)}
+.etq.alerta{background:rgba(224,147,15,.14);color:var(--morno)}.etq.cheio{background:rgba(224,49,39,.12);color:var(--quente)}
+.lado{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+.lado h5{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.lado .k{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line-2)}
+.lado .k:last-child{border:0}.lado .k b{font-variant-numeric:tabular-nums}
+.lado .leg{font-size:11.5px;color:var(--faint);line-height:1.5;margin-top:10px}
+.nota{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 16px;font-size:12.5px;color:var(--muted);line-height:1.6;margin-top:14px}
+.nota b{color:var(--ink)}
+.dia-lista .aula{grid-template-columns:70px 1fr auto}
+.scrollx{overflow-x:auto}
 </style>
 <style>body.embed .voltar{display:none}body.embed .topbar{height:52px;background:transparent;backdrop-filter:none;border-bottom:1px solid var(--line);padding:0 18px}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -62,7 +92,7 @@ button,select,input,textarea{font-family:inherit}button{cursor:pointer}
   <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
   <h1>Aula experimental</h1>
   <div class="ferr">
-    <div class="abas"><button class="on" id="ab-hoje" onclick="modo('hoje')">Hoje</button><button id="ab-semana" onclick="modo('semana')">Semana</button><button id="ab-pend" onclick="modo('pend')">Sem desfecho</button><button id="ab-tudo" onclick="modo('tudo')">Tudo</button></div>
+    <div class="abas"><button id="ab-dia" onclick="modo('dia')">Dia</button><button class="on" id="ab-semana" onclick="modo('semana')">Semana</button></div>
   </div>
 </div>
 <div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
@@ -79,45 +109,88 @@ const hoje = new Date().toISOString().slice(0,10);
 const MOTIVOS = ['Orçamento','Horário não bate','Vai pensar','Distância','Criança não se adaptou','Só pesquisando'];
 const PAGTOS = ['Pix','cartão','boleto','recorrente'];
 const KITS = ['First','OneBot','TechBot','Autobot','App Developer','GameBot'];
-let D = { agendamentos: [], turmas: [], leads: [] }, MODO = 'hoje', SEL = null;
+let D = { agendamentos: [], turmas: [], leads: [] }, MODO = 'semana', SEL = null, SELDIA = hoje, VAGAS = null, KITS_T = [];
+const addDias = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0,10); };
+const segunda = d => { const x = new Date(d + 'T12:00:00'); const w = x.getDay(); x.setDate(x.getDate() - (w === 0 ? 6 : w - 1)); return x.toISOString().slice(0,10); };
+const fmt = (d, o) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', o || { day:'numeric', month:'long' });
 
 async function api(acao, extra = {}) {
   const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, ...extra }) });
   const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
 }
-async function carregar(){ try { D = await api('experimentais'); desenhar(); } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; } }
-function modo(m){ MODO = m; ['hoje','semana','pend','tudo'].forEach(x => document.getElementById('ab-'+x).classList.toggle('on', x===m)); desenhar(); }
+async function carregar(){
+  try {
+    const de = addDias(segunda(SELDIA), -28), ate = addDias(segunda(SELDIA), 35);
+    const [ex, al, ag] = await Promise.all([api('experimentais', { de, ate }), api('alunos').catch(() => ({ kits: [] })), api('agenda', { dias: 42 }).catch(() => null)]);
+    D = ex; KITS_T = al.kits || []; VAGAS = ag && ag.horarios ? ag.horarios : null; desenhar();
+  } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
+}
+function modo(m){ MODO = m; ['dia','semana'].forEach(x => document.getElementById('ab-'+x).classList.toggle('on', x===m)); desenhar(); }
+function mover(n){ SELDIA = addDias(SELDIA, MODO === 'dia' ? n : 7*n); const de = addDias(segunda(SELDIA), -28), ate = addDias(segunda(SELDIA), 35); const min = D.agendamentos[0] && D.agendamentos[0].data; if (SELDIA < de + 0 || SELDIA > ate) carregar(); else desenhar(); }
+function irHoje(){ SELDIA = hoje; carregar(); }
 const leadDe = a => D.leads.find(l => l.id === a.lead_id) || {};
 const turmaDe = a => D.turmas.find(t => t.id === a.turma_id) || {};
-const pendente = a => ['agendado','confirmado','compareceu'].includes(a.status) && a.data <= hoje;
+const viva = a => a.status !== 'cancelado';
+const pendente = a => ['agendado','confirmado','compareceu'].includes(a.status) && a.data <= hoje && !(a.observacao && /desfecho:/i.test(a.observacao));
 
+function estoque(a){
+  if (!VAGAS) return '';
+  const v = VAGAS.find(h => h.turma_id === a.turma_id && h.data === a.data); if (!v) return '';
+  const liv = v.vagas ?? 0, cap = v.capacidade ?? 0;
+  return `<span class="estoque"><span class="etq ${liv<=0?'cheio':liv<=2?'alerta':''}">First ${liv}/${cap}</span>${v.sala_livre!=null?`<span class="etq">sala ${v.sala_livre}</span>`:''}</span>`;
+}
+function ev(a){
+  const l = leadDe(a); const q = (l.temperatura||'').toLowerCase() === 'quente';
+  return `<div class="ev ${a.status} ${q?'quente':''}" onclick="abrir('${a.id}')">
+    <div class="t">${hh(a.hora_inicio)} ${esc(a.crianca_nome || l.nome || 'Criança')}${a.status!=='agendado'?`<span class="st ${a.status}">${a.status}</span>`:''}</div>
+    <div class="m">${a.crianca_idade ? a.crianca_idade + ' anos · ' : ''}${esc(l.nome||'')}${l.atendente?' · '+esc(l.atendente):''}</div>
+    ${estoque(a)}</div>`;
+}
 function desenhar(){
-  const fim7 = new Date(Date.now()+7*864e5).toISOString().slice(0,10);
-  let lista = D.agendamentos.filter(a => a.status !== 'cancelado');
-  if (MODO === 'hoje') lista = lista.filter(a => a.data === hoje);
-  if (MODO === 'semana') lista = lista.filter(a => a.data >= hoje && a.data <= fim7);
-  if (MODO === 'pend') lista = lista.filter(pendente);
-  const kpis = `<div class="kpis">
-    <div class="kpi"><div class="l">Hoje</div><div class="v">${D.agendamentos.filter(a=>a.data===hoje&&a.status!=='cancelado').length}</div></div>
-    <div class="kpi"><div class="l">Próximos 7 dias</div><div class="v">${D.agendamentos.filter(a=>a.data>hoje&&a.data<=fim7&&a.status!=='cancelado').length}</div></div>
-    <div class="kpi"><div class="l">Sem desfecho</div><div class="v">${D.agendamentos.filter(pendente).length}</div></div>
-    <div class="kpi"><div class="l">Faltas (14 dias)</div><div class="v">${D.agendamentos.filter(a=>a.status==='faltou').length}</div></div>
-  </div>`;
-  if (!lista.length) { document.getElementById('raiz').innerHTML = kpis + `<div class="vazio">Nenhuma aula experimental ${MODO==='hoje'?'hoje':MODO==='semana'?'nos próximos 7 dias':MODO==='pend'?'sem desfecho':'no período'}.<br>Aulas são marcadas no Pipeline, no painel do lead → Agendar aula.</div>`; return; }
-  const dias = [...new Set(lista.map(a => a.data))].sort();
-  document.getElementById('raiz').innerHTML = kpis + dias.map(d => {
-    const dt = new Date(d + 'T12:00:00');
-    const its = lista.filter(a => a.data === d);
-    return `<div class="dia"><h2>${DIAS[dt.getDay()]} ${dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}${d===hoje?' · hoje':''}<span>${its.length} aula${its.length>1?'s':''}</span></h2>
-      ${its.map(cartao).join('')}</div>`; }).join('');
+  const seg = segunda(SELDIA), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
+  const base = D.agendamentos.filter(viva).filter(a => MODO === 'dia' ? a.data === SELDIA : dias.includes(a.data));
+  const periodo = MODO === 'dia' ? fmt(SELDIA, { weekday:'long', day:'numeric', month:'long' }) : `${fmt(dias[0])} a ${fmt(dias[5])}`;
+  const quentes = base.filter(a => (leadDe(a).temperatura||'').toLowerCase()==='quente').length;
+  const matric = base.filter(a => /desfecho: matriculou/i.test(a.observacao||'')).length;
+  const kits = KITS_T.length ? KITS_T : [{kit:'First',capacidade:8},{kit:'OneBot',capacidade:6},{kit:'TechBot',capacidade:5},{kit:'Autobot',capacidade:4},{kit:'App Developer',capacidade:4},{kit:'GameBot',capacidade:2}];
+  let grade;
+  if (MODO === 'dia') {
+    grade = base.length ? `<div class="dia-lista">${base.sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio))).map(cartao).join('')}</div>` : `<div class="vazio">Sem aulas experimentais neste dia.</div>`;
+  } else {
+    grade = `<div class="scrollx"><div class="semana">${dias.map(d => { const its = base.filter(a => a.data === d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+      return `<div class="colw ${d===hoje?'hoje':''}"><h4>${DIAS[new Date(d+'T12:00').getDay()]} ${new Date(d+'T12:00').getDate()}</h4>${its.length ? its.map(ev).join('') : '<div class="nada">sem aulas</div>'}</div>`; }).join('')}</div></div>`;
+  }
+  document.getElementById('raiz').innerHTML = `
+    <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="irHoje()">Hoje</button><span class="periodo">${periodo}</span></div>
+    <div class="tally"><div><b>${base.length}</b><small>agendadas</small></div><div class="hot"><b>${quentes}</b><small>chega querendo fechar</small></div><div><b>${matric}</b><small>matriculadas</small></div><div><b>${D.agendamentos.filter(pendente).length}</b><small>sem desfecho</small></div></div>
+    <div class="corpo"><div>${grade}</div>
+      <div class="lado"><h5>Kits por bloco</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
+        <div class="leg">Aula experimental usa o kit <b>First</b>. A etiqueta no horário mostra quantos First sobram naquele bloco naquele dia, já descontando os alunos ativos e as experimentais marcadas.</div></div>
+    </div>
+    <div class="nota"><b>As etiquetas ao lado do horário mostram o estoque naquele momento.</b> Vale sempre o menor entre os kits First livres e os lugares na sala. Laranja = restam 2 ou menos; vermelho = lotou. Clique na aula pra registrar o desfecho.</div>`;
+}
+function abrir(id){
+  const a = D.agendamentos.find(x => x.id === id); if (!a) return;
+  if (a.data > hoje) return desfecho(id, 'faltou');
+  const l = leadDe(a);
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela">
+    <h3>${esc(a.crianca_nome||l.nome||'')}</h3><p>${new Date(a.data+'T12:00').toLocaleDateString('pt-BR')} ${hh(a.hora_inicio)}${l.nome?' · '+esc(l.nome):''}${l.contato?' · '+esc(l.contato):''}${a.observacao?'<br>'+esc(a.observacao):''}</p>
+    <div class="chips" style="margin-top:14px">
+      <button class="btn v" onclick="desfecho('${id}','matriculou')">Matriculou</button>
+      <button class="btn a" onclick="desfecho('${id}','andamento')">Em andamento</button>
+      <button class="btn x" onclick="desfecho('${id}','nao')">Não matriculou</button>
+      <button class="btn g" onclick="desfecho('${id}','faltou')">Faltou</button>
+      ${l.kommo_lead_id ? `<a class="btn g" style="text-decoration:none" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Kommo ↗</a>` : ''}
+    </div>
+    <div class="fim"><button class="btn g" onclick="fechar()">Fechar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fechar(); };
 }
 function cartao(a){
   const l = leadDe(a), t = turmaDe(a);
-  const feito = ['faltou'].includes(a.status) || (a.status === 'compareceu' && a.observacao && /desfecho:/i.test(a.observacao));
   return `<div class="aula">
     <div class="h">${hh(a.hora_inicio)}<small>${hh(a.hora_fim)}${t.nome?' · '+esc(t.nome):''}</small></div>
-    <div><div class="n">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade ? ` <span class="et">${a.crianca_idade} anos</span>` : ''} <span class="st ${a.status}">${a.status}</span></div>
-      <div class="s">${esc(l.nome||'')}${l.contato?' · '+esc(l.contato):''}${l.atendente?' · atendido por '+esc(l.atendente):''}${a.observacao?' · '+esc(a.observacao):''}</div></div>
+    <div><div class="n">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade ? ` <span class="et">${a.crianca_idade} anos</span>` : ''} <span class="st ${a.status}">${a.status}</span> ${estoque(a)}</div>
+      <div class="s">${esc(l.nome||'')}${l.contato?' · '+esc(l.contato):''}${l.temperatura?' · '+esc(l.temperatura):''}${l.atendente?' · '+esc(l.atendente):''}${a.observacao?' · '+esc(a.observacao):''}</div></div>
     <div class="acs">
       ${a.data > hoje ? `<button class="btn g" onclick="desfecho('${a.id}','faltou')">Faltou</button>` : `
       <button class="btn v" onclick="desfecho('${a.id}','matriculou')">Matriculou</button>
