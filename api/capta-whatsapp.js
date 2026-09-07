@@ -78,7 +78,7 @@ module.exports = async function handler(req, res) {
 
     // Funil, agenda e presença não dependem de WhatsApp: valem em qualquer
     // plano, com ou sem canal conectado.
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -91,6 +91,8 @@ module.exports = async function handler(req, res) {
         case 'campos':   return await acaoCampos(tenant, body, res);
         case 'alunos':   return await acaoAlunos(tenant, body, res);
         case 'aluno':    return await acaoAluno(tenant, body, res);
+        case 'experimentais': return await acaoExperimentais(tenant, body, res);
+        case 'desfecho': return await acaoDesfecho(tenant, body, res);
       }
     }
 
@@ -662,7 +664,7 @@ async function acaoLead(tenant, body, res) {
 }
 
 // CAMPOS — Fonte / Porta / Quem atendeu / anotações; grava no Capta e no Kommo
-const KOMMO_FIELD = { fonte: 3886273, porta: 3886275, atendente: 3881999, data_aula: 3886283, bloco: 3886279, curso: 3886277 };
+const KOMMO_FIELD = { fonte: 3886273, porta: 3886275, atendente: 3881999, data_aula: 3886283, bloco: 3886279, curso: 3886277, pagamento: 3886281 };
 async function acaoCampos(tenant, body, res) {
   const id = (body.lead_id || '').trim();
   if (!id) return res.status(400).json({ erro: 'Informe lead_id.' });
@@ -728,6 +730,88 @@ async function acaoAluno(tenant, body, res) {
   if (!campos.nome) return res.status(400).json({ erro: 'Informe o nome.' });
   const criado = await sb('capta_alunos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ tenant_id: tenant.id, status: 'ativo', ...campos }) });
   return res.status(200).json({ ok: true, id: criado[0].id });
+}
+
+
+// ---------------------------------------------------------------------
+// AULA EXPERIMENTAL — lista de aulas + desfecho (matriculou / não / em andamento / faltou)
+// ---------------------------------------------------------------------
+async function acaoExperimentais(tenant, body, res) {
+  const de = body.de || new Date(Date.now() - 14*864e5).toISOString().slice(0,10);
+  const ate = body.ate || new Date(Date.now() + 30*864e5).toISOString().slice(0,10);
+  const [ags, turmas] = await Promise.all([
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&data=gte.${de}&data=lte.${ate}&select=id,lead_id,turma_id,data,hora_inicio,hora_fim,crianca_nome,crianca_idade,status,compareceu_em,observacao,criado_em,motivo_id&order=data,hora_inicio`),
+    sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim`)
+  ]);
+  const ids = [...new Set((ags || []).map(a => a.lead_id).filter(Boolean))];
+  const leads = ids.length ? await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${ids.join(',')})&select=id,nome,contato,temperatura,atendente,fonte,porta,etapa_id,kommo_lead_id,valor,pagamento,curso`) : [];
+  return res.status(200).json({ agendamentos: ags || [], turmas: turmas || [], leads: leads || [] });
+}
+
+// desfecho: matriculou | nao | andamento | faltou  (+ valor/pagamento/curso ou motivo)
+async function acaoDesfecho(tenant, body, res) {
+  const { agendamento_id, desfecho } = body;
+  if (!['matriculou', 'nao', 'andamento', 'faltou', 'compareceu'].includes(desfecho)) return res.status(400).json({ erro: 'Desfecho inválido.' });
+  const a = (await sb(`capta_agendamentos?id=eq.${agendamento_id}&tenant_id=eq.${tenant.id}&select=id,lead_id,turma_id,data,crianca_nome,crianca_idade,status&limit=1`))?.[0];
+  if (!a) return res.status(404).json({ erro: 'Aula não encontrada.' });
+  const agora = new Date().toISOString();
+  const etapa = async nome => (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.${encodeURIComponent(nome)}&select=id&limit=1`))?.[0]?.id || null;
+  const patchAg = { observacao: body.observacao || null };
+  let etapaNome = null, kommoExtra = {}, leadPatch = {};
+
+  if (desfecho === 'faltou') { Object.assign(patchAg, { status: 'faltou' }); etapaNome = 'Aula agendada'; }
+  if (desfecho === 'compareceu') { Object.assign(patchAg, { status: 'compareceu', compareceu_em: agora }); }
+  if (desfecho === 'andamento') { Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora }); etapaNome = 'Matrícula em andamento'; }
+  if (desfecho === 'nao') {
+    Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora });
+    etapaNome = body.motivo === 'Vai pensar' ? 'Remarketing' : 'Perdido';
+    leadPatch.motivo_perda = body.motivo || null;
+  }
+  if (desfecho === 'matriculou') {
+    Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora });
+    etapaNome = 'Aluno ativo';
+    leadPatch = { valor: body.valor ? Number(body.valor) : null, pagamento: body.pagamento || null, curso: body.curso || 'First', ganho_em: agora, status: 'fechado' };
+    kommoExtra = { curso: body.curso || 'First' };
+    // vira aluno (se ainda não for)
+    if (a.lead_id) {
+      const ja = await sb(`capta_alunos?tenant_id=eq.${tenant.id}&lead_id=eq.${a.lead_id}&select=id&limit=1`).catch(() => []);
+      if (!ja?.length) await sb('capta_alunos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+        tenant_id: tenant.id, nome: body.aluno_nome || a.crianca_nome || 'Aluno novo', nome_curto: a.crianca_nome || null,
+        kit: body.curso || 'First', turma_id: body.turma_id || a.turma_id, lead_id: a.lead_id, status: 'ativo',
+        observacao: `Matriculado pela aula experimental de ${a.data}` }) }).catch(() => null);
+    }
+    // registro comercial (comissão)
+    if (a.lead_id) await sb('capta_matriculas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+      tenant_id: tenant.id, lead_id: a.lead_id, agendamento_id: a.id, valor_bruto: body.valor ? Number(body.valor) : null,
+      fechada_em: agora.slice(0,10), fechada_por: body.atendente || null, status: 'ativa' }) }).catch(() => null);
+  }
+  Object.keys(patchAg).forEach(k => patchAg[k] === undefined && delete patchAg[k]);
+  await sb(`capta_agendamentos?id=eq.${a.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patchAg) });
+
+  let kommo = null;
+  if (a.lead_id) {
+    if (Object.keys(leadPatch).length) await sb(`capta_leads?id=eq.${a.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(leadPatch) }).catch(() => null);
+    if (etapaNome) { const eid = await etapa(etapaNome); if (eid) { await moverLead(tenant.id, a.lead_id, eid, body.motivo || null); kommo = await empurrarKommo(tenant.id, a.lead_id, eid, body.motivo || null).catch(e => ({ erro: e.message })); } }
+    if (desfecho === 'matriculou') {
+      await kommoCampos(tenant.id, a.lead_id, { ...kommoExtra, ...(body.pagamento ? { pagamento: body.pagamento } : {}) }).catch(() => null);
+      if (body.valor) await kommoPreco(tenant.id, a.lead_id, Number(body.valor)).catch(() => null);
+    }
+    if (desfecho === 'faltou') await kommoTag(tenant.id, a.lead_id, 'reagendar devido falta').catch(() => null);
+  }
+  return res.status(200).json({ ok: true, kommo });
+}
+async function kommoPreco(tenantId, leadId, valor) {
+  const token = process.env.KOMMO_TOKEN; if (!token) return null;
+  const l = await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id&limit=1`); if (!l?.[0]?.kommo_lead_id) return null;
+  const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
+  await fetch(`https://${dominio}/api/v4/leads/${l[0].kommo_lead_id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ price: Math.round(valor) }) });
+}
+async function kommoTag(tenantId, leadId, tag) {
+  const token = process.env.KOMMO_TOKEN; if (!token) return null;
+  const l = await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id,tags&limit=1`); if (!l?.[0]?.kommo_lead_id) return null;
+  const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
+  const tags = [...new Set([...(l[0].tags || []), tag])].map(name => ({ name }));
+  await fetch(`https://${dominio}/api/v4/leads/${l[0].kommo_lead_id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ _embedded: { tags } }) });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
