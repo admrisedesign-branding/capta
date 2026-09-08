@@ -31,7 +31,7 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .nav{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 12px;font-weight:700;color:var(--muted)}
 .periodo{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 14px;font-weight:700;font-size:13.5px;text-transform:capitalize}
 .tally{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 18px;display:flex;gap:26px;margin-bottom:14px;flex-wrap:wrap}
-.tally b{font-size:22px;font-weight:800;margin-right:6px}.tally small{color:var(--muted);font-weight:600;font-size:12.5px}.tally .hot b{color:var(--morno)}
+.tally b{font-size:22px;font-weight:800;margin-right:6px}.tally small{color:var(--muted);font-weight:600;font-size:12.5px}.tally .hot b{color:var(--morno)}.tally .bad b{color:var(--quente)}
 .corpo{display:grid;grid-template-columns:1fr 240px;gap:14px;align-items:start}
 @media(max-width:980px){.corpo{grid-template-columns:1fr}}
 .lado{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
@@ -161,7 +161,7 @@ function tally(dias){
   const emAula = dias.reduce((s, d) => s + turmasDo(d).reduce((x, t) => x + alunosDa(t).length, 0), 0);
   const exps = dias.reduce((s, d) => s + expDo(d).length, 0);
   let semVaga = 0; dias.forEach(d => turmasDo(d).forEach(t => { const v = vagasHora(d, hN(t.hora_inicio)); if (v && v.n <= 0) semVaga++; }));
-  return `<div class="tally"><div><b>${emAula}</b><small>alunos ativos em aula</small></div><div><b>${exps}</b><small>aulas experimentais</small></div><div class="hot"><b>${semVaga}</b><small>horários sem vaga</small></div></div>`;
+  return `<div class="tally"><div><b>${emAula}</b><small>alunos ativos em aula</small></div><div><b>${exps}</b><small>aulas experimentais</small></div><div class="bad"><b>${semVaga}</b><small>horários sem vaga</small></div></div>`;
 }
 function lado(){
   const kits = D.kits.length ? D.kits : [{kit:'First',capacidade:8},{kit:'OneBot',capacidade:6},{kit:'TechBot',capacidade:5},{kit:'Autobot',capacidade:4},{kit:'App Developer',capacidade:4},{kit:'GameBot',capacidade:2}];

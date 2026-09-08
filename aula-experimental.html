@@ -58,8 +58,8 @@ button,select,input,textarea{font-family:inherit}button{cursor:pointer}
 body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .nav{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 12px;font-weight:700;color:var(--muted)}
 .periodo{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 14px;font-weight:700;font-size:13.5px}
-.tally{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 18px;display:flex;gap:26px;margin-bottom:14px}
-.tally b{font-size:22px;font-weight:800;margin-right:6px}.tally small{color:var(--muted);font-weight:600;font-size:12.5px}.tally .hot b{color:var(--quente)}
+.tally{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 18px;display:flex;gap:26px;margin-bottom:14px;flex-wrap:wrap}
+.tally b{font-size:22px;font-weight:800;margin-right:6px}.tally small{color:var(--muted);font-weight:600;font-size:12.5px}.tally .hot b{color:var(--morno)}.tally .bad b{color:var(--quente)}
 .corpo{display:grid;grid-template-columns:1fr 250px;gap:14px;align-items:start}
 @media(max-width:980px){.corpo{grid-template-columns:1fr}}
 .semana{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;min-width:720px}
@@ -256,10 +256,10 @@ function desenhar(){
   }
   document.getElementById('raiz').innerHTML = `
     <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="irHoje()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}</div>
-    <div class="tally"><div><b>${base.length}</b><small>agendadas</small></div><div class="hot"><b>${quentes}</b><small>chega querendo fechar</small></div><div><b>${matric}</b><small>matriculadas</small></div><div><b>${D.agendamentos.filter(pendente).length}</b><small>sem desfecho</small></div></div>
+    <div class="tally"><div><b>${base.length}</b><small>agendadas</small></div><div class="bad"><b>${quentes}</b><small>chega querendo fechar</small></div><div><b>${matric}</b><small>matriculadas</small></div><div class="hot"><b>${D.agendamentos.filter(pendente).length}</b><small>sem desfecho</small></div></div>
     <div class="corpo"><div>${grade}</div>
-      <div class="lado"><h5>Kits por bloco</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
-        <div class="leg">Aula experimental usa o kit <b>First</b>. A etiqueta no horário mostra quantos First sobram naquele bloco naquele dia, já descontando os alunos ativos e as experimentais marcadas.</div></div>
+      <div class="lado"><h5>Kits disponíveis</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
+        <div class="leg"><span><i style="background:var(--exp)"></i>Aula experimental usa o kit First</span><span><i style="background:var(--morno)"></i>laranja = restam 2 ou menos</span><span><i style="background:var(--quente)"></i>vermelho = sem vaga</span></div></div>
     </div>
     <div class="nota"><b>As etiquetas ao lado do horário mostram o estoque naquele momento.</b> Vale sempre o menor entre os kits First livres e os lugares na sala. Laranja = restam 2 ou menos; vermelho = lotou. Clique na aula pra registrar o desfecho — ou, com o mouse sobre o card, aperte <b>M</b> (matriculou), <b>N</b> (não), <b>A</b> (andamento) ou <b>F</b> (faltou).</div>`;
 }
