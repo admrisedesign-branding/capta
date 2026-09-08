@@ -110,6 +110,9 @@ body.embed #painel{height:calc(100vh - 52px);top:52px}
 .salvo{font-size:11.5px;color:var(--verde);font-weight:600;margin-left:8px}
 @media(max-width:760px){#painel.aberto{position:fixed;inset:0;top:0;width:100%;flex-basis:100%;height:100%;z-index:40}}
 
+.filtros-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.fb-busca,.fb-sel{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 10px;font-size:12.5px;font-family:inherit;color:var(--ink)}
+.fb-busca{min-width:200px}.fb-chk{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}.fb-n{margin-left:auto;font-size:12px;color:var(--faint);font-weight:600}
 .fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
 .janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:400px;
   box-shadow:0 20px 50px rgba(20,26,46,.2)}
@@ -124,6 +127,24 @@ body.embed #painel{height:calc(100vh - 52px);top:52px}
 .btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}
 </style>
 <style>body.embed .voltar{display:none}body.embed .topbar{height:52px;background:transparent;backdrop-filter:none;border-bottom:1px solid var(--line);padding:0 18px}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+<style>
+#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:90;pointer-events:none}
+.toast{pointer-events:auto;background:var(--ink,#141A2E);color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px rgba(20,26,46,.25);display:flex;align-items:center;gap:12px;animation:tin .18s ease-out;max-width:560px}
+.toast.erro{background:#B3261E}.toast.ok{background:#1F7A4D}
+.toast button{border:0;background:rgba(255,255,255,.14);color:#fff;font-weight:700;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
+.toast button:hover{background:rgba(255,255,255,.24)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+<script>
+// aviso discreto no rodapé, com ação opcional (ex.: desfazer)
+function toast(msg, opts){ opts = opts || {}; let box = document.getElementById('toasts'); if(!box){ box = document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
+  const el = document.createElement('div'); el.className = 'toast' + (opts.tipo?' '+opts.tipo:''); el.innerHTML = `<span>${msg}</span>${opts.acao?`<button type="button">${opts.acao}</button>`:''}`;
+  if(opts.acao) el.querySelector('button').onclick = () => { el.remove(); opts.onAcao && opts.onAcao(); };
+  box.appendChild(el); setTimeout(() => el.remove(), opts.ms || (opts.acao ? 7000 : 3500)); return el; }
+// mensagem pro painel (quando embutido): trocar de tela sem sair
+function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
+</script>
+
 </head>
 <body>
 <div class="topbar">
@@ -183,15 +204,39 @@ async function carregar() {
   }
 }
 
+const F = { parado: 0, temp: '', busca: '', ordem: 'recente', esconderFrios: false };
+const diasParado = l => Math.floor((Date.now() - new Date(l.etapa_em || l.criado_em).getTime()) / 864e5);
+function filtrar(lista) {
+  const q = F.busca.trim().toLowerCase();
+  let out = lista.filter(l => (!F.parado || diasParado(l) >= F.parado)
+    && (!F.temp || (l.temperatura||'').toLowerCase() === F.temp)
+    && (!q || (l.nome||'').toLowerCase().includes(q) || (l.contato||'').includes(q))
+    && !(F.esconderFrios && (l.temperatura||'').toLowerCase() === 'frio' && diasParado(l) >= 30));
+  const peso = { quente: 0, morno: 1, frio: 2 };
+  if (F.ordem === 'temperatura') out.sort((a,b) => (peso[(a.temperatura||'').toLowerCase()] ?? 3) - (peso[(b.temperatura||'').toLowerCase()] ?? 3) || diasParado(b) - diasParado(a));
+  else if (F.ordem === 'parado') out.sort((a,b) => diasParado(b) - diasParado(a));
+  else out.sort((a,b) => new Date(b.etapa_em||b.criado_em) - new Date(a.etapa_em||a.criado_em));
+  return out;
+}
+function barraFiltros(total, vis) {
+  return `<div class="filtros-bar">
+    <input class="fb-busca" placeholder="Buscar nome ou telefone" value="${esc(F.busca)}" oninput="F.busca=this.value;desenhar()">
+    <select class="fb-sel" onchange="F.parado=+this.value;desenhar()"><option value="0" ${F.parado===0?'selected':''}>Parado: qualquer</option><option value="3" ${F.parado===3?'selected':''}>Parado há 3+ dias</option><option value="7" ${F.parado===7?'selected':''}>7+ dias</option><option value="30" ${F.parado===30?'selected':''}>30+ dias</option></select>
+    <select class="fb-sel" onchange="F.temp=this.value;desenhar()"><option value="" ${!F.temp?'selected':''}>Temperatura: todas</option><option value="quente" ${F.temp==='quente'?'selected':''}>Quer fechar</option><option value="morno" ${F.temp==='morno'?'selected':''}>Considerando</option><option value="frio" ${F.temp==='frio'?'selected':''}>Só conhecendo</option></select>
+    <select class="fb-sel" onchange="F.ordem=this.value;desenhar()"><option value="recente" ${F.ordem==='recente'?'selected':''}>Mais recente primeiro</option><option value="temperatura" ${F.ordem==='temperatura'?'selected':''}>Quentes primeiro</option><option value="parado" ${F.ordem==='parado'?'selected':''}>Mais parado primeiro</option></select>
+    <label class="fb-chk"><input type="checkbox" ${F.esconderFrios?'checked':''} onchange="F.esconderFrios=this.checked;desenhar()"> esconder frios parados há 30+ dias</label>
+    <span class="fb-n">${vis} de ${total}</span></div>`;
+}
 function desenhar() {
   const raiz = document.getElementById('raiz');
   raiz.className = 'raia-area';
 
-  const semEtapa = leads.filter(l => !l.etapa_id);
-  const colunas = etapas.map(e => ({ e, itens: leads.filter(l => l.etapa_id === e.id) }));
+  const vis = filtrar(leads);
+  const semEtapa = vis.filter(l => !l.etapa_id);
+  const colunas = etapas.map(e => ({ e, itens: vis.filter(l => l.etapa_id === e.id) }));
   if (semEtapa.length) colunas.unshift({ e: { id: '', nome: 'Sem etapa', cor: '#9AA1B4' }, itens: semEtapa });
 
-  raiz.innerHTML = `<div class="raias">${colunas.map(c => `
+  raiz.innerHTML = barraFiltros(leads.length, vis.length) + `<div class="raias">${colunas.map(c => `
     <section class="raia" data-etapa="${c.e.id}">
       <div class="raia-cab">
         <span class="raia-cor" style="background:${esc(c.e.cor || '#2E5BFF')}"></span>
@@ -199,7 +244,7 @@ function desenhar() {
         <span class="raia-qtd">${c.itens.length}</span>
       </div>
       <div class="raia-corpo">
-        ${c.itens.length ? c.itens.map(cartao).join('') : '<div class="vazia">Nenhum lead aqui</div>'}
+        ${c.itens.length ? c.itens.map(cartao).join('') : '<div class="vazia">Nenhum lead aqui' + (c.e.id ? '' : '') + '</div>'}
       </div>
     </section>`).join('')}</div>`;
 
@@ -258,8 +303,12 @@ async function mover(leadId, etapaId, motivo) {
   l.etapa_id = etapaId; l.etapa_em = new Date().toISOString();
   if (motivo) l.motivo_perda = motivo;
   desenhar();                                   // move na hora, sem esperar a rede
-  try { await api('mover', { lead_id: leadId, etapa_id: etapaId, motivo }); }
-  catch (e) { l.etapa_id = antes; desenhar(); alert(e.message); }
+  try {
+    await api('mover', { lead_id: leadId, etapa_id: etapaId, motivo });
+    const de = etapas.find(x => x.id === antes), para = etapas.find(x => x.id === etapaId);
+    toast(`<b>${esc(l.nome||'Lead')}</b> → ${esc(para ? para.nome : '')} · Kommo atualizado`, { acao: 'desfazer', onAcao: () => mover(leadId, antes, null) });
+  }
+  catch (e) { l.etapa_id = antes; desenhar(); toast(e.message,{tipo:'erro'}); }
 }
 
 function fechar() { document.getElementById('modal').innerHTML = ''; }
@@ -355,7 +404,7 @@ async function enviarMsg() {
   try {
     await api('enviar', P.info.conversa ? { conversa_id: P.info.conversa.id, texto } : { telefone: P.lead.contato, texto });
     P.info = await api('lead', { lead_id: P.lead.id }); desenharPainel();
-  } catch (e) { alert(e.message); }
+  } catch (e) { toast(e.message,{tipo:'erro'}); }
 }
 
 // ---- dados: fonte, porta, quem atendeu, criança, anotações → Capta + Kommo ----
@@ -365,8 +414,8 @@ const ATEND  = ['Rafael','Bento','RISE'];
 const sel = (id, ops, v) => `<select id="${id}"><option value="">—</option>${ops.map(o => `<option ${o===v?'selected':''}>${o}</option>`).join('')}</select>`;
 function painelDados(l) {
   return `<div class="p-corpo">${chipsEtapa(l)}
-    <div class="p-sec">Origem</div>
-    <div class="linha2"><div class="campo"><label>Fonte</label>${sel('d-fonte', FONTES, l.fonte)}</div><div class="campo"><label>Porta</label>${sel('d-porta', PORTAS, l.porta)}</div></div>
+    <div class="p-sec">De onde veio o lead</div>
+    <div class="linha2"><div class="campo"><label>Por onde veio</label>${sel('d-fonte', FONTES, l.fonte)}</div><div class="campo"><label>Como chegou</label>${sel('d-porta', PORTAS, l.porta)}</div></div>
     <div class="campo" style="margin-top:8px"><label>Quem atendeu</label>${sel('d-at', ATEND, l.atendente)}</div>
     <div class="p-sec">Criança</div>
     <div class="linha2"><div class="campo"><label>Nome</label><input id="d-cri" value="${esc(l.crianca||'')}"></div><div class="campo"><label>Idade</label><input id="d-id" type="number" min="3" max="17" value="${l.idade||''}"></div></div>
@@ -383,7 +432,7 @@ async function salvarDados() {
     notas: document.getElementById('d-notas').value };
   try { await api('campos', d); Object.assign(l, { fonte: d.fonte||null, porta: d.porta||null, atendente: d.atendente||null, crianca: d.crianca||null, idade: d.idade?Number(d.idade):null, notas: d.notas||null });
     document.getElementById('d-ok').textContent = 'salvo ✓'; setTimeout(() => { const s = document.getElementById('d-ok'); if (s) s.textContent = ''; }, 2000); desenhar(); }
-  catch (e) { alert(e.message); }
+  catch (e) { toast(e.message,{tipo:'erro'}); }
 }
 
 // ---- agendar em sequência: criança → kit First → próximas vagas (manhã · tarde · sábado) → confirmar ----
@@ -416,7 +465,7 @@ function cardVaga(tipo, rotulo) {
 async function cancelarAula(id) {
   if (!confirm('Cancelar esta aula experimental?')) return;
   try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pelo atendente' }); P.info = await api('lead', { lead_id: P.lead.id }); carregarAgenda(true); }
-  catch (e) { alert(e.message); }
+  catch (e) { toast(e.message,{tipo:'erro'}); }
 }
 function painelAgendar(l) {
   if (!P.idx) P.idx = { manha: 0, tarde: 0, sab: 0 };
@@ -436,13 +485,13 @@ function painelAgendar(l) {
 async function confirmarAgenda(turmaId, data) {
   const l = P.lead;
   const crianca = document.getElementById('a-cri').value.trim(), idade = document.getElementById('a-id').value;
-  if (!crianca) { alert('Informe o nome da criança.'); document.getElementById('a-cri').focus(); return; }
+  if (!crianca) { toast('Informe o nome da criança.',{tipo:'erro'}); document.getElementById('a-cri').focus(); return; }
   try {
     await api('agendar', { turma_id: turmaId, data, crianca_nome: crianca, crianca_idade: idade || null, lead_id: l.id });
     l.crianca = crianca; l.idade = idade ? Number(idade) : l.idade;
     const e = etapas.find(x => /aula agendada/i.test(x.nome)); if (e) { l.etapa_id = e.id; l.etapa_em = new Date().toISOString(); }
     desenhar(); P.info = await api('lead', { lead_id: l.id }); P.aba = 'agendar'; carregarAgenda(true);
-  } catch (e) { alert(e.message); }
+  } catch (e) { toast(e.message,{tipo:'erro'}); }
 }
 
 if (!SLUG || !TOKEN) {

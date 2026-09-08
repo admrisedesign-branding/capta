@@ -154,6 +154,24 @@ button,select,input,textarea{font-family:inherit}button{cursor:pointer}
 </style>
 <style>body.embed .voltar{display:none}body.embed .topbar{height:52px;background:transparent;backdrop-filter:none;border-bottom:1px solid var(--line);padding:0 18px}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+<style>
+#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:90;pointer-events:none}
+.toast{pointer-events:auto;background:var(--ink,#141A2E);color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px rgba(20,26,46,.25);display:flex;align-items:center;gap:12px;animation:tin .18s ease-out;max-width:560px}
+.toast.erro{background:#B3261E}.toast.ok{background:#1F7A4D}
+.toast button{border:0;background:rgba(255,255,255,.14);color:#fff;font-weight:700;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
+.toast button:hover{background:rgba(255,255,255,.24)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+<script>
+// aviso discreto no rodapé, com ação opcional (ex.: desfazer)
+function toast(msg, opts){ opts = opts || {}; let box = document.getElementById('toasts'); if(!box){ box = document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
+  const el = document.createElement('div'); el.className = 'toast' + (opts.tipo?' '+opts.tipo:''); el.innerHTML = `<span>${msg}</span>${opts.acao?`<button type="button">${opts.acao}</button>`:''}`;
+  if(opts.acao) el.querySelector('button').onclick = () => { el.remove(); opts.onAcao && opts.onAcao(); };
+  box.appendChild(el); setTimeout(() => el.remove(), opts.ms || (opts.acao ? 7000 : 3500)); return el; }
+// mensagem pro painel (quando embutido): trocar de tela sem sair
+function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
+</script>
+
 </head>
 <body>
 <div class="topbar">
@@ -231,7 +249,7 @@ function desenhar(){
       const its = base.filter(a => parseInt(a.hora_inicio) === h).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
       const v = vg(h)[0]; const liv = v ? v.vagas : null;
       return `<div class="h ${its.length?'tem':''}"><b>${String(h).padStart(2,'0')}:00</b><div class="vg ${liv==null?'n':liv<=0?'z':''}">${liv==null?'sem turma':liv<=0?'sem vaga':liv+' vaga'+(liv>1?'s':'')}</div>${v?`<div class="kf ${liv<=0?'cheio':liv<=2?'alerta':''}">FIRST ${liv} livre${liv===1?'':'s'}</div>`:''}</div>
-        <div class="c ${its.length>1?'dois':''}">${its.length ? its.map(cartao).join('') : '<div class="livre">livre</div>'}</div>`; }).join('')}</div>`;
+        <div class="c ${its.length>1?'dois':''}">${its.length ? its.map(cartao).join('') : '<div class="livre">livre · <a href="#" onclick="irPara(\'/funil.html\');return false" style="color:var(--brand);font-weight:700;text-decoration:none">marcar aula</a></div>'}</div>`; }).join('')}</div>`;
   } else {
     grade = `<div class="scrollx"><div class="semana">${dias.map(d => { const its = base.filter(a => a.data === d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
       return `<div class="colw ${d===hoje?'hoje':''}"><h4>${DIAS[new Date(d+'T12:00').getDay()]} ${new Date(d+'T12:00').getDate()}</h4>${its.length ? its.map(ev).join('') : '<div class="nada">sem aulas</div>'}</div>`; }).join('')}</div></div>`;
@@ -243,7 +261,7 @@ function desenhar(){
       <div class="lado"><h5>Kits por bloco</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
         <div class="leg">Aula experimental usa o kit <b>First</b>. A etiqueta no horário mostra quantos First sobram naquele bloco naquele dia, já descontando os alunos ativos e as experimentais marcadas.</div></div>
     </div>
-    <div class="nota"><b>As etiquetas ao lado do horário mostram o estoque naquele momento.</b> Vale sempre o menor entre os kits First livres e os lugares na sala. Laranja = restam 2 ou menos; vermelho = lotou. Clique na aula pra registrar o desfecho.</div>`;
+    <div class="nota"><b>As etiquetas ao lado do horário mostram o estoque naquele momento.</b> Vale sempre o menor entre os kits First livres e os lugares na sala. Laranja = restam 2 ou menos; vermelho = lotou. Clique na aula pra registrar o desfecho — ou, com o mouse sobre o card, aperte <b>M</b> (matriculou), <b>N</b> (não), <b>A</b> (andamento) ou <b>F</b> (faltou).</div>`;
 }
 function abrir(id){
   const a = D.agendamentos.find(x => x.id === id); if (!a) return;
@@ -305,7 +323,7 @@ function cartao(a){
         <button onclick="registrar('${a.id}','faltou',{})">Faltou</button></div>
       <div class="acts mini"><button onclick="abrirMenu('${a.id}','reagendar')">reagendar</button><button onclick="cancelar('${a.id}')">cancelar aula</button></div>${menu}`;
   }
-  return `<div class="cardx${est}">
+  return `<div class="cardx${est}" data-id="${a.id}">
     <button class="scriptbtn" onclick="script('${a.id}')" title="Ver a conversa">script</button>
     <div class="top"><span class="kid">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade?`<em>${a.crianca_idade} anos</em>`:''}</span>${rot}</div>
     <div class="guard">com ${esc(l.nome||'responsável')}${l.atendente?' · atendido por '+esc(l.atendente):''}</div>
@@ -336,18 +354,20 @@ async function carregarVagas(){ try { VAGAS3 = (await api('agenda', { dias: 30 }
 function abrirMenu(id, tipo){ ABERTO = { id, tipo }; ESC = {}; desenhar(); }
 function fecharMenu(){ ABERTO = null; desenhar(); }
 async function registrar(id, tipo, extra){
-  try { await api('desfecho', { agendamento_id: id, desfecho: tipo, observacao: `desfecho: ${tipo}${extra.motivo?' · '+extra.motivo:''}${extra.observacao?' · '+extra.observacao:''}`, ...extra }); ABERTO = null; await carregar(); }
-  catch(e){ alert(e.message); }
+  try { await api('desfecho', { agendamento_id: id, desfecho: tipo, observacao: `desfecho: ${tipo}${extra.motivo?' · '+extra.motivo:''}${extra.observacao?' · '+extra.observacao:''}`, ...extra }); ABERTO = null; await carregar();
+    const nome = (D.agendamentos.find(x=>x.id===id)||{}).crianca_nome || 'Aula';
+    toast(`<b>${esc(nome)}</b> · ${({matriculou:'matriculou',nao:'não fechou',andamento:'em andamento',faltou:'faltou'})[tipo]} · Kommo atualizado`, tipo==='matriculou'?{tipo:'ok'}:{ acao:'desfazer', onAcao:() => desfazer(id) }); }
+  catch(e){ toast(e.message,{tipo:'erro'}); }
 }
 async function confirmarMatricula(id){
   const g = x => document.getElementById(x).value;
-  if (!ESC.pagamento) return alert('Escolha a forma de pagamento.');
+  if (!ESC.pagamento) return toast('Escolha a forma de pagamento.',{tipo:'erro'});
   try { await api('desfecho', { agendamento_id: id, desfecho: 'matriculou', valor: g('m-valor'), curso: g('m-curso'), pagamento: ESC.pagamento, turma_id: g('m-turma'), aluno_nome: g('m-aluno'), observacao: `desfecho: matriculou · ${ESC.pagamento}${g('m-valor')?' · R$ '+g('m-valor'):''}` }); ABERTO = null; await carregar(); }
-  catch(e){ alert(e.message); }
+  catch(e){ toast(e.message,{tipo:'erro'}); }
 }
-async function desfazer(id){ try { await api('desfazer', { agendamento_id: id }); await carregar(); } catch(e){ alert(e.message); } }
-async function cancelar(id){ if (!confirm('Cancelar esta aula?')) return; try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pela recepção' }); await carregar(); } catch(e){ alert(e.message); } }
-async function reagendar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'reagendado pela recepção' }); ABERTO = null; VAGAS3 = null; await carregar(); } catch(e){ alert(e.message); } }
+async function desfazer(id){ try { await api('desfazer', { agendamento_id: id }); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+async function cancelar(id){ if (!confirm('Cancelar esta aula?')) return; try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pela recepção' }); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+async function reagendar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'reagendado pela recepção' }); ABERTO = null; VAGAS3 = null; await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
 
 // conversa do lead (drawer à direita)
 async function script(id){
@@ -364,6 +384,14 @@ async function script(id){
 }
 
 let ESC = {};
+let HOVER = null;
+document.addEventListener('mouseover', e => { const c = e.target.closest && e.target.closest('.cardx'); if (c) HOVER = c.dataset.id || HOVER; });
+document.addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA','SELECT'].includes((e.target.tagName||''))) return;
+  const k = e.key.toLowerCase(); const a = D.agendamentos.find(x => x.id === HOVER); if (!a || desfechoDe(a) || a.status === 'faltou') return;
+  if (k === 'm') abrirMenu(a.id, 'matriculou'); else if (k === 'n') abrirMenu(a.id, 'nao'); else if (k === 'a') abrirMenu(a.id, 'andamento'); else if (k === 'f') registrar(a.id, 'faltou', {}); else return;
+  e.preventDefault();
+});
 if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
 </script>
 </body>

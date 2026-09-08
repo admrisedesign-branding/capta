@@ -85,6 +85,24 @@ tr:last-child td{border-bottom:0}
 }
 </style>
 <style>body.embed .voltar{display:none}body.embed .topbar{height:52px;background:transparent;backdrop-filter:none;border-bottom:1px solid var(--line);padding:0 18px}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+<style>
+#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:90;pointer-events:none}
+.toast{pointer-events:auto;background:var(--ink,#141A2E);color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px rgba(20,26,46,.25);display:flex;align-items:center;gap:12px;animation:tin .18s ease-out;max-width:560px}
+.toast.erro{background:#B3261E}.toast.ok{background:#1F7A4D}
+.toast button{border:0;background:rgba(255,255,255,.14);color:#fff;font-weight:700;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
+.toast button:hover{background:rgba(255,255,255,.24)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+<script>
+// aviso discreto no rodapé, com ação opcional (ex.: desfazer)
+function toast(msg, opts){ opts = opts || {}; let box = document.getElementById('toasts'); if(!box){ box = document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
+  const el = document.createElement('div'); el.className = 'toast' + (opts.tipo?' '+opts.tipo:''); el.innerHTML = `<span>${msg}</span>${opts.acao?`<button type="button">${opts.acao}</button>`:''}`;
+  if(opts.acao) el.querySelector('button').onclick = () => { el.remove(); opts.onAcao && opts.onAcao(); };
+  box.appendChild(el); setTimeout(() => el.remove(), opts.ms || (opts.acao ? 7000 : 3500)); return el; }
+// mensagem pro painel (quando embutido): trocar de tela sem sair
+function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
+</script>
+
 </head>
 <body>
 <div class="topbar">
@@ -171,7 +189,7 @@ function render(){
     return `<div class="card"><h3>${titulo}</h3><div class="h">${sub}</div>
       ${linhas.length ? `<table><tr><th>${titulo}</th><th>Leads</th><th class="n">Matr.</th></tr>
       ${linhas.map(([nome,q]) => {
-        const mq = doMes.filter(l => ((titulo==='Fonte' ? (l.fonte || (l.origem && l.origem!=='kommo' ? l.origem : null) || 'não informado') : (l.porta || 'não informado')) === nome) && ganhou(l)).length;
+        const mq = doMes.filter(l => ((titulo==='Por onde veio' ? (l.fonte || (l.origem && l.origem!=='kommo' ? l.origem : null) || 'não informado') : (l.porta || 'não informado')) === nome) && ganhou(l)).length;
         return `<tr><td>${esc(nome)}</td><td><div style="display:flex;align-items:center"><div class="bar" style="flex:1"><i style="width:${q/max*100}%"></i></div><span class="pct">${q}</span></div></td><td class="n">${mq}</td></tr>`;
       }).join('')}
       <tr class="tot"><td>Total</td><td class="n">${leads}</td><td class="n">${mat}</td></tr></table>` : `<div class="vazio">Sem leads neste período.</div>`}
@@ -214,14 +232,14 @@ function render(){
     <div class="cab"><div><h2>${esc(TENANT.nome||'')}</h2><div class="sub">${k ? rotulo(k) : 'Todo o período'} · gerado ${new Date().toLocaleDateString('pt-BR')}</div></div></div>
     <div class="kpis">${kpis}</div>
     <div class="grid">
-      ${tabela(porFonte,'Fonte','De onde o lead veio: anúncio, Instagram, Google, evento, indicação…')}
-      ${tabela(porPorta,'Porta','Por onde entrou: site, WhatsApp (bot), WhatsApp direto, evento…')}
+      ${tabela(porFonte,'Por onde veio','Anúncio, Instagram, Google, evento, indicação…')}
+      ${tabela(porPorta,'Como chegou','Site, WhatsApp pelo bot, WhatsApp direto, evento…')}
       ${funil}
       ${quem}
       ${temp}
       ${evol}
     </div>
-    <div class="nota">Fonte e Porta vêm dos campos preenchidos no Kommo; "não informado" são leads sem esses campos. Matrícula = lead ganho no Kommo. Aulas = leads com aula marcada ou além dessa etapa.</div>`;
+    <div class="nota">"Por onde veio" e "Como chegou" vêm dos campos preenchidos no Kommo; "não informado" são leads sem esses campos. Matrícula = lead ganho no Kommo. Aulas = leads com aula marcada ou além dessa etapa.</div>`;
 }
 carregar();
 </script>

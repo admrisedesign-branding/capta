@@ -2792,13 +2792,13 @@ function montarMenuGestao(){
   const item=(icon,txt,attrs,sub,breve)=>`<button class="nav-item${sub?' sub':''}" data-tip="${txt}" ${attrs}>${I[icon]}${txt}${breve?'<span class="breve">em breve</span>':''}</button>`;
   const go=(pagina)=>`data-page="${pagina}"`;
   nav.innerHTML=`<span class="nav-lbl">Gestão</span>
-    ${item('painel','Painel Gestão',go('/gestao.html'))}
+    ${item('painel','Painel',go('/gestao.html'))}
     ${item('pipe','Pipeline',go('/funil.html'))}
     ${item('chat','Conversas',go('/inbox.html'))}
     ${item('leads','Leads','data-t="leads"')}
-    ${item('cal','Agendamentos',go('/agendamentos.html'))}
+    ${item('cal','Agenda',go('/agendamentos.html'))}
     ${item('aula','Aula experimental',go('/aula-experimental.html'))}
-    ${item('alunos','Alunos ativos',go('/alunos.html'))}
+    ${item('alunos','Alunos',go('/alunos.html'))}
     ${item('evento','Eventos','disabled',false,true)}`;
   const st=document.createElement('style');
   st.textContent='.nav-item.sub{padding-left:34px;font-size:13px}.nav-item[disabled]{opacity:.55;cursor:default}.nav-item .breve{margin-left:auto;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);background:var(--line-2);border-radius:99px;padding:2px 6px}';
@@ -2817,6 +2817,8 @@ function montarMenuGestao(){
   // no plano Gestão a home é a lista de leads (o Painel Gestão é página própria)
   const leadsBtn=nav.querySelector('.nav-item[data-t="leads"]'); if(leadsBtn) leadsBtn.classList.add('on');
   window.__gestao=true;
+  // telas embutidas pedem pra trocar de tela (ex.: "marcar aula no Pipeline")
+  window.addEventListener('message', ev => { const d = ev.data || {}; if (d.capta !== 'ir' || !d.pagina) return; const b = document.querySelector(`.nav-item[data-page="${d.pagina}"]`); if (b) b.click(); });
   // Conectar WhatsApp vira botão no canto superior direito (abre a tela embutida)
   const bz=document.getElementById('btn-zap');
   if(bz){ bz.style.display='inline-flex'; bz.onclick=()=>{ document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('on')); document.getElementById('page-title').textContent='Conectar WhatsApp'; activeTab='embed'; view.innerHTML=`<iframe class="embed" src="/whatsapp.html${qs}&embed=1" title="Conectar WhatsApp"></iframe>`; window.scrollTo(0,0); };
