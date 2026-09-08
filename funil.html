@@ -342,6 +342,30 @@ function janelaMotivo(lead, etapa) {
   };
 }
 
+
+// ---- importar histórico (.txt exportado do WhatsApp) ----
+function importarTxt(opts){ // opts: {lead_id?, telefone?, depois}
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.txt,text/plain';
+  inp.onchange = () => { const f = inp.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => previaImport(rd.result, opts); rd.readAsText(f); };
+  inp.click();
+}
+async function previaImport(texto, opts){
+  let pv; try { pv = await api('importar_historico', { texto, previa: true }); } catch(e){ return toast(e.message,{tipo:'erro'}); }
+  const autores = Object.entries(pv.autores).sort((a,b)=>b[1]-a[1]);
+  const box = document.createElement('div'); box.className = 'fundo'; box.id = 'imp-fundo';
+  box.innerHTML = `<div class="janela"><h3>Importar conversa</h3><p>${pv.total} mensagens, de ${new Date(pv.de).toLocaleDateString('pt-BR')} a ${new Date(pv.ate).toLocaleDateString('pt-BR')}.<br>Quem é <b>a escola</b> nessa conversa? (o resto é o lead)</p>
+    <div class="chips" style="margin-top:12px">${autores.map(([n,q]) => `<button class="chip" onclick="this.classList.toggle('on')" data-n="${esc(n)}">${esc(n)} <span style="opacity:.7">${q}</span></button>`).join('')}</div>
+    ${opts.lead_id ? '' : `<div class="campo" style="margin-top:12px"><label>Telefone do lead (com DDD)</label><input id="imp-tel" placeholder="92999999999"></div>`}
+    <div class="fim"><button class="btn g" onclick="document.getElementById('imp-fundo').remove()">Cancelar</button><button class="btn" id="imp-ok">Importar</button></div></div>`;
+  document.body.appendChild(box);
+  document.getElementById('imp-ok').onclick = async () => {
+    const nomes = [...box.querySelectorAll('.chip.on')].map(c => c.dataset.n); if (!nomes.length) return toast('Marque quem é a escola.',{tipo:'erro'});
+    const telefone = opts.telefone || (document.getElementById('imp-tel') || {}).value;
+    try { const r = await api('importar_historico', { texto, nomes_escola: nomes, lead_id: opts.lead_id, telefone }); box.remove(); toast(`${r.importadas} mensagens importadas`, {tipo:'ok'}); opts.depois && opts.depois(r); }
+    catch(e){ toast(e.message,{tipo:'erro'}); }
+  };
+}
+
 // ===================== painel lateral do lead =====================
 const DIAS_N = ['dom','seg','ter','qua','qui','sex','sáb'];
 const hhmm = t => String(t || '').slice(0, 5);
@@ -399,7 +423,7 @@ function painelConversa(l) {
       'A conversa aparece aqui quando o WhatsApp da unidade estiver conectado ao Capta.'}${l.kommo_lead_id ? `<br><a class="kommo-lnk" style="margin:0" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Ver a conversa no Kommo ↗</a>` : ''}
       ${l.contato ? `<br><a class="kommo-lnk" style="margin:0" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">Chamar no WhatsApp 💬</a>` : ''}</div>`;
   const podeEnviar = i && i.canal === 'conectado';
-  return `<div class="p-corpo">${chipsEtapa(l)}<div class="p-sec">Conversa</div>${corpo}</div>
+  return `<div class="p-corpo">${chipsEtapa(l)}<div class="p-sec" style="display:flex;align-items:center">Conversa<a href="#" style="margin-left:auto;font-weight:700;color:var(--brand);text-transform:none;letter-spacing:0;text-decoration:none" onclick="importarTxt({ lead_id: '${l.id}', telefone: '${esc(l.contato||'')}', depois: async () => { P.info = await api('lead', { lead_id: '${l.id}' }); desenharPainel(); } });return false">importar .txt</a></div>${corpo}</div>
     ${podeEnviar ? `<div class="enviar"><input id="p-txt" placeholder="Escreva uma mensagem…" onkeydown="if(event.key==='Enter')enviarMsg()"><button class="btn" onclick="enviarMsg()">Enviar</button></div>` : ''}`;
 }
 async function enviarMsg() {
