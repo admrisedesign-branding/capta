@@ -85,7 +85,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -107,6 +107,9 @@ module.exports = async function handler(req, res) {
         case 'equipe':   return await acaoEquipe(tenant, body, res);
         case 'equipe_salvar': return await acaoEquipeSalvar(tenant, body, res);
         case 'eu':       return await acaoEu(tenant, body, res);
+        case 'eventos':  return await acaoEventos(tenant, body, res);
+        case 'evento_salvar': return await acaoEventoSalvar(tenant, body, res);
+        case 'evento_leads':  return await acaoEventoLeads(tenant, body, res);
       }
     }
 
@@ -1075,6 +1078,68 @@ async function acaoEquipeSalvar(tenant, body, res) {
   }
   const lista = await sb(`capta_usuarios?tenant_id=eq.${tenant.id}&select=id,nome,email,papel,ativo,telas,ultimo_acesso&order=nome`).catch(() => []);
   return res.status(200).json({ ok: true, equipe: lista || [], papeis: PAPEIS });
+}
+
+
+// ---------------------------------------------------------------------
+// EVENTOS — feiras, shoppings, escolas: cada um com seus leads
+// ---------------------------------------------------------------------
+async function acaoEventos(tenant, body, res) {
+  const eventos = await sb(`capta_eventos?tenant_id=eq.${tenant.id}&select=*&order=data_inicio.desc`).catch(() => []);
+  const ids = (eventos || []).map(e => e.id);
+  let porEvento = {};
+  if (ids.length) {
+    const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&evento_id=in.(${ids.join(',')})&select=id,evento_id,etapa_id,ganho_em,valor,data_aula,temperatura,criado_em`).catch(() => []);
+    const etapas = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome`).catch(() => []);
+    const nome = id => (etapas.find(e => e.id === id) || {}).nome || '';
+    for (const l of leads || []) {
+      const b = porEvento[l.evento_id] || (porEvento[l.evento_id] = { leads: 0, aulas: 0, matriculas: 0, receita: 0, quentes: 0 });
+      b.leads++;
+      if (l.data_aula || /aula agendada|matr|aluno/i.test(nome(l.etapa_id))) b.aulas++;
+      if (l.ganho_em || /aluno ativo/i.test(nome(l.etapa_id))) { b.matriculas++; b.receita += Number(l.valor) || 0; }
+      if ((l.temperatura || '').toLowerCase() === 'quente') b.quentes++;
+    }
+  }
+  return res.status(200).json({ eventos: eventos || [], numeros: porEvento });
+}
+async function acaoEventoSalvar(tenant, body, res) {
+  if (body.apagar) {
+    await sb(`capta_leads?tenant_id=eq.${tenant.id}&evento_id=eq.${body.apagar}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ evento_id: null }) }).catch(() => null);
+    await sb(`capta_eventos?id=eq.${body.apagar}&tenant_id=eq.${tenant.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  } else {
+    const e = body.evento || {};
+    if (!e.nome) return res.status(400).json({ erro: 'Informe o nome do evento.' });
+    const dados = { nome: e.nome.trim(), local: e.local || null, cidade: e.cidade || 'Manaus', data_inicio: e.data_inicio || null, data_fim: e.data_fim || e.data_inicio || null, tipo: e.tipo || null, isca: e.isca || null, observacao: e.observacao || null, ativo: e.ativo !== false };
+    if (e.id) await sb(`capta_eventos?id=eq.${e.id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
+    else await sb('capta_eventos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ tenant_id: tenant.id, ...dados }) });
+  }
+  return acaoEventos(tenant, body, res);
+}
+// leads de um evento; e "vincular": marca leads existentes (por tag, período ou lista de ids)
+async function acaoEventoLeads(tenant, body, res) {
+  if (body.vincular) {
+    const { evento_id, ids, tag, de, ate } = body.vincular;
+    if (!evento_id) return res.status(400).json({ erro: 'Informe o evento.' });
+    let alvo = ids || [];
+    if (!alvo.length && (tag || de)) {
+      let q = `capta_leads?tenant_id=eq.${tenant.id}&select=id&limit=1000`;
+      if (tag) q += `&tags=cs.{${encodeURIComponent(tag)}}`;
+      if (de) q += `&criado_em=gte.${de}`;
+      if (ate) q += `&criado_em=lte.${ate}T23:59:59`;
+      const r = await sb(q).catch(() => []);
+      alvo = (r || []).map(x => x.id);
+    }
+    if (!alvo.length) return res.status(200).json({ ok: true, vinculados: 0 });
+    for (let i = 0; i < alvo.length; i += 100) {
+      const lote = alvo.slice(i, i + 100);
+      await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${lote.join(',')})`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ evento_id, porta: 'evento', fonte: 'evento' }) });
+    }
+    return res.status(200).json({ ok: true, vinculados: alvo.length });
+  }
+  const id = body.evento_id; if (!id) return res.status(400).json({ erro: 'Informe o evento.' });
+  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&evento_id=eq.${id}&select=id,nome,contato,temperatura,score,etapa_id,atendente,data_aula,ganho_em,valor,criado_em,kommo_lead_id,tags&order=criado_em.desc`).catch(() => []);
+  const etapas = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome,tipo&order=ordem`).catch(() => []);
+  return res.status(200).json({ leads: leads || [], etapas: etapas || [] });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
