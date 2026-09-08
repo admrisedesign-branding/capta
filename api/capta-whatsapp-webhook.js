@@ -54,7 +54,7 @@ async function processar(canalId, payload) {
   // O canal vem pela query, mas confere contra o instanceId do payload:
   // impede que um webhook forjado escreva na conversa de outro cliente.
   const canais = await sb(
-    `capta_canais?select=id,tenant_id,instancia_id&id=eq.${canalId}`
+    `capta_canais?select=id,tenant_id,instancia_id,instancia_token,client_token&id=eq.${canalId}`
   );
   const canal = canais?.[0];
   if (!canal) return;
