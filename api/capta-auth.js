@@ -127,7 +127,7 @@ module.exports = async function handler(req, res) {
       if (t && t[0] && t[0].dashboard_token) {
         await fetch(`${SUPABASE_URL}/rest/v1/capta_usuarios?id=eq.${u[0].id}`, { method: 'PATCH', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ ultimo_acesso: new Date().toISOString() }) }).catch(() => {});
         const nome = encodeURIComponent(u[0].nome || email.split('@')[0]);
-        return res.status(200).json({ role: 'client', url: `/dashboard.html?t=${encodeURIComponent(t[0].slug)}&k=${encodeURIComponent(t[0].dashboard_token)}&u=${nome}&papel=${encodeURIComponent(u[0].papel || 'atendente')}` });
+        return res.status(200).json({ role: 'client', url: `/dashboard.html?t=${encodeURIComponent(t[0].slug)}&k=${encodeURIComponent(t[0].dashboard_token)}&u=${nome}&papel=${encodeURIComponent(u[0].papel || 'atendente')}&e=${esc}` });
       }
     }
   } catch (e) {}

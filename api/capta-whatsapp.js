@@ -78,7 +78,14 @@ module.exports = async function handler(req, res) {
 
     // Funil, agenda e presença não dependem de WhatsApp: valem em qualquer
     // plano, com ou sem canal conectado.
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico'];
+    // permissão por papel (o e-mail de quem está usando vem no corpo)
+    if (body.email_atual) {
+      const eu = await usuarioDe(tenant.id, body.email_atual);
+      if (eu && eu.ativo === false) return res.status(403).json({ erro: 'Seu acesso está desativado. Fale com o gestor.' });
+      if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
+    }
+
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -97,6 +104,9 @@ module.exports = async function handler(req, res) {
         case 'conversa_atualizar': return await acaoConversaAtualizar(tenant, body, res);
         case 'respostas': return await acaoRespostas(tenant, body, res);
         case 'importar_historico': return await acaoImportarHistorico(tenant, body, res);
+        case 'equipe':   return await acaoEquipe(tenant, body, res);
+        case 'equipe_salvar': return await acaoEquipeSalvar(tenant, body, res);
+        case 'eu':       return await acaoEu(tenant, body, res);
       }
     }
 
@@ -1013,6 +1023,57 @@ async function acaoImportarHistorico(tenant, body, res) {
   const ultima = msgs[msgs.length - 1];
   await sb(`capta_conversas?id=eq.${conv.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ultima_mensagem: (ultima.texto || '').slice(0, 120) }) }).catch(() => null);
   return res.status(200).json({ ok: true, conversa_id: conv.id, importadas: gravadas });
+}
+
+
+// ---------------------------------------------------------------------
+// EQUIPE E PERMISSÕES
+// Papéis: gestor (tudo) · atendente (atende e agenda) · secretaria (alunos e agenda) · leitura (só vê)
+// ---------------------------------------------------------------------
+const PAPEIS = {
+  gestor:     { nome: 'Gestor',     desc: 'Vê e faz tudo, inclusive equipe e painel.',              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos','eventos','ajustes'], pode: ['*'] },
+  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','alunos','eu'] },
+  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','lead','funil','eu'] },
+  leitura:    { nome: 'Só leitura', desc: 'Vê tudo, não altera nada.',                              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos'],                   pode: ['agenda','funil','lead','experimentais','alunos','conversas','mensagens','midia','eu'] },
+};
+async function usuarioDe(tenantId, email) {
+  if (!email) return null;
+  const u = await sb(`capta_usuarios?tenant_id=eq.${tenantId}&email=eq.${encodeURIComponent(String(email).toLowerCase().trim())}&select=id,nome,email,papel,ativo,telas&limit=1`).catch(() => []);
+  return u?.[0] || null;
+}
+function podeFazer(papel, acao) {
+  const p = PAPEIS[papel] || PAPEIS.gestor;
+  return p.pode.includes('*') || p.pode.includes(acao);
+}
+async function acaoEu(tenant, body, res) {
+  const u = await usuarioDe(tenant.id, body.email);
+  const papel = u?.papel || 'gestor';
+  const def = PAPEIS[papel] || PAPEIS.gestor;
+  return res.status(200).json({ usuario: u ? { nome: u.nome, email: u.email, papel } : null, papel, telas: (u && u.telas && u.telas.length ? u.telas : def.telas), papeis: PAPEIS });
+}
+async function acaoEquipe(tenant, body, res) {
+  const lista = await sb(`capta_usuarios?tenant_id=eq.${tenant.id}&select=id,nome,email,papel,ativo,telas,ultimo_acesso,criado_em&order=nome`).catch(() => []);
+  return res.status(200).json({ equipe: lista || [], papeis: PAPEIS });
+}
+async function acaoEquipeSalvar(tenant, body, res) {
+  const quem = await usuarioDe(tenant.id, body.email_atual);
+  if (quem && quem.papel !== 'gestor') return res.status(403).json({ erro: 'Só um gestor pode mexer na equipe.' });
+  if (body.apagar) { await sb(`capta_usuarios?id=eq.${body.apagar}&tenant_id=eq.${tenant.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); }
+  else {
+    const u = body.usuario || {};
+    const email = String(u.email || '').toLowerCase().trim();
+    if (!u.id && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ erro: 'E-mail inválido.' });
+    if (!PAPEIS[u.papel || 'atendente']) return res.status(400).json({ erro: 'Papel inválido.' });
+    const dados = { nome: (u.nome || '').trim() || email.split('@')[0], papel: u.papel || 'atendente', ativo: u.ativo !== false, telas: Array.isArray(u.telas) && u.telas.length ? u.telas : null };
+    if (u.id) await sb(`capta_usuarios?id=eq.${u.id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
+    else {
+      const ja = await sb(`capta_usuarios?tenant_id=eq.${tenant.id}&email=eq.${encodeURIComponent(email)}&select=id&limit=1`).catch(() => []);
+      if (ja?.length) return res.status(409).json({ erro: 'Esse e-mail já está na equipe.' });
+      await sb('capta_usuarios', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ tenant_id: tenant.id, email, ...dados }) });
+    }
+  }
+  const lista = await sb(`capta_usuarios?tenant_id=eq.${tenant.id}&select=id,nome,email,papel,ativo,telas,ultimo_acesso&order=nome`).catch(() => []);
+  return res.status(200).json({ ok: true, equipe: lista || [], papeis: PAPEIS });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
