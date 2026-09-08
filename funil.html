@@ -201,6 +201,7 @@ async function carregar() {
       return;
     }
     desenhar();
+    try { const pd = JSON.parse(localStorage.getItem('capta_abrir_lead')||'null'); if (pd && Date.now() - pd.t < 60000) { localStorage.removeItem('capta_abrir_lead'); if (leads.find(x => x.id === pd.id)) { P.aba = pd.aba || 'conversa'; abrirLead(pd.id); if (pd.aba === 'agendar') { P.aba = 'agendar'; desenharPainel(); carregarAgenda(); } } } } catch(e){}
   } catch (e) {
     document.getElementById('raiz').className = 'aviso';
     document.getElementById('raiz').textContent = e.message;

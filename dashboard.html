@@ -2807,6 +2807,7 @@ function montarMenuGestao(){
   const nav=document.querySelector('.nav'); if(!nav) return;
   const qs='?t='+encodeURIComponent(SLUG)+'&k='+encodeURIComponent(TOKEN);
   const I={
+    dia:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     painel:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 3 5-6"/></svg>',
     leads:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/></svg>',
     chat:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
@@ -2820,6 +2821,7 @@ function montarMenuGestao(){
   const item=(icon,txt,attrs,sub,breve)=>`<button class="nav-item${sub?' sub':''}" data-tip="${txt}" ${attrs}>${I[icon]}${txt}${breve?'<span class="breve">em breve</span>':''}</button>`;
   const go=(pagina)=>`data-page="${pagina}"`;
   nav.innerHTML=`<span class="nav-lbl">Gestão</span>
+    ${item('dia','Atendimento',go('/atendimento.html'))}
     ${item('painel','Painel',go('/gestao.html'))}
     ${item('pipe','Pipeline',go('/funil.html'))}
     ${item('chat','Conversas',go('/inbox.html'))}
@@ -2843,7 +2845,7 @@ function montarMenuGestao(){
     if(typeof closeSide === 'function') closeSide();
   });
   // no plano Gestão a home é a lista de leads (o Painel Gestão é página própria)
-  const leadsBtn=nav.querySelector('.nav-item[data-t="leads"]'); if(leadsBtn) leadsBtn.classList.add('on');
+  const home=nav.querySelector('.nav-item[data-page="/atendimento.html"]'); if(home){ home.classList.add('on'); setTimeout(()=>{ if(activeTab!=='embed') home.click(); }, 0); }
   window.__gestao=true;
   // telas embutidas pedem pra trocar de tela (ex.: "marcar aula no Pipeline")
   window.addEventListener('message', ev => { const d = ev.data || {}; if (d.capta !== 'ir' || !d.pagina) return; const b = document.querySelector(`.nav-item[data-page="${d.pagina}"]`); if (b) b.click(); });
@@ -2880,7 +2882,7 @@ async function load(){
     try{ localStorage.setItem('capta_dash', `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`); }catch(e){}
   }
   const irPara = params.get('ir');
-  if(irPara && TITLES[irPara]) goTab(irPara); else render(window.__gestao ? 'leads' : 'painel');
+  if(irPara && TITLES[irPara]) goTab(irPara); else if(!window.__gestao) render('painel');
   if(params.get('tour')==='1') setTimeout(startTour, 500);
   if(params.get('pago')==='1') avisoPagamento();
   startLeadPolling();

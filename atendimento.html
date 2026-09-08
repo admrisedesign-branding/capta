@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Atendimento — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#2E5BFF; --brand-2:#5B8DEF; --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
+  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
+  --ink:#141A2E; --muted:#697089; --faint:#9AA1B4;
+  --quente:#E03127; --morno:#C47A08; --verde:#16A34A; --verde-bg:rgba(22,163,74,.12);
+  --exp:#E8734A; --exp-bg:#FDEFE7;
+  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
+button,input,select,textarea{font-family:inherit}button{cursor:pointer}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px;font-weight:700}
+.voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;padding:7px 13px;border-radius:10px;text-decoration:none}
+.wrap{padding:20px 26px 48px}
+.barra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.barra h2{font-size:20px;font-weight:800;letter-spacing:-.01em}.barra .sub{color:var(--muted);font-size:13px;margin-left:4px}
+.btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:9px}
+.btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}.btn.v{background:var(--verde)}.btn.x{background:rgba(224,49,39,.1);color:var(--quente)}
+.btn.sm{padding:6px 10px;font-size:12px}
+.tally{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 18px;display:flex;gap:26px;margin-bottom:14px;flex-wrap:wrap}
+.tally > div{cursor:pointer}.tally b{font-size:22px;font-weight:800;margin-right:6px}.tally small{color:var(--muted);font-weight:600;font-size:12.5px}.tally .hot b{color:var(--morno)}.tally .bad b{color:var(--quente)}.tally .ok b{color:var(--verde)}
+.grade{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;align-items:start}
+@media(max-width:980px){.grade{grid-template-columns:1fr}}
+.bloco{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:14px}
+.bloco h3{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.bloco h3 .n{background:var(--line-2);color:var(--ink);border-radius:99px;padding:1px 8px;font-size:11.5px}
+.bloco h3 .link{margin-left:auto;font-size:12px;font-weight:700;color:var(--brand);text-transform:none;letter-spacing:0;cursor:pointer}
+.vazio{color:var(--faint);font-size:13px;padding:10px 0;line-height:1.6}
+/* aula do dia */
+.aula{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;position:relative}
+.aula.feita{opacity:.7}.aula.win{background:#F2FAF4;border-color:#BFE3C9}.aula.lost{background:#FCF3F2;border-color:#F0C6C3}.aula.hold{background:#FDF8EC;border-color:#EAD7A5}
+.aula .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.aula .h{font-weight:800;font-size:15px;color:var(--muted)}.aula .kid{font-weight:800;font-size:14.5px}
+.aula .sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+.rot{font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:99px}.rot.q{color:var(--quente);background:rgba(224,49,39,.1)}.rot.m{color:var(--morno);background:rgba(224,147,15,.12)}.rot.f{color:var(--muted);background:var(--line-2)}
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.acts button{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 6px;font-weight:700;font-size:12px;color:var(--muted)}
+.acts .yes{background:var(--verde);border-color:var(--verde);color:#fff}.acts .nope{background:rgba(224,49,39,.1);border-color:rgba(224,49,39,.25);color:var(--quente)}
+.done{font-size:12.5px;margin-top:8px;color:var(--muted)}.done b{color:var(--ink)}
+/* listas de leads */
+.li{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-2)}.li:last-child{border:0}
+.av{width:32px;height:32px;border-radius:9px;background:var(--brand-soft);color:var(--brand);font-weight:800;display:grid;place-items:center;flex:0 0 32px;font-size:12px}
+.li .t{flex:1;min-width:0}.li .t b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.li .t small{color:var(--muted);font-size:12px}
+.li .acs{display:flex;gap:6px;flex-shrink:0}
+/* vagas */
+.vagas3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.vg{background:var(--brand-softer);border:1px solid var(--line);border-radius:12px;padding:10px 12px}.vg small{color:var(--muted);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}.vg b{display:block;font-size:14px;margin-top:2px}.vg span{font-size:12px;color:var(--muted)}
+.script{margin-top:10px;font-size:12.5px;color:var(--muted);background:var(--line-2);border-radius:10px;padding:8px 10px;line-height:1.5}.script b{color:var(--ink)}
+/* dialog */
+.fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
+.janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:440px;box-shadow:0 20px 50px rgba(20,26,46,.2)}
+.janela h3{font-size:16px;font-weight:700}.janela p{color:var(--muted);font-size:13px;margin-top:4px}
+.campo{margin-top:12px}.campo label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.campo select,.campo input,.campo textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--ink);background:var(--card)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 11px;font-size:12.5px;font-weight:600;color:var(--muted)}.chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.l2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fim{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+</style>
+<style>body.embed .voltar,body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}</style>
+<script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+<style>
+#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:90;pointer-events:none}
+.toast{pointer-events:auto;background:var(--ink,#141A2E);color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px rgba(20,26,46,.25);display:flex;align-items:center;gap:12px;animation:tin .18s ease-out;max-width:560px}
+.toast.erro{background:#B3261E}.toast.ok{background:#1F7A4D}
+.toast button{border:0;background:rgba(255,255,255,.14);color:#fff;font-weight:700;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
+.toast button:hover{background:rgba(255,255,255,.24)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+<script>
+// aviso discreto no rodapé, com ação opcional (ex.: desfazer)
+function toast(msg, opts){ opts = opts || {}; let box = document.getElementById('toasts'); if(!box){ box = document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
+  const el = document.createElement('div'); el.className = 'toast' + (opts.tipo?' '+opts.tipo:''); el.innerHTML = `<span>${msg}</span>${opts.acao?`<button type="button">${opts.acao}</button>`:''}`;
+  if(opts.acao) el.querySelector('button').onclick = () => { el.remove(); opts.onAcao && opts.onAcao(); };
+  box.appendChild(el); setTimeout(() => el.remove(), opts.ms || (opts.acao ? 7000 : 3500)); return el; }
+// mensagem pro painel (quando embutido): trocar de tela sem sair
+function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
+</script>
+
+</head>
+<body>
+<div class="topbar"><a class="voltar" id="voltar" href="/dashboard.html">← Painel</a><h1>Atendimento</h1></div>
+<div class="wrap" id="raiz"><div class="vazio">Carregando o dia…</div></div>
+<div id="modal"></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'], DIAS3 = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const hoje = new Date().toISOString().slice(0,10);
+const hh = t => String(t||'').slice(0,5);
+const ini = n => (n||'?').trim().split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+const dias = d => Math.floor((Date.now() - new Date(d).getTime()) / 864e5);
+const ROT = { quente: ['Quer fechar','q'], morno: ['Considerando','m'], frio: ['Só conhecendo','f'] };
+const MOTIVOS = ['Orçamento','Horário não bate','Vai pensar','Distância','Criança não se adaptou','Só pesquisando'];
+const PAGTOS = ['Pix','cartão','boleto','recorrente'];
+const KITS = ['First','OneBot','TechBot','Autobot','App Developer','GameBot'];
+let D = { aulas: [], leadsAula: [], turmas: [], leads: [], etapas: [], conversas: [], vagas: [] };
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, ...extra }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
+}
+async function carregar(){
+  try {
+    const [ex, fu, ag, cv] = await Promise.all([
+      api('experimentais', { de: hoje, ate: hoje }), api('funil'), api('agenda', { dias: 14 }).catch(() => ({ horarios: [] })), api('conversas').catch(() => ({ conversas: [] }))
+    ]);
+    D = { aulas: ex.agendamentos || [], leadsAula: ex.leads || [], turmas: ex.turmas || [], leads: fu.leads || [], etapas: fu.etapas || [], conversas: cv.conversas || cv || [], vagas: (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0 && h.data > hoje) };
+    desenhar();
+  } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
+}
+const etapaNome = id => (D.etapas.find(e => e.id === id) || {}).nome || '';
+const leadAula = a => D.leadsAula.find(l => l.id === a.lead_id) || D.leads.find(l => l.id === a.lead_id) || {};
+const desfechoDe = a => { const m = /desfecho:\s*(matriculou|nao|andamento|faltou)(?:\s*·\s*(.*))?/i.exec(a.observacao||''); return m ? { t: m[1].toLowerCase(), obs: (m[2]||'').trim() } : null; };
+function irLead(id, aba){ try { localStorage.setItem('capta_abrir_lead', JSON.stringify({ id, aba: aba || 'conversa', t: Date.now() })); } catch(e){} irPara('/funil.html'); }
+
+function desenhar(){
+  const aulas = D.aulas.filter(a => a.status !== 'cancelado').sort((a,b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+  const pend = aulas.filter(a => !desfechoDe(a) && a.status !== 'faltou');
+  // conversas sem resposta: última mensagem recebida e não lida
+  const semResp = (Array.isArray(D.conversas) ? D.conversas : []).filter(c => (c.nao_lidas||0) > 0).sort((a,b) => new Date(b.ultima_mensagem_em||0) - new Date(a.ultima_mensagem_em||0));
+  // querem fechar sem aula
+  const etAula = D.etapas.filter(e => /aula agendada|matr|aluno|remarketing|perdido/i.test(e.nome)).map(e => e.id);
+  const quentes = D.leads.filter(l => (l.temperatura||'').toLowerCase() === 'quente' && !etAula.includes(l.etapa_id) && !l.data_aula).sort((a,b) => new Date(b.etapa_em||b.criado_em) - new Date(a.etapa_em||a.criado_em));
+  // parados: em contato / qualificado há 3+ dias
+  const etTrab = D.etapas.filter(e => /em contato|qualificado/i.test(e.nome)).map(e => e.id);
+  const parados = D.leads.filter(l => etTrab.includes(l.etapa_id) && dias(l.etapa_em||l.criado_em) >= 3).sort((a,b) => dias(b.etapa_em||b.criado_em) - dias(a.etapa_em||a.criado_em));
+  const vaga = tipo => D.vagas.filter(h => { const w = new Date(h.data+'T12:00').getDay(), hi = parseInt(h.hora_inicio); return tipo==='sab'?w===6:tipo==='manha'?(w!==6&&hi<12):(w!==6&&hi>=12); }).sort((x,y)=>(x.data+x.hora_inicio).localeCompare(y.data+y.hora_inicio))[0];
+  const vg = (rot, v) => `<div class="vg"><small>${rot}</small>${v ? `<b>${DIAS3[new Date(v.data+'T12:00').getDay()]} ${new Date(v.data+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} · ${hh(v.hora_inicio)}</b><span>${v.vagas} First livres</span>` : '<b>—</b><span>sem vaga em 14 dias</span>'}</div>`;
+  const vm = vaga('manha'), vt = vaga('tarde'), vs = vaga('sab');
+  const fraseVaga = v => v ? `${DIAS[new Date(v.data+'T12:00').getDay()]} às ${hh(v.hora_inicio)}` : null;
+  const script = [fraseVaga(vm), fraseVaga(vt)].filter(Boolean);
+
+  document.getElementById('raiz').innerHTML = `
+    <div class="barra"><h2>${new Date().getHours() < 12 ? 'Bom dia' : new Date().getHours() < 18 ? 'Boa tarde' : 'Boa noite'}</h2><span class="sub">${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}</span>
+      <div style="margin-left:auto;display:flex;gap:8px"><button class="btn g" onclick="carregar()">Atualizar</button><button class="btn" onclick="irPara('/agendamentos.html')">+ Novo agendamento</button></div></div>
+    <div class="tally">
+      <div onclick="document.getElementById('sec-aulas').scrollIntoView({behavior:'smooth'})"><b>${aulas.length}</b><small>aulas hoje</small></div>
+      <div class="hot" onclick="document.getElementById('sec-aulas').scrollIntoView({behavior:'smooth'})"><b>${pend.length}</b><small>sem desfecho</small></div>
+      <div class="bad" onclick="document.getElementById('sec-resp').scrollIntoView({behavior:'smooth'})"><b>${semResp.length}</b><small>mensagens sem resposta</small></div>
+      <div class="bad" onclick="document.getElementById('sec-quentes').scrollIntoView({behavior:'smooth'})"><b>${quentes.length}</b><small>querem fechar sem aula</small></div>
+      <div onclick="document.getElementById('sec-parados').scrollIntoView({behavior:'smooth'})"><b>${parados.length}</b><small>parados há 3+ dias</small></div>
+    </div>
+    <div class="grade">
+      <div>
+        <div class="bloco" id="sec-aulas"><h3>Aulas de hoje <span class="n">${aulas.length}</span><span class="link" onclick="irPara('/aula-experimental.html')">ver a semana →</span></h3>
+          ${aulas.length ? aulas.map(cardAula).join('') : `<div class="vazio">Nenhuma aula experimental hoje.<br><button class="btn sm" style="margin-top:8px" onclick="irPara('/agendamentos.html')">Marcar uma aula</button></div>`}</div>
+        <div class="bloco" id="sec-resp"><h3>Responder agora <span class="n">${semResp.length}</span><span class="link" onclick="irPara('/inbox.html')">abrir conversas →</span></h3>
+          ${semResp.length ? semResp.slice(0,8).map(c => { const l = D.leads.find(x => x.id === (c.lead && c.lead.id)) || c.lead || {}; return `<div class="li"><div class="av">${ini(l.nome||c.nome||c.telefone)}</div><div class="t"><b>${esc(l.nome||c.nome||c.telefone||'')}</b><small>${c.nao_lidas} nova${c.nao_lidas>1?'s':''}${c.ultima_mensagem_em?' · '+new Date(c.ultima_mensagem_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}${l.temperatura?' · '+esc(l.temperatura):''}</small></div><div class="acs">${l.id?`<button class="btn sm" onclick="irLead('${l.id}','conversa')">responder</button>`:`<button class="btn sm g" onclick="irPara('/inbox.html')">abrir</button>`}</div></div>`; }).join('') : `<div class="vazio">Tudo respondido. ${D.conversas.length ? '' : 'As mensagens aparecem aqui quando o WhatsApp da unidade estiver conectado.'}</div>`}</div>
+      </div>
+      <div>
+        <div class="bloco"><h3>Próximas vagas <span class="link" onclick="irPara('/agendamentos.html')">ver agenda →</span></h3>
+          <div class="vagas3">${vg('Manhã', vm)}${vg('Tarde', vt)}${vg('Sábado', vs)}</div>
+          ${script.length ? `<div class="script"><b>Script:</b> "Temos aula experimental ${script.join(' ou ')} — qual fica melhor pra vocês?"</div>` : ''}</div>
+        <div class="bloco" id="sec-quentes"><h3>Querem fechar, sem aula marcada <span class="n">${quentes.length}</span></h3>
+          ${quentes.length ? quentes.slice(0,8).map(l => `<div class="li"><div class="av">${ini(l.nome)}</div><div class="t"><b>${esc(l.nome||'Sem nome')}</b><small>${esc(l.contato||'')} · ${esc(etapaNome(l.etapa_id)||'sem etapa')}${l.atendente?' · '+esc(l.atendente):''}</small></div><div class="acs"><button class="btn sm" onclick="irLead('${l.id}','agendar')">marcar aula</button></div></div>`).join('') : '<div class="vazio">Nenhum lead quente esperando aula.</div>'}</div>
+        <div class="bloco" id="sec-parados"><h3>Parados há 3+ dias <span class="n">${parados.length}</span><span class="link" onclick="irPara('/funil.html')">ver pipeline →</span></h3>
+          ${parados.length ? parados.slice(0,8).map(l => `<div class="li"><div class="av">${ini(l.nome)}</div><div class="t"><b>${esc(l.nome||'Sem nome')}</b><small>${esc(etapaNome(l.etapa_id))} há ${dias(l.etapa_em||l.criado_em)} dias${l.temperatura?' · '+esc(l.temperatura):''}</small></div><div class="acs"><button class="btn sm g" onclick="irLead('${l.id}','conversa')">abrir</button></div></div>`).join('') : '<div class="vazio">Ninguém parado.</div>'}</div>
+      </div>
+    </div>`;
+}
+function cardAula(a){
+  const l = leadAula(a); const D_ = desfechoDe(a); const temp = (l.temperatura||'').toLowerCase();
+  const rot = ROT[temp] ? `<span class="rot ${ROT[temp][1]}">${ROT[temp][0]}</span>` : '';
+  let cls = '', fim = '';
+  if (a.status === 'faltou') { cls = ' feita'; fim = `<div class="done"><b>Faltou.</b> Tag <i>reagendar devido falta</i> no Kommo. <a href="#" onclick="irLead('${a.lead_id}','agendar');return false" style="color:var(--brand);font-weight:700">reagendar</a></div>`; }
+  else if (D_) { cls = D_.t==='matriculou'?' win':D_.t==='nao'?' lost':' hold'; fim = `<div class="done"><b>${D_.t==='matriculou'?'Matriculou':D_.t==='nao'?'Não fechou':'Em andamento'}</b>${D_.obs?' · '+esc(D_.obs):''}</div>`; }
+  else fim = `<div class="acts"><button class="yes" onclick="menu('${a.id}','matriculou')">Matriculou</button><button class="nope" onclick="menu('${a.id}','nao')">Não</button><button onclick="menu('${a.id}','andamento')">Em andamento</button><button onclick="registrar('${a.id}','faltou',{})">Faltou</button></div>`;
+  return `<div class="aula${cls}"><div class="top"><span class="h">${hh(a.hora_inicio)}</span><span class="kid">${esc(a.crianca_nome||l.nome||'Criança')}${a.crianca_idade?` <span style="color:var(--faint);font-weight:600;font-size:12px">${a.crianca_idade} anos</span>`:''}</span>${rot}</div>
+    <div class="sub">com ${esc(l.nome||'responsável')}${l.contato?' · '+esc(l.contato):''}${l.atendente?' · '+esc(l.atendente):''}${l.id?` · <a href="#" onclick="irLead('${l.id}','conversa');return false" style="color:var(--brand);font-weight:700">conversa</a>`:''}</div>${fim}</div>`;
+}
+let ESC = {};
+function menu(id, tipo){
+  const a = D.aulas.find(x => x.id === id); const l = leadAula(a); ESC = {};
+  const corpo = tipo === 'matriculou' ? `<div class="campo"><label>Pagamento</label><div class="chips">${PAGTOS.map(v=>`<button class="chip" onclick="ESC.pagamento='${v}';this.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')">${v}</button>`).join('')}</div></div>
+      <div class="l2"><div class="campo"><label>Valor (R$)</label><input id="m-valor" type="number" min="0" step="10" placeholder="397"></div><div class="campo"><label>Kit</label><select id="m-curso">${KITS.map(k=>`<option ${k==='First'?'selected':''}>${k}</option>`).join('')}</select></div></div>
+      <div class="l2"><div class="campo"><label>Turma</label><select id="m-turma">${D.turmas.map(t=>`<option value="${t.id}" ${t.id===a.turma_id?'selected':''}>${esc(t.nome)}</option>`).join('')}</select></div><div class="campo"><label>Nome completo</label><input id="m-aluno" value="${esc(a.crianca_nome||'')}"></div></div>`
+    : tipo === 'nao' ? `<div class="campo"><label>Motivo</label><div class="chips">${MOTIVOS.map(v=>`<button class="chip" onclick="ESC.motivo='${v}';this.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')">${v}</button>`).join('')}</div></div>`
+    : `<div class="campo"><label>Situação da família</label><textarea id="m-obs" placeholder="Ex.: espera a fatura virar, falar com o marido"></textarea></div>`;
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela"><h3>${tipo==='matriculou'?'Matriculou 🎉':tipo==='nao'?'Não matriculou':'Em andamento'}</h3><p>${esc(a.crianca_nome||l.nome||'')} · hoje ${hh(a.hora_inicio)}</p>${corpo}
+    <div class="fim"><button class="btn g" onclick="fechar()">Cancelar</button><button class="btn" onclick="confirmar('${id}','${tipo}')">Confirmar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fechar(); };
+}
+function fechar(){ document.getElementById('modal').innerHTML = ''; }
+async function confirmar(id, tipo){
+  const g = x => { const e = document.getElementById(x); return e ? e.value : undefined; };
+  if (tipo === 'matriculou') { if (!ESC.pagamento) return toast('Escolha a forma de pagamento.',{tipo:'erro'}); return registrar(id, 'matriculou', { valor: g('m-valor'), curso: g('m-curso'), pagamento: ESC.pagamento, turma_id: g('m-turma'), aluno_nome: g('m-aluno'), obsExtra: `${ESC.pagamento}${g('m-valor')?' · R$ '+g('m-valor'):''}` }); }
+  if (tipo === 'nao') { if (!ESC.motivo) return toast('Escolha o motivo.',{tipo:'erro'}); return registrar(id, 'nao', { motivo: ESC.motivo }); }
+  return registrar(id, 'andamento', { observacao: g('m-obs'), situacao: g('m-obs') });
+}
+async function registrar(id, tipo, extra){
+  const obs = `desfecho: ${tipo}${extra.obsExtra?' · '+extra.obsExtra:extra.motivo?' · '+extra.motivo:extra.observacao?' · '+extra.observacao:''}`;
+  try { await api('desfecho', { agendamento_id: id, desfecho: tipo, observacao: obs, ...extra }); fechar();
+    const nome = (D.aulas.find(x=>x.id===id)||{}).crianca_nome || 'Aula';
+    toast(`<b>${esc(nome)}</b> · ${({matriculou:'matriculou',nao:'não fechou',andamento:'em andamento',faltou:'faltou'})[tipo]} · Kommo atualizado`, tipo==='matriculou'?{tipo:'ok'}:{ acao:'desfazer', onAcao: async () => { try { await api('desfazer',{agendamento_id:id}); carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } } });
+    await carregar(); }
+  catch(e){ toast(e.message,{tipo:'erro'}); }
+}
+if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
+</script>
+</body>
+</html>
