@@ -26,7 +26,7 @@ async function zapiFetch(canal, caminho, opcoes = {}) {
     ...opcoes,
     headers: {
       'Content-Type': 'application/json',
-      'Client-Token': ZAPI_CLIENT_TOKEN,
+      'Client-Token': canal.client_token || ZAPI_CLIENT_TOKEN,   // por canal (conta Z-API diferente) ou o da RISE
       ...(opcoes.headers || {})
     }
   });
