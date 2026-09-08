@@ -111,6 +111,22 @@ function irPara(pagina){ if(window.parent !== window) window.parent.postMessage(
 </script>
 
 <script src="/lead-painel.js"></script>
+
+<script>
+// Quem está usando: vem do login (?u=Nome&papel=) e fica salvo por negócio.
+window.CaptaUser = (function(){
+  const q = new URLSearchParams(location.search); const slug = q.get('t') || '';
+  const K = 'capta_user_' + slug;
+  let u = null; try { u = JSON.parse(localStorage.getItem(K) || 'null'); } catch(e){}
+  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
+  return {
+    nome: () => (u && u.nome) || '',
+    papel: () => (u && u.papel) || '',
+    definir: nome => { u = { nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    sair: () => { try { localStorage.removeItem(K); } catch(e){} }
+  };
+})();
+</script>
 </head>
 <body>
 <div class="topbar">

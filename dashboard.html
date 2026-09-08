@@ -52,6 +52,8 @@ h2{font-size:16px;font-weight:700}
 .nav-item.on{background:var(--brand-soft);color:var(--brand)}
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
 .nav.pendente{visibility:hidden}
+.quem{font-size:11.5px;color:var(--muted);padding:6px 8px;line-height:1.4}.quem b{color:var(--ink)}.quem a{color:var(--brand);font-weight:700;text-decoration:none;cursor:pointer}
+.layout.mini .quem{display:none!important}
 .badge-n{margin-left:auto;background:var(--quente,#E03127);color:#fff;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 7px;min-width:20px;text-align:center}
 .layout.mini .badge-n{position:absolute;top:4px;right:6px;margin:0;padding:1px 5px;font-size:9.5px}
 .conv-box{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -362,6 +364,22 @@ function irPara(pagina){ if(window.parent !== window) window.parent.postMessage(
 </script>
 
 <script src="/lead-painel.js"></script>
+
+<script>
+// Quem está usando: vem do login (?u=Nome&papel=) e fica salvo por negócio.
+window.CaptaUser = (function(){
+  const q = new URLSearchParams(location.search); const slug = q.get('t') || '';
+  const K = 'capta_user_' + slug;
+  let u = null; try { u = JSON.parse(localStorage.getItem(K) || 'null'); } catch(e){}
+  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
+  return {
+    nome: () => (u && u.nome) || '',
+    papel: () => (u && u.papel) || '',
+    definir: nome => { u = { nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    sair: () => { try { localStorage.removeItem(K); } catch(e){} }
+  };
+})();
+</script>
 </head>
 <body>
 <div class="layout">
@@ -381,6 +399,7 @@ function irPara(pagina){ if(window.parent !== window) window.parent.postMessage(
      <button class="nav-item" data-t="plano" data-tip="Plano"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4z"/></svg>Plano</button>
     </nav>
     <div class="side-foot"><div class="who"><b id="who-nome">—</b><span id="who-plan">—</span></div>
+      <div class="quem" id="quem" style="display:none"></div>
       <button class="side-toggle" id="side-toggle" title="Recolher menu"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg><span class="lbl">Recolher menu</span></button>
     </div>
   </aside>
@@ -2850,6 +2869,9 @@ function montarMenuGestao(){
   // no plano Gestão a home é a lista de leads (o Painel Gestão é página própria)
   const home=nav.querySelector('.nav-item[data-page="/atendimento.html"]'); if(home){ home.classList.add('on'); setTimeout(()=>{ if(activeTab!=='embed') home.click(); }, 0); }
   window.__gestao=true;
+  (function(){ const q=document.getElementById('quem'); if(!q) return;
+    const pinta=()=>{ const n=CaptaUser.nome(); q.style.display='block'; q.innerHTML = n ? `Você: <b>${n}</b> · <a onclick="CaptaUser.sair();location.reload()">trocar</a>` : `<a onclick="(function(){const n=prompt('Quem está usando? (Rafael, Bento, RISE…)');if(n){CaptaUser.definir(n);location.reload();}})()">quem está usando?</a>`; };
+    pinta(); })();
   // telas embutidas pedem pra trocar de tela (ex.: "marcar aula no Pipeline")
   window.addEventListener('message', ev => { const d = ev.data || {}; if (d.capta === 'nao_lidas') return badgeConversas(d.n); if (d.capta !== 'ir' || !d.pagina) return; const b = document.querySelector(`.nav-item[data-page="${d.pagina}"]`); if (b) b.click(); });
   function badgeConversas(n){ const b = document.querySelector('.nav-item[data-page="/inbox.html"]'); if(!b) return; let x = b.querySelector('.badge-n'); if(!n){ if(x) x.remove(); return; } if(!x){ x = document.createElement('span'); x.className='badge-n'; b.appendChild(x); } x.textContent = n > 99 ? '99+' : n; }

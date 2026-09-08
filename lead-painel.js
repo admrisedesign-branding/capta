@@ -46,6 +46,7 @@
   const FONTES = ['anúncio','instagram','google busca','google business','evento','direto','indicação'];
   const PORTAS = ['site','whatsapp-bot','whatsapp-direto','evento','my robot'];
   const ATEND = ['Rafael','Bento','RISE'];
+  const EU = () => (window.CaptaUser && CaptaUser.nome()) || '';
   const DIAS_N = ['dom','seg','ter','qua','qui','sex','sáb'];
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const hhmm = t => String(t || '').slice(0, 5);
@@ -109,6 +110,7 @@
     if (e && e.tipo === 'perdida') { motivo = prompt('Motivo da perda (opcional):') || null; }
     const antes = l.etapa_id; l.etapa_id = etapaId; l.etapa_em = new Date().toISOString(); desenhar();
     try { if (cfg.onMover) await cfg.onMover(l, etapaId, motivo); else await api('mover', { lead_id: l.id, etapa_id: etapaId, motivo });
+      if (!l.atendente && EU()) { api('campos', { lead_id: l.id, atendente: EU() }).catch(()=>{}); l.atendente = EU(); }
       say(`<b>${esc(l.nome||'Lead')}</b> → ${esc(e ? e.nome : '')} · Kommo atualizado`, { acao:'desfazer', onAcao: () => mudarEtapa(antes) }); }
     catch (err) { l.etapa_id = antes; desenhar(); say(err.message, { tipo:'erro' }); }
   }
@@ -118,7 +120,7 @@
     const i = S.info, c = i && i.conversa; const conectado = i && i.canal === 'conectado';
     const acoes = `<div class="acoes">
       ${c ? `<span class="robo ${c.agente_ativo?'on':''}"><i></i>${c.agente_ativo ? 'Robô' : 'Você'}</span>
-      <select onchange="LeadPainel.atribuir(this.value)" title="Quem está atendendo"><option value="">— atendente —</option>${ATEND.map(a=>`<option ${c.atendente===a?'selected':''}>${a}</option>`).join('')}</select>
+      <select onchange="LeadPainel.atribuir(this.value)" title="Quem está atendendo"><option value="">— atendente —</option>${[...new Set([...ATEND, EU()].filter(Boolean))].map(a=>`<option ${(c.atendente||EU())===a?'selected':''}>${a}</option>`).join('')}</select>
       ${c.resolvida_em ? `<button onclick="LeadPainel.resolver(false)">Reabrir</button>` : `<button class="ok" onclick="LeadPainel.resolver(true)">Resolver ✓</button>`}` : `<span class="robo"><i></i>${conectado ? 'sem conversa ainda' : 'WhatsApp não conectado'}</span>`}
       <button onclick="LeadPainel.importarTxt()" title="Importar histórico exportado do WhatsApp (.txt)">Importar .txt</button>
       <span style="margin-left:auto;display:flex;gap:6px">${l.contato ? `<a class="lnk" style="font-size:12px" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">abrir no WhatsApp ↗</a>` : ''}</span></div>`;
@@ -141,7 +143,7 @@
   async function enviar() {
     const ta = document.getElementById('lp-txt'); const texto = (ta.value||'').trim(); if (!texto || !S.lead) return;
     const btn = document.getElementById('lp-btn'); btn.disabled = true; ta.value = ''; ta.style.height = 'auto';
-    try { await api('enviar', S.info?.conversa ? { conversa_id: S.info.conversa.id, texto } : { telefone: S.lead.contato, texto }); S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); say('Enviado', { tipo:'ok', ms:1500 }); }
+    try { await api('enviar', { autor: EU() || 'atendente', ...(S.info?.conversa ? { conversa_id: S.info.conversa.id, texto } : { telefone: S.lead.contato, texto }) }); S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); say('Enviado', { tipo:'ok', ms:1500 }); }
     catch (e) { say(e.message, { tipo:'erro' }); btn.disabled = false; }
   }
   async function atribuir(quem) { if (!S.info?.conversa) return; try { await api('conversa_atualizar', { conversa_id: S.info.conversa.id, atendente: quem }); S.info.conversa.atendente = quem || null; say(quem ? `Conversa com ${esc(quem)}` : 'Sem atendente'); } catch (e) { say(e.message, { tipo:'erro' }); } }
@@ -185,7 +187,7 @@
     return `<div class="corpo">${chipsEtapa(l, et)}
       <div class="sec">De onde veio o lead</div>
       <div class="l2"><div class="campo"><label>Por onde veio</label>${sel('lp-fonte', FONTES, l.fonte)}</div><div class="campo"><label>Como chegou</label>${sel('lp-porta', PORTAS, l.porta)}</div></div>
-      <div class="campo" style="margin-top:8px"><label>Quem atendeu</label>${sel('lp-at', ATEND, l.atendente)}</div>
+      <div class="campo" style="margin-top:8px"><label>Quem atendeu</label>${sel('lp-at', [...new Set([...ATEND, EU()].filter(Boolean))], l.atendente || EU())}</div>
       <div class="sec">Criança</div>
       <div class="l2"><div class="campo"><label>Nome</label><input id="lp-cri" value="${esc(l.crianca||'')}"></div><div class="campo"><label>Idade</label><input id="lp-id" type="number" min="3" max="17" value="${l.idade||''}"></div></div>
       <div class="sec">Anotações</div>
@@ -237,6 +239,7 @@
     const l = S.lead; const crianca = document.getElementById('lp-a-cri').value.trim(), idade = document.getElementById('lp-a-id').value;
     if (!crianca) { say('Informe o nome da criança.', { tipo:'erro' }); document.getElementById('lp-a-cri').focus(); return; }
     try { await api('agendar', { turma_id: turmaId, data, crianca_nome: crianca, crianca_idade: idade || null, lead_id: l.id });
+      if (!l.atendente && EU()) { api('campos', { lead_id: l.id, atendente: EU() }).catch(()=>{}); l.atendente = EU(); }
       l.crianca = crianca; l.idade = idade ? Number(idade) : l.idade; const et = await etapas(); const e = et.find(x => /aula agendada/i.test(x.nome)); if (e) { l.etapa_id = e.id; l.etapa_em = new Date().toISOString(); }
       say(`<b>${esc(crianca)}</b> · aula marcada ${nomeDia(data)} ${dataBR(data)} · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' });
       S.info = await api('lead', { lead_id: l.id }); carregarAgenda(true); cfg.onAgendou && cfg.onAgendou(l); }

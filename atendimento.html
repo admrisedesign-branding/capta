@@ -85,6 +85,22 @@ function irPara(pagina){ if(window.parent !== window) window.parent.postMessage(
 </script>
 
 <script src="/lead-painel.js"></script>
+
+<script>
+// Quem está usando: vem do login (?u=Nome&papel=) e fica salvo por negócio.
+window.CaptaUser = (function(){
+  const q = new URLSearchParams(location.search); const slug = q.get('t') || '';
+  const K = 'capta_user_' + slug;
+  let u = null; try { u = JSON.parse(localStorage.getItem(K) || 'null'); } catch(e){}
+  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
+  return {
+    nome: () => (u && u.nome) || '',
+    papel: () => (u && u.papel) || '',
+    definir: nome => { u = { nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    sair: () => { try { localStorage.removeItem(K); } catch(e){} }
+  };
+})();
+</script>
 </head>
 <body>
 <div class="topbar"><a class="voltar" id="voltar" href="/dashboard.html">← Painel</a><h1>Atendimento</h1></div>
@@ -202,7 +218,7 @@ async function confirmar(id, tipo){
 }
 async function registrar(id, tipo, extra){
   const obs = `desfecho: ${tipo}${extra.obsExtra?' · '+extra.obsExtra:extra.motivo?' · '+extra.motivo:extra.observacao?' · '+extra.observacao:''}`;
-  try { await api('desfecho', { agendamento_id: id, desfecho: tipo, observacao: obs, ...extra }); fechar();
+  try { await api('desfecho', { atendente: (window.CaptaUser&&CaptaUser.nome())||undefined, agendamento_id: id, desfecho: tipo, observacao: obs, ...extra }); fechar();
     const nome = (D.aulas.find(x=>x.id===id)||{}).crianca_nome || 'Aula';
     toast(`<b>${esc(nome)}</b> · ${({matriculou:'matriculou',nao:'não fechou',andamento:'em andamento',faltou:'faltou'})[tipo]} · Kommo atualizado`, tipo==='matriculou'?{tipo:'ok'}:{ acao:'desfazer', onAcao: async () => { try { await api('desfazer',{agendamento_id:id}); carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } } });
     await carregar(); }

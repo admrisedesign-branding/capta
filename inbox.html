@@ -157,6 +157,22 @@ function toast(msg, opts){ opts = opts || {}; let box = document.getElementById(
 function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
 </script>
 
+
+<script>
+// Quem está usando: vem do login (?u=Nome&papel=) e fica salvo por negócio.
+window.CaptaUser = (function(){
+  const q = new URLSearchParams(location.search); const slug = q.get('t') || '';
+  const K = 'capta_user_' + slug;
+  let u = null; try { u = JSON.parse(localStorage.getItem(K) || 'null'); } catch(e){}
+  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
+  return {
+    nome: () => (u && u.nome) || '',
+    papel: () => (u && u.papel) || '',
+    definir: nome => { u = { nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    sair: () => { try { localStorage.removeItem(K); } catch(e){} }
+  };
+})();
+</script>
 </head>
 <body>
 <div class="topbar">
@@ -216,8 +232,8 @@ function hora(iso) {
 const iniciais = t => (t || '?').trim().slice(0, 2).toUpperCase();
 
 const FI = { q: '', f: 'abertas', eu: '' };
-try { FI.eu = localStorage.getItem('capta_atendente') || ''; } catch(e){}
-const ATEND = ['Rafael','Bento','RISE'];
+FI.eu = (window.CaptaUser && CaptaUser.nome()) || ''; try { FI.eu = FI.eu || localStorage.getItem('capta_atendente') || ''; } catch(e){}
+const ATEND = [...new Set(['Rafael','Bento','RISE', (window.CaptaUser&&CaptaUser.nome())||''].filter(Boolean))];
 let CONVS = [], RAPIDAS = null;
 function desenharLista(){
   const q = FI.q.trim().toLowerCase();
@@ -437,7 +453,7 @@ async function enviar() {
 
   btn.disabled = true; btn.textContent = 'Enviando…';
   try {
-    await api('enviar', { conversa_id: atual, texto });
+    await api('enviar', { conversa_id: atual, texto, autor: (window.CaptaUser&&CaptaUser.nome())||'atendente' });
     txt.value = ''; txt.style.height = 'auto'; toast('Enviado', { tipo:'ok', ms: 1500 });
     await abrir(atual);
     carregarLista();
