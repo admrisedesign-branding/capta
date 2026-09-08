@@ -30,6 +30,29 @@ async function sb(caminho, opcoes = {}) {
   return t ? JSON.parse(t) : null;
 }
 
+
+// Resposta ao lembrete: "1" confirma a aula, "2" pede remarcação.
+async function respostaLembrete(canal, conversa, texto) {
+  const t = String(texto || '').trim().toLowerCase().replace(/[.!]/g, '');
+  const confirma = ['1', 'sim', 'confirmo', 'confirmado', 'ok', 'tudo certo'].includes(t);
+  const remarca  = ['2', 'remarcar', 'nao', 'não', 'não posso', 'nao posso'].includes(t);
+  if (!confirma && !remarca) return null;
+  const hoje = new Date().toISOString().slice(0, 10);
+  const ags = await sb(`capta_agendamentos?tenant_id=eq.${canal.tenant_id}&lead_id=eq.${conversa.lead_id}` +
+    `&status=in.(agendado,confirmado)&data=gte.${hoje}&select=id,data,hora_inicio&order=data.asc&limit=1`).catch(() => []);
+  const a = ags?.[0]; if (!a) return null;
+  if (confirma) {
+    await sb(`capta_agendamentos?id=eq.${a.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'confirmado', confirmado_em: new Date().toISOString(), confirmado_por: 'lead' }) });
+    return 'Perfeito, confirmado! Até lá 😊';
+  }
+  await sb(`capta_agendamentos?id=eq.${a.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ observacao: 'pediu para remarcar (respondeu 2 no lembrete)' }) });
+  await sb(`capta_conversas?id=eq.${conversa.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ agente_ativo: false }) }).catch(() => null);
+  return 'Sem problema! Já vou te passar outras opções de horário 😉';
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'use POST' });
 
@@ -124,6 +147,20 @@ async function processar(canalId, payload) {
   if (msg && evento.midia?.url) {
     try { await guardarMidia(tenant, msg, evento); }
     catch (e) { console.error('[midia]', e.message); }
+  }
+
+  // Resposta do lead a um lembrete: 1 confirma, 2 pede remarcação.
+  if (!evento.de_mim && evento.tipo === 'texto' && conversa.lead_id) {
+    try {
+      const resposta = await respostaLembrete({ tenant_id: tenant, id: canal.id, instancia_id: canal.instancia_id, instancia_token: canal.instancia_token, client_token: canal.client_token }, conversa, evento.texto);
+      if (resposta) {
+        const prov = require('./_lib/whatsapp-provedor.js');
+        const envio = await prov.enviarTexto({ id: canal.id, instancia_id: canal.instancia_id, instancia_token: canal.instancia_token, client_token: canal.client_token }, conversa.telefone, resposta).catch(() => null);
+        await sb('capta_mensagens', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+          conversa_id: conversa.id, tenant_id: tenant, direcao: 'saida', autor: 'sistema', tipo: 'texto', texto: resposta,
+          provedor_msg_id: envio?.provedor_msg_id || null, entrega: 'enviada', criado_em: new Date().toISOString() }) }).catch(() => null);
+      }
+    } catch (e) { console.error('[lembrete-resposta]', e.message); }
   }
 
   // Mensagem vinda do celular significa que um humano respondeu por fora.

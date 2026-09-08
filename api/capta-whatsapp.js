@@ -424,8 +424,8 @@ async function lembretes(canal, resumo) {
     const hora = String(item.hora_inicio || '').slice(0, 5);
 
     const texto = item.tipo === 'd1'
-      ? `Oi! Tudo certo pra amanhã às ${hora}? A aula ${primeiro ? 'do ' + primeiro + ' ' : ''}já está reservada 😊`
-      : `Bom dia! Passando pra lembrar da aula ${primeiro ? 'do ' + primeiro + ' ' : ''}hoje às ${hora}. Tá tudo preparado!`;
+      ? `Oi! Tudo certo pra amanhã às ${hora}? A aula experimental ${primeiro ? 'do ' + primeiro + ' ' : ''}já está reservada 😊\n\nResponda *1* para confirmar ou *2* se precisar remarcar.`
+      : `Bom dia! Lembrete da aula ${primeiro ? 'do ' + primeiro + ' ' : ''}hoje às ${hora}. Estamos te esperando!\n\nSe precisar remarcar, é só responder *2*.`;
 
     try {
       const envio = await prov.enviarTexto(canal, item.contato, texto);
