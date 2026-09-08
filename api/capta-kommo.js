@@ -174,6 +174,19 @@ async function espelhar(leadId) {
     body: JSON.stringify(linha),
   });
   if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
+  // ganho no Kommo (Aluno Ativo) → vira aluno em Alunos, se ainda não for
+  if (st.tipo === 1) {
+    try {
+      const lr = await fetch(`${SB_URL}/rest/v1/capta_leads?tenant_id=eq.${linha.tenant_id}&kommo_lead_id=eq.${lead.id}&select=id&limit=1`, { headers: H_SB }).then(x => x.json());
+      const leadId = lr?.[0]?.id;
+      if (leadId) {
+        const ja = await fetch(`${SB_URL}/rest/v1/capta_alunos?tenant_id=eq.${linha.tenant_id}&lead_id=eq.${leadId}&select=id&limit=1`, { headers: H_SB }).then(x => x.json());
+        if (!ja?.length) await fetch(`${SB_URL}/rest/v1/capta_alunos`, { method: 'POST', headers: { ...H_SB, Prefer: 'return=minimal' }, body: JSON.stringify({
+          tenant_id: linha.tenant_id, lead_id: leadId, nome: linha.crianca || linha.nome || 'Aluno novo', nome_curto: linha.crianca || null,
+          kit: linha.curso || 'First', status: 'ativo', observacao: 'Matriculado pelo Kommo — definir a turma em Alunos' }) });
+      }
+    } catch (e) { /* não bloqueia o espelho */ }
+  }
   // relê o que ficou salvo (gatilhos podem alterar score/temperatura/status)
   const g = await fetch(`${SB_URL}/rest/v1/capta_leads?tenant_id=eq.${linha.tenant_id}&kommo_lead_id=eq.${lead.id}&select=score,temperatura,status,origem,criado_em,tags`, { headers: H_SB }).then(x => x.json()).catch(() => null);
   return { lead_id: lead.id, etapa: linha.etapa_nome, fonte: linha.fonte, porta: linha.porta,

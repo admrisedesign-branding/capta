@@ -698,7 +698,7 @@ async function acaoLead(tenant, body, res) {
   if (!id) return res.status(400).json({ erro: 'Informe lead_id.' });
   const [conv, ags, canais] = await Promise.all([
     sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,telefone,agente_ativo,status,nao_lidas&order=ultima_mensagem_em.desc.nullslast&limit=1`).catch(() => []),
-    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,data,hora_inicio,hora_fim,status,crianca_nome,turma_id&order=data.desc&limit=10`).catch(() => []),
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,data,hora_inicio,hora_fim,status,crianca_nome,turma_id,remarcado_para&order=data.desc&limit=10`).catch(() => []),
     sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&select=status&limit=1`).catch(() => [])
   ]);
   let mensagens = [];
