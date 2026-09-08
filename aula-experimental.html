@@ -55,6 +55,7 @@ button,select,input,textarea{font-family:inherit}button{cursor:pointer}
 .fim{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
 
 .barra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .nav{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 12px;font-weight:700;color:var(--muted)}
 .periodo{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 14px;font-weight:700;font-size:13.5px}
 .tally{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 18px;display:flex;gap:26px;margin-bottom:14px}
@@ -177,9 +178,7 @@ function irPara(pagina){ if(window.parent !== window) window.parent.postMessage(
 <div class="topbar">
   <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
   <h1>Aula experimental</h1>
-  <div class="ferr">
-    <div class="abas"><button id="ab-dia" onclick="modo('dia')">Dia</button><button class="on" id="ab-semana" onclick="modo('semana')">Semana</button></div>
-  </div>
+
 </div>
 <div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
 <div id="modal"></div>
@@ -212,7 +211,8 @@ async function carregar(){
     D = ex; KITS_T = al.kits || []; VAGAS = ag && ag.horarios ? ag.horarios : null; desenhar();
   } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
-function modo(m){ MODO = m; ['dia','semana'].forEach(x => document.getElementById('ab-'+x).classList.toggle('on', x===m)); desenhar(); }
+function modo(m){ MODO = m; desenhar(); }
+const abasHtml = () => `<div class="abas" style="margin-left:auto">${[['dia','Dia'],['semana','Semana']].map(([k,t])=>`<button class="${MODO===k?'on':''}" onclick="modo('${k}')">${t}</button>`).join('')}</div>`;
 function mover(n){ SELDIA = addDias(SELDIA, MODO === 'dia' ? n : 7*n); const de = addDias(segunda(SELDIA), -28), ate = addDias(segunda(SELDIA), 35); const min = D.agendamentos[0] && D.agendamentos[0].data; if (SELDIA < de + 0 || SELDIA > ate) carregar(); else desenhar(); }
 function irHoje(){ SELDIA = hoje; carregar(); }
 const leadDe = a => D.leads.find(l => l.id === a.lead_id) || {};
@@ -255,7 +255,7 @@ function desenhar(){
       return `<div class="colw ${d===hoje?'hoje':''}"><h4>${DIAS[new Date(d+'T12:00').getDay()]} ${new Date(d+'T12:00').getDate()}</h4>${its.length ? its.map(ev).join('') : '<div class="nada">sem aulas</div>'}</div>`; }).join('')}</div></div>`;
   }
   document.getElementById('raiz').innerHTML = `
-    <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="irHoje()">Hoje</button><span class="periodo">${periodo}</span></div>
+    <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="irHoje()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}</div>
     <div class="tally"><div><b>${base.length}</b><small>agendadas</small></div><div class="hot"><b>${quentes}</b><small>chega querendo fechar</small></div><div><b>${matric}</b><small>matriculadas</small></div><div><b>${D.agendamentos.filter(pendente).length}</b><small>sem desfecho</small></div></div>
     <div class="corpo"><div>${grade}</div>
       <div class="lado"><h5>Kits por bloco</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>

@@ -27,6 +27,7 @@ button,select{font-family:inherit}button{cursor:pointer}
 .abas button.on{background:var(--card);color:var(--brand);box-shadow:var(--shadow)}
 .wrap{padding:20px 26px 48px}
 .barra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .nav{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 12px;font-weight:700;color:var(--muted)}
 .periodo{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 14px;font-weight:700;font-size:13.5px;text-transform:capitalize}
 .tally{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 18px;display:flex;gap:26px;margin-bottom:14px;flex-wrap:wrap}
@@ -102,7 +103,7 @@ function irPara(pagina){ if(window.parent !== window) window.parent.postMessage(
 <div class="topbar">
   <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
   <h1>Agendamentos</h1>
-  <div class="ferr"><div class="abas"><button class="on" id="ab-dia" onclick="modo('dia')">Dia</button><button id="ab-semana" onclick="modo('semana')">Semana</button><button id="ab-mes" onclick="modo('mes')">Mês</button></div></div>
+
 </div>
 <div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
 
@@ -135,7 +136,8 @@ async function carregar(){
     D = al; EXP = ex.agendamentos || []; LEADS = ex.leads || []; VAGAS = ag.horarios || []; carregadoDe = de; carregadoAte = ate; desenhar();
   } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
-function modo(m){ MODO = m; ['dia','semana','mes'].forEach(x => document.getElementById('ab-'+x).classList.toggle('on', x===m)); desenhar(); }
+function modo(m){ MODO = m; desenhar(); }
+const abasHtml = () => `<div class="abas" style="margin-left:auto">${[['dia','Dia'],['semana','Semana'],['mes','Mês']].map(([k,t])=>`<button class="${MODO===k?'on':''}" onclick="modo('${k}')">${t}</button>`).join('')}</div>`;
 function mover(n){
   if (MODO === 'dia') SEL = addDias(SEL, n); else if (MODO === 'semana') SEL = addDias(SEL, 7*n);
   else { const x = new Date(SEL + 'T12:00:00'); x.setMonth(x.getMonth() + n, 1); SEL = iso(x); }
@@ -225,7 +227,7 @@ function desenhar(){
   else if (MODO === 'semana') { const s = segunda(SEL); dias = [0,1,2,3,4,5].map(n => addDias(s, n)); periodo = `${fmt(dias[0],{day:'numeric',month:'long'})} a ${fmt(dias[5],{day:'numeric',month:'long'})}`; corpo = vSemana(); }
   else { const x = new Date(SEL+'T12:00:00'); periodo = x.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); const f = iso(new Date(x.getFullYear(), x.getMonth()+1, 0, 12)); dias = []; for (let d = iso(new Date(x.getFullYear(), x.getMonth(), 1, 12)); d <= f; d = addDias(d,1)) dias.push(d); corpo = vMes(); }
   document.getElementById('raiz').innerHTML = `
-    <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span></div>
+    <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}</div>
     ${tally(dias)}
     <div class="corpo"><div>${corpo}</div>${lado()}</div>`;
 }
