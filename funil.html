@@ -148,6 +148,7 @@ function toast(msg, opts){ opts = opts || {}; let box = document.getElementById(
 function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
 </script>
 
+<script src="/lead-painel.js"></script>
 </head>
 <body>
 <div class="topbar">
@@ -156,7 +157,7 @@ function irPara(pagina){ if(window.parent !== window) window.parent.postMessage(
   <span class="dica">Arraste o card para mudar de etapa</span>
 </div>
 
-<div class="tela"><div id="raiz" class="aviso">Carregando…</div><aside id="painel"></aside></div><div id="scrim-p" onclick="fecharLead()"></div>
+<div class="tela"><div id="raiz" class="aviso">Carregando…</div></div>
 <div id="modal"></div>
 
 <script>
@@ -201,7 +202,7 @@ async function carregar() {
       return;
     }
     desenhar();
-    try { const pd = JSON.parse(localStorage.getItem('capta_abrir_lead')||'null'); if (pd && Date.now() - pd.t < 60000) { localStorage.removeItem('capta_abrir_lead'); if (leads.find(x => x.id === pd.id)) { P.aba = pd.aba || 'conversa'; abrirLead(pd.id); if (pd.aba === 'agendar') { P.aba = 'agendar'; desenharPainel(); carregarAgenda(); } } } } catch(e){}
+    try { const pd = JSON.parse(localStorage.getItem('capta_abrir_lead')||'null'); if (pd && Date.now() - pd.t < 60000) { localStorage.removeItem('capta_abrir_lead'); if (leads.find(x => x.id === pd.id)) LeadPainel.abrir(pd.id, pd.aba || 'conversa'); } } catch(e){}
   } catch (e) {
     document.getElementById('raiz').className = 'aviso';
     document.getElementById('raiz').textContent = e.message;
@@ -343,185 +344,16 @@ function janelaMotivo(lead, etapa) {
 }
 
 
-// ---- importar histórico (.txt exportado do WhatsApp) ----
-function importarTxt(opts){ // opts: {lead_id?, telefone?, depois}
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.txt,text/plain';
-  inp.onchange = () => { const f = inp.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => previaImport(rd.result, opts); rd.readAsText(f); };
-  inp.click();
-}
-async function previaImport(texto, opts){
-  let pv; try { pv = await api('importar_historico', { texto, previa: true }); } catch(e){ return toast(e.message,{tipo:'erro'}); }
-  const autores = Object.entries(pv.autores).sort((a,b)=>b[1]-a[1]);
-  const box = document.createElement('div'); box.className = 'fundo'; box.id = 'imp-fundo';
-  box.innerHTML = `<div class="janela"><h3>Importar conversa</h3><p>${pv.total} mensagens, de ${new Date(pv.de).toLocaleDateString('pt-BR')} a ${new Date(pv.ate).toLocaleDateString('pt-BR')}.<br>Quem é <b>a escola</b> nessa conversa? (o resto é o lead)</p>
-    <div class="chips" style="margin-top:12px">${autores.map(([n,q]) => `<button class="chip" onclick="this.classList.toggle('on')" data-n="${esc(n)}">${esc(n)} <span style="opacity:.7">${q}</span></button>`).join('')}</div>
-    ${opts.lead_id ? '' : `<div class="campo" style="margin-top:12px"><label>Telefone do lead (com DDD)</label><input id="imp-tel" placeholder="92999999999"></div>`}
-    <div class="fim"><button class="btn g" onclick="document.getElementById('imp-fundo').remove()">Cancelar</button><button class="btn" id="imp-ok">Importar</button></div></div>`;
-  document.body.appendChild(box);
-  document.getElementById('imp-ok').onclick = async () => {
-    const nomes = [...box.querySelectorAll('.chip.on')].map(c => c.dataset.n); if (!nomes.length) return toast('Marque quem é a escola.',{tipo:'erro'});
-    const telefone = opts.telefone || (document.getElementById('imp-tel') || {}).value;
-    try { const r = await api('importar_historico', { texto, nomes_escola: nomes, lead_id: opts.lead_id, telefone }); box.remove(); toast(`${r.importadas} mensagens importadas`, {tipo:'ok'}); opts.depois && opts.depois(r); }
-    catch(e){ toast(e.message,{tipo:'erro'}); }
-  };
-}
-
-// ===================== painel lateral do lead =====================
-const DIAS_N = ['dom','seg','ter','qua','qui','sex','sáb'];
-const hhmm = t => String(t || '').slice(0, 5);
-const dataBR = d => { const [a,m,dd] = String(d).split('-'); return `${dd}/${m}`; };
-const nomeDia = d => DIAS_N[new Date(d + 'T12:00:00').getDay()];
-let P = { lead: null, aba: 'conversa', info: null, agenda: null, idx: { manha: 0, tarde: 0, sab: 0 } };
-
-async function abrirLead(id) {
-  const l = leads.find(x => x.id === id); if (!l) return;
-  P = { lead: l, aba: P.lead && P.lead.id === id ? P.aba : 'conversa', info: null, agenda: null, idx: { manha: 0, tarde: 0, sab: 0 } };
-  document.getElementById('painel').classList.add('aberto'); document.getElementById('scrim-p').classList.add('on');
-  desenharPainel();
-  try { P.info = await api('lead', { lead_id: id }); } catch (e) { P.info = { erro: e.message }; }
-  desenharPainel();
-}
-function fecharLead() { document.getElementById('painel').classList.remove('aberto'); document.getElementById('scrim-p').classList.remove('on'); P.lead = null; clearTimeout(AG_TIMER); }
-function abaP(a) { P.aba = a; desenharPainel(); if (a === 'agendar' && !P.agenda) carregarAgenda(); }
-
-function desenharPainel() {
-  const l = P.lead; if (!l) return;
-  const ini = (l.nome || '?').trim().split(/\s+/).map(x => x[0]).slice(0,2).join('').toUpperCase();
-  const et = etapas.find(e => e.id === l.etapa_id);
-  const abas = [['conversa','Conversa'],['dados','Dados'],['agendar','Agendar aula']];
-  document.getElementById('painel').innerHTML = `
-    <div class="p-cab"><div class="av">${esc(ini)}</div>
-      <div><h3>${esc(l.nome || 'Sem nome')}</h3>
-        <div class="sub">${esc(l.contato || '')}${l.temperatura ? ' · ' + esc(l.temperatura) : ''}${l.atendente ? ' · ' + esc(l.atendente) : ''}${et ? ' · ' + esc(et.nome) : ''}</div>
-        ${l.kommo_lead_id ? `<div class="sub"><a class="kommo-lnk" style="margin:0" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">abrir no Kommo ↗</a></div>` : ''}
-      </div>
-      <button class="x" onclick="fecharLead()" title="Fechar">×</button>
-    </div>
-    <div class="p-abas">${abas.map(([k,t]) => `<button class="${P.aba===k?'on':''}" onclick="abaP('${k}')">${t}</button>`).join('')}</div>
-    ${P.aba === 'conversa' ? painelConversa(l) : P.aba === 'dados' ? painelDados(l) : painelAgendar(l)}`;
-}
-
-// ---- etapa (chips): salva, move o card no kanban e vai pro Kommo ----
-function chipsEtapa(l) {
-  return `<div class="p-sec">Etapa</div><div class="chips">${etapas.map(e =>
-    `<button class="chip ${e.tipo} ${l.etapa_id===e.id?'on':''}" onclick="mudarEtapa('${e.id}')">${esc(e.nome)}</button>`).join('')}</div>`;
-}
-async function mudarEtapa(etapaId) {
-  const l = P.lead; if (!l || l.etapa_id === etapaId) return;
-  const e = etapas.find(x => x.id === etapaId);
-  if (e && e.tipo === 'perdida') return janelaMotivo(l, e);
-  await mover(l.id, etapaId, null); desenharPainel();
-}
-
-function painelConversa(l) {
-  const i = P.info;
-  let corpo;
-  if (!i) corpo = `<div class="aviso-p">Carregando…</div>`;
-  else if (i.mensagens && i.mensagens.length) corpo = `<div class="msgs">${i.mensagens.map(m =>
-      `<div class="msg ${m.direcao==='saida'?'saida':''}">${esc(m.texto || m.transcricao || '['+(m.tipo||'mídia')+']')}<small>${esc(m.autor||'')} · ${new Date(m.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div>`).join('')}</div>`;
-  else corpo = `<div class="aviso-p">${i.canal === 'conectado' ? 'Ainda não há conversa com este lead pelo WhatsApp do Capta.' :
-      'A conversa aparece aqui quando o WhatsApp da unidade estiver conectado ao Capta.'}${l.kommo_lead_id ? `<br><a class="kommo-lnk" style="margin:0" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Ver a conversa no Kommo ↗</a>` : ''}
-      ${l.contato ? `<br><a class="kommo-lnk" style="margin:0" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">Chamar no WhatsApp 💬</a>` : ''}</div>`;
-  const podeEnviar = i && i.canal === 'conectado';
-  return `<div class="p-corpo">${chipsEtapa(l)}<div class="p-sec" style="display:flex;align-items:center">Conversa<a href="#" style="margin-left:auto;font-weight:700;color:var(--brand);text-transform:none;letter-spacing:0;text-decoration:none" onclick="importarTxt({ lead_id: '${l.id}', telefone: '${esc(l.contato||'')}', depois: async () => { P.info = await api('lead', { lead_id: '${l.id}' }); desenharPainel(); } });return false">importar .txt</a></div>${corpo}</div>
-    ${podeEnviar ? `<div class="enviar"><input id="p-txt" placeholder="Escreva uma mensagem…" onkeydown="if(event.key==='Enter')enviarMsg()"><button class="btn" onclick="enviarMsg()">Enviar</button></div>` : ''}`;
-}
-async function enviarMsg() {
-  const inp = document.getElementById('p-txt'); const texto = (inp.value || '').trim(); if (!texto) return;
-  inp.value = '';
-  try {
-    await api('enviar', P.info.conversa ? { conversa_id: P.info.conversa.id, texto } : { telefone: P.lead.contato, texto });
-    P.info = await api('lead', { lead_id: P.lead.id }); desenharPainel();
-  } catch (e) { toast(e.message,{tipo:'erro'}); }
-}
-
-// ---- dados: fonte, porta, quem atendeu, criança, anotações → Capta + Kommo ----
-const FONTES = ['anúncio','instagram','google busca','google business','evento','direto','indicação'];
-const PORTAS = ['site','whatsapp-bot','whatsapp-direto','evento','my robot'];
-const ATEND  = ['Rafael','Bento','RISE'];
-const sel = (id, ops, v) => `<select id="${id}"><option value="">—</option>${ops.map(o => `<option ${o===v?'selected':''}>${o}</option>`).join('')}</select>`;
-function painelDados(l) {
-  return `<div class="p-corpo">${chipsEtapa(l)}
-    <div class="p-sec">De onde veio o lead</div>
-    <div class="linha2"><div class="campo"><label>Por onde veio</label>${sel('d-fonte', FONTES, l.fonte)}</div><div class="campo"><label>Como chegou</label>${sel('d-porta', PORTAS, l.porta)}</div></div>
-    <div class="campo" style="margin-top:8px"><label>Quem atendeu</label>${sel('d-at', ATEND, l.atendente)}</div>
-    <div class="p-sec">Criança</div>
-    <div class="linha2"><div class="campo"><label>Nome</label><input id="d-cri" value="${esc(l.crianca||'')}"></div><div class="campo"><label>Idade</label><input id="d-id" type="number" min="3" max="17" value="${l.idade||''}"></div></div>
-    <div class="p-sec">Anotações</div>
-    <div class="campo"><textarea id="d-notas" placeholder="Ex.: mãe prefere sábado de manhã">${esc(l.notas||'')}</textarea></div>
-    <div style="margin-top:10px;display:flex;align-items:center"><button class="btn" onclick="salvarDados()">Salvar</button><span class="salvo" id="d-ok"></span></div>
-    ${l.tags && l.tags.length ? `<div class="p-sec">Tags</div><div class="chips">${l.tags.map(t=>`<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}
-  </div>`;
-}
-async function salvarDados() {
-  const l = P.lead;
-  const d = { lead_id: l.id, fonte: document.getElementById('d-fonte').value, porta: document.getElementById('d-porta').value,
-    atendente: document.getElementById('d-at').value, crianca: document.getElementById('d-cri').value, idade: document.getElementById('d-id').value,
-    notas: document.getElementById('d-notas').value };
-  try { await api('campos', d); Object.assign(l, { fonte: d.fonte||null, porta: d.porta||null, atendente: d.atendente||null, crianca: d.crianca||null, idade: d.idade?Number(d.idade):null, notas: d.notas||null });
-    document.getElementById('d-ok').textContent = 'salvo ✓'; setTimeout(() => { const s = document.getElementById('d-ok'); if (s) s.textContent = ''; }, 2000); desenhar(); }
-  catch (e) { toast(e.message,{tipo:'erro'}); }
-}
-
-// ---- agendar em sequência: criança → kit First → próximas vagas (manhã · tarde · sábado) → confirmar ----
-let AG_TIMER = null;
-async function carregarAgenda(silencioso) {
-  try { const r = await api('agenda', { dias: 30 }); P.agenda = r; } catch (e) { if (!silencioso) P.agenda = { erro: e.message }; }
-  if (!silencioso) P.idx = { manha: 0, tarde: 0, sab: 0 };
-  desenharPainel();
-  clearTimeout(AG_TIMER); AG_TIMER = setTimeout(() => { if (P.lead && P.aba === 'agendar') carregarAgenda(true); }, 60000); // estoque ao vivo
-}
-function vagasPor(tipo) {
-  const hs = (P.agenda && P.agenda.horarios || []).filter(h => (h.vagas ?? 1) > 0 && h.data > new Date().toISOString().slice(0,10));
-  return hs.filter(h => {
-    const dow = new Date(h.data + 'T12:00:00').getDay(), hi = parseInt(h.hora_inicio);
-    if (tipo === 'sab') return dow === 6;
-    if (tipo === 'manha') return dow !== 6 && hi < 12;
-    return dow !== 6 && hi >= 12;
-  }).sort((a,b) => (a.data + a.hora_inicio).localeCompare(b.data + b.hora_inicio));
-}
-function cardVaga(tipo, rotulo) {
-  const lista = vagasPor(tipo); const idx = (P.idx && P.idx[tipo]) || 0; const v = lista[idx];
-  if (!v) return `<div class="vaga"><div class="p-sec" style="margin:0 0 4px">${rotulo}</div><div class="liv">Sem vaga livre nos próximos 30 dias.</div></div>`;
-  return `<div class="vaga"><div class="p-sec" style="margin:0 0 4px">${rotulo}</div>
-    <b>${nomeDia(v.data)} ${dataBR(v.data)} · ${hhmm(v.hora_inicio)}–${hhmm(v.hora_fim)}</b>
-    <div class="liv">${v.vagas} de ${v.capacidade} kits First livres${v.sala_livre!=null?' · sala '+v.sala_livre:''} · opção ${idx+1} de ${lista.length}</div>
-    <div class="acs"><button class="btn" onclick="confirmarAgenda('${v.turma_id}','${v.data}')">Agendar nessa</button>
-      <button class="btn g" onclick="P.idx.${tipo}=Math.min(${idx+1},${lista.length-1});desenharPainel()" ${idx>=lista.length-1?'disabled':''}>Outra →</button>
-      ${idx>0?`<button class="btn g" onclick="P.idx.${tipo}=${idx-1};desenharPainel()">←</button>`:''}</div></div>`;
-}
-async function cancelarAula(id) {
-  if (!confirm('Cancelar esta aula experimental?')) return;
-  try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pelo atendente' }); P.info = await api('lead', { lead_id: P.lead.id }); const lf = leads.find(x => x.id === P.lead.id); const ec = etapas.find(x => /em contato/i.test(x.nome)); if (lf && ec && !(P.info.agendamentos||[]).some(a=>['agendado','confirmado'].includes(a.status))) { lf.etapa_id = lf.etapa_anterior_id || ec.id; desenhar(); } toast('Aula cancelada · kit devolvido · lead voltou de etapa', { tipo:'ok' }); carregarAgenda(true); }
-  catch (e) { toast(e.message,{tipo:'erro'}); }
-}
-function painelAgendar(l) {
-  if (!P.idx) P.idx = { manha: 0, tarde: 0, sab: 0 };
-  const ag = (P.info && P.info.agendamentos || []).filter(a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para);
-  return `<div class="p-corpo">
-    ${ag.length ? `<div class="p-sec">Aulas deste lead</div>${ag.map(a => `<div class="ag-item"><span>${nomeDia(a.data)} ${dataBR(a.data)} · ${hhmm(a.hora_inicio)}${a.crianca_nome?' · '+esc(a.crianca_nome):''}</span><span class="st">${esc(a.status)}${['agendado','confirmado'].includes(a.status)?` <a href="#" onclick="cancelarAula('${a.id}');return false" style="color:var(--quente);margin-left:6px">cancelar</a>`:''}</span></div>`).join('')}` : ''}
-    <div class="p-sec">1 · Criança</div>
-    <div class="linha2"><div class="campo"><label>Nome</label><input id="a-cri" value="${esc(l.crianca||'')}" placeholder="Nome da criança"></div><div class="campo"><label>Idade</label><input id="a-id" type="number" min="3" max="17" value="${l.idade||''}"></div></div>
-    <div class="p-sec">2 · Kit</div>
-    <div class="chips"><span class="chip on">First</span><span class="chip" style="border:0;color:var(--faint)">a experimental é sempre no First; o nivelamento é no dia</span></div>
-    <div class="p-sec">3 · Ofereça duas opções</div>
-    ${!P.agenda ? `<div class="aviso-p">Buscando vagas…</div>` : P.agenda.erro ? `<div class="aviso-p">${esc(P.agenda.erro)}</div>` :
-      cardVaga('manha','Manhã') + cardVaga('tarde','Tarde') + cardVaga('sab','Sábado')}
-    <div class="aviso-p" style="margin-top:10px;border:0;padding:6px 0;text-align:left">Estoque atualiza sozinho a cada minuto e a cada aula marcada.</div>
-  </div>`;
-}
-async function confirmarAgenda(turmaId, data) {
-  const l = P.lead;
-  const crianca = document.getElementById('a-cri').value.trim(), idade = document.getElementById('a-id').value;
-  if (!crianca) { toast('Informe o nome da criança.',{tipo:'erro'}); document.getElementById('a-cri').focus(); return; }
-  try {
-    await api('agendar', { turma_id: turmaId, data, crianca_nome: crianca, crianca_idade: idade || null, lead_id: l.id });
-    l.crianca = crianca; l.idade = idade ? Number(idade) : l.idade;
-    const e = etapas.find(x => /aula agendada/i.test(x.nome)); if (e) { l.etapa_id = e.id; l.etapa_em = new Date().toISOString(); }
-    toast(`<b>${esc(crianca)}</b> · aula marcada ${nomeDia(data)} ${dataBR(data)} · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' });
-    desenhar(); P.info = await api('lead', { lead_id: l.id }); P.aba = 'agendar'; carregarAgenda(true);
-  } catch (e) { toast(e.message,{tipo:'erro'}); }
-}
+// ===================== gaveta do lead (componente compartilhado) =====================
+LeadPainel.init({
+  slug: SLUG, token: TOKEN,
+  getLead: id => leads.find(x => x.id === id),
+  getEtapas: () => etapas,
+  onMover: async (l, etapaId, motivo) => { await api('mover', { lead_id: l.id, etapa_id: etapaId, motivo }); desenhar(); },
+  onAgendou: () => desenhar(),
+  onAtualizou: () => desenhar()
+});
+function abrirLead(id) { LeadPainel.abrir(id, 'conversa'); }
 
 if (!SLUG || !TOKEN) {
   document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.';

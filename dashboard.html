@@ -361,6 +361,7 @@ function toast(msg, opts){ opts = opts || {}; let box = document.getElementById(
 function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
 </script>
 
+<script src="/lead-painel.js"></script>
 </head>
 <body>
 <div class="layout">
@@ -3259,7 +3260,19 @@ function leadCard(l, i){
 function emptyState(){ return `<div class="empty">Nenhum lead ainda.<br>Divulgue seu link e eles aparecem aqui — já pontuados.</div>`; }
 function bindLeads(){ document.querySelectorAll('tr[data-i], .lead[data-i]').forEach(el => el.onclick=()=>openLead(+el.dataset.i)); }
 
+let LP_PRONTO = false;
+function prepararLP(){ if (LP_PRONTO || !window.LeadPainel) return; LP_PRONTO = true;
+  LeadPainel.init({ slug: SLUG, token: TOKEN, getLead: id => DATA.leads.find(x => x.id === id), getEtapas: () => window.__etapasCache || [],
+    onExcluir: async (l) => { await excluirLeadDireto(l); },
+    onAtualizou: () => { if (typeof render === 'function') render(activeTab === 'embed' ? 'leads' : activeTab); },
+    onAgendou: () => { if (typeof render === 'function' && activeTab === 'leads') render('leads'); } });
+  fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'funil',slug:SLUG,token:TOKEN})}).then(r=>r.json()).then(j=>{ window.__etapasCache = j.etapas || []; }).catch(()=>{});
+}
 function openLead(i, focoConversa){
+  if (window.__gestao && window.LeadPainel) { prepararLP(); const l = DATA.leads[i]; if (l) LeadPainel.abrir(l.id, focoConversa ? 'conversa' : 'dados'); return; }
+  openLeadAntigo(i, focoConversa);
+}
+function openLeadAntigo(i, focoConversa){
   const l = DATA.leads[i];
   const respostas = Object.values(l.respostas||{});
   const msg = encodeURIComponent(zapMsg(l));
@@ -3356,6 +3369,11 @@ function ligarNotas(l){
   ta.onblur = () => { clearTimeout(timer); salvar(); };
 }
 
+async function excluirLeadDireto(l){
+  const r = await fetch(`/api/capta-leads?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({lead_id:l.id})});
+  const d = await r.json(); if(!r.ok) throw new Error(d.erro||('Erro '+r.status));
+  DATA.leads = DATA.leads.filter(x => x.id !== l.id); if (typeof render === 'function') render('leads'); toast(`${l.nome||'Lead'} excluído`);
+}
 async function excluirLead(l){
   const nome = (l.nome||'este lead').trim();
   if(!confirm('Excluir '+nome+'?\n\nEssa ação não pode ser desfeita.')) return;

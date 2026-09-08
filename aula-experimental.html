@@ -180,6 +180,7 @@ function toast(msg, opts){ opts = opts || {}; let box = document.getElementById(
 function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
 </script>
 
+<script src="/lead-painel.js"></script>
 </head>
 <body>
 <div class="topbar">
@@ -419,19 +420,9 @@ async function cancelar(id){ if (!confirm('Cancelar esta aula?')) return; try { 
 async function reagendar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'reagendado pela recepção' }); ABERTO = null; VAGAS3 = null; toast('Aula remarcada · Kommo atualizado', { tipo:'ok' }); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
 async function desfazer(id){ try { await api('desfazer', { agendamento_id: id }); toast('Desfeito · aula voltou a agendada'); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
 
-// conversa do lead (drawer à direita)
-async function script(id){
-  const a = D.agendamentos.find(x => x.id === id); const l = leadDe(a);
-  const dr = document.getElementById('drawer'); dr.classList.add('aberto');
-  dr.innerHTML = `<div class="dh"><h3>${esc(l.nome||a.crianca_nome||'')}</h3><button class="x" onclick="document.getElementById('drawer').classList.remove('aberto')">×</button></div><div class="dc"><div class="aviso-p">Carregando…</div></div>`;
-  let corpo;
-  try {
-    const i = await api('lead', { lead_id: a.lead_id });
-    corpo = i.mensagens && i.mensagens.length ? `<div class="msgs">${i.mensagens.map(m=>`<div class="msg ${m.direcao==='saida'?'saida':''}">${esc(m.texto||m.transcricao||'['+(m.tipo||'mídia')+']')}<small>${esc(m.autor||'')} · ${new Date(m.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div>`).join('')}</div>`
-      : `<div class="aviso-p">A conversa aparece aqui quando o WhatsApp da unidade estiver conectado ao Capta.${l.kommo_lead_id?`<br><a href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700">Ver a conversa no Kommo ↗</a>`:''}${l.contato?`<br><a href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700">Chamar no WhatsApp 💬</a>`:''}</div>`;
-  } catch(e){ corpo = `<div class="aviso-p">${esc(e.message)}</div>`; }
-  dr.querySelector('.dc').innerHTML = `<div class="guard" style="margin-bottom:10px">${esc(l.contato||'')}${l.temperatura?' · '+esc(l.temperatura):''}${l.atendente?' · '+esc(l.atendente):''}</div>${corpo}`;
-}
+// conversa do lead: gaveta compartilhada
+LeadPainel.init({ slug: SLUG, token: TOKEN, getLead: id => D.leads.find(x => x.id === id), getEtapas: () => [], onAgendou: () => carregar() });
+function script(id){ const a = D.agendamentos.find(x => x.id === id); if (a && a.lead_id) LeadPainel.abrir(a.lead_id, 'conversa'); }
 
 let ESC = {};
 let HOVER = null;

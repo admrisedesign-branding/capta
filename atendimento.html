@@ -84,6 +84,7 @@ function toast(msg, opts){ opts = opts || {}; let box = document.getElementById(
 function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
 </script>
 
+<script src="/lead-painel.js"></script>
 </head>
 <body>
 <div class="topbar"><a class="voltar" id="voltar" href="/dashboard.html">← Painel</a><h1>Atendimento</h1></div>
@@ -122,7 +123,8 @@ async function carregar(){
 const etapaNome = id => (D.etapas.find(e => e.id === id) || {}).nome || '';
 const leadAula = a => D.leadsAula.find(l => l.id === a.lead_id) || D.leads.find(l => l.id === a.lead_id) || {};
 const desfechoDe = a => { const m = /desfecho:\s*(matriculou|nao|andamento|faltou)(?:\s*·\s*(.*))?/i.exec(a.observacao||''); return m ? { t: m[1].toLowerCase(), obs: (m[2]||'').trim() } : null; };
-function irLead(id, aba){ try { localStorage.setItem('capta_abrir_lead', JSON.stringify({ id, aba: aba || 'conversa', t: Date.now() })); } catch(e){} irPara('/funil.html'); }
+function irLead(id, aba){ LeadPainel.abrir(id, aba || 'conversa'); }
+LeadPainel.init({ slug: SLUG, token: TOKEN, getLead: id => D.leads.find(x => x.id === id) || D.leadsAula.find(x => x.id === id), getEtapas: () => D.etapas, onAgendou: () => carregar(), onAtualizou: () => desenhar() });
 
 function desenhar(){
   const aulas = D.aulas.filter(a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para).sort((a,b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));

@@ -110,6 +110,7 @@ function toast(msg, opts){ opts = opts || {}; let box = document.getElementById(
 function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
 </script>
 
+<script src="/lead-painel.js"></script>
 </head>
 <body>
 <div class="topbar">
@@ -210,7 +211,7 @@ function vDia(d){
 function expBloco(list, h){
   if (!list.length) return '';
   return `<div class="bloco exp" style="margin-bottom:6px"><div class="t"><b>${list.length} em aula</b> · ${String(h).padStart(2,'0')}:00</div>
-    <div class="pills">${list.map(e => { const l = leadDe(e); return `<span class="pill cont" draggable="true" ondragstart="dragExp(event,'${e.id}')" title="${esc(l.nome||'')}">${esc(e.crianca_nome||l.nome||'Criança')}${e.crianca_idade?', '+e.crianca_idade:''}<small>${esc(l.nome||'')}</small></span>`; }).join('')}</div></div>`;
+    <div class="pills">${list.map(e => { const l = leadDe(e); return `<span class="pill cont" draggable="true" ondragstart="dragExp(event,'${e.id}')" onclick="LeadPainel.abrir('${e.lead_id}','agendar')" title="${esc(l.nome||'')}">${esc(e.crianca_nome||l.nome||'Criança')}${e.crianca_idade?', '+e.crianca_idade:''}<small>${esc(l.nome||'')}</small></span>`; }).join('')}</div></div>`;
 }
 
 function vSemana(){
@@ -294,6 +295,7 @@ async function confirmarNA(){
   catch(e){ toast(e.message, { tipo:'erro' }); }
 }
 
+LeadPainel.init({ slug: SLUG, token: TOKEN, getLead: id => LEADS.find(x => x.id === id), getEtapas: () => [], onAgendou: () => carregar() });
 if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
 </script>
 </body>
