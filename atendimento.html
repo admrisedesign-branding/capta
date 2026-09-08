@@ -125,7 +125,7 @@ const desfechoDe = a => { const m = /desfecho:\s*(matriculou|nao|andamento|falto
 function irLead(id, aba){ try { localStorage.setItem('capta_abrir_lead', JSON.stringify({ id, aba: aba || 'conversa', t: Date.now() })); } catch(e){} irPara('/funil.html'); }
 
 function desenhar(){
-  const aulas = D.aulas.filter(a => a.status !== 'cancelado').sort((a,b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+  const aulas = D.aulas.filter(a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para).sort((a,b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
   const pend = aulas.filter(a => !desfechoDe(a) && a.status !== 'faltou');
   // conversas sem resposta: última mensagem recebida e não lida
   const semResp = (Array.isArray(D.conversas) ? D.conversas : []).filter(c => (c.nao_lidas||0) > 0).sort((a,b) => new Date(b.ultima_mensagem_em||0) - new Date(a.ultima_mensagem_em||0));

@@ -159,7 +159,7 @@ function mover(n){
 function irDia(d){ SEL = d; modo('dia'); }
 const turmasDo = d => D.turmas.filter(t => t.ativa !== false && t.dia_semana === dow(d));
 const alunosDa = t => D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo');
-const expDo = d => EXP.filter(a => a.data === d && a.status !== 'cancelado');
+const expDo = d => EXP.filter(a => a.data === d && !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para);
 const leadDe = a => LEADS.find(l => l.id === a.lead_id) || {};
 const vagaDe = (t, d) => VAGAS.find(v => v.turma_id === t.id && v.data === d);
 function vagasHora(d, h){ // turma que cobre a hora h no dia d

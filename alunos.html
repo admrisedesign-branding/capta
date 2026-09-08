@@ -204,7 +204,7 @@ async function salvar(id){
   const g = x => document.getElementById(x).value;
   const d = { id: id || undefined, nome: g('f-nome').trim(), nome_curto: g('f-curto').trim(), matricula: g('f-mat'), kit: g('f-kit'), turma_id: g('f-turma'), status: g('f-st'), trancado_ate: g('f-tr'), observacao: g('f-obs').trim() };
   if (!d.nome) return toast('Informe o nome.',{tipo:'erro'});
-  try { await api('aluno', d); fechar(); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); }
+  try { await api('aluno', d); fechar(); await carregar(); toast(`<b>${esc(d.nome)}</b> ${id ? 'atualizado' : 'cadastrado'}${d.status!=='ativo'?' · '+d.status:''}`, { tipo:'ok' }); } catch(e){ toast(e.message,{tipo:'erro'}); }
 }
 if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
 </script>

@@ -492,12 +492,12 @@ function cardVaga(tipo, rotulo) {
 }
 async function cancelarAula(id) {
   if (!confirm('Cancelar esta aula experimental?')) return;
-  try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pelo atendente' }); P.info = await api('lead', { lead_id: P.lead.id }); carregarAgenda(true); }
+  try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pelo atendente' }); P.info = await api('lead', { lead_id: P.lead.id }); const lf = leads.find(x => x.id === P.lead.id); const ec = etapas.find(x => /em contato/i.test(x.nome)); if (lf && ec && !(P.info.agendamentos||[]).some(a=>['agendado','confirmado'].includes(a.status))) { lf.etapa_id = lf.etapa_anterior_id || ec.id; desenhar(); } toast('Aula cancelada · kit devolvido · lead voltou de etapa', { tipo:'ok' }); carregarAgenda(true); }
   catch (e) { toast(e.message,{tipo:'erro'}); }
 }
 function painelAgendar(l) {
   if (!P.idx) P.idx = { manha: 0, tarde: 0, sab: 0 };
-  const ag = (P.info && P.info.agendamentos || []).filter(a => a.status !== 'cancelado');
+  const ag = (P.info && P.info.agendamentos || []).filter(a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para);
   return `<div class="p-corpo">
     ${ag.length ? `<div class="p-sec">Aulas deste lead</div>${ag.map(a => `<div class="ag-item"><span>${nomeDia(a.data)} ${dataBR(a.data)} · ${hhmm(a.hora_inicio)}${a.crianca_nome?' · '+esc(a.crianca_nome):''}</span><span class="st">${esc(a.status)}${['agendado','confirmado'].includes(a.status)?` <a href="#" onclick="cancelarAula('${a.id}');return false" style="color:var(--quente);margin-left:6px">cancelar</a>`:''}</span></div>`).join('')}` : ''}
     <div class="p-sec">1 · Criança</div>
@@ -518,6 +518,7 @@ async function confirmarAgenda(turmaId, data) {
     await api('agendar', { turma_id: turmaId, data, crianca_nome: crianca, crianca_idade: idade || null, lead_id: l.id });
     l.crianca = crianca; l.idade = idade ? Number(idade) : l.idade;
     const e = etapas.find(x => /aula agendada/i.test(x.nome)); if (e) { l.etapa_id = e.id; l.etapa_em = new Date().toISOString(); }
+    toast(`<b>${esc(crianca)}</b> · aula marcada ${nomeDia(data)} ${dataBR(data)} · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' });
     desenhar(); P.info = await api('lead', { lead_id: l.id }); P.aba = 'agendar'; carregarAgenda(true);
   } catch (e) { toast(e.message,{tipo:'erro'}); }
 }

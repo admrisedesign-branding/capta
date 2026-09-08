@@ -438,7 +438,7 @@ async function enviar() {
   btn.disabled = true; btn.textContent = 'Enviando…';
   try {
     await api('enviar', { conversa_id: atual, texto });
-    txt.value = ''; txt.style.height = 'auto';
+    txt.value = ''; txt.style.height = 'auto'; toast('Enviado', { tipo:'ok', ms: 1500 });
     await abrir(atual);
     carregarLista();
   } catch (e) {

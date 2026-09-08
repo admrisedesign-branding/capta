@@ -224,7 +224,7 @@ function mover(n){ if (MODO === 'mes') { const x = new Date(SELDIA + 'T12:00:00'
 function irHoje(){ SELDIA = hoje; carregar(); }
 const leadDe = a => D.leads.find(l => l.id === a.lead_id) || {};
 const turmaDe = a => D.turmas.find(t => t.id === a.turma_id) || {};
-const viva = a => a.status !== 'cancelado';
+const viva = a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para;
 const pendente = a => ['agendado','confirmado','compareceu'].includes(a.status) && a.data <= hoje && !(a.observacao && /desfecho:/i.test(a.observacao));
 
 function estoque(a){
@@ -415,9 +415,9 @@ async function confirmarMatricula(id){
   try { await api('desfecho', { agendamento_id: id, desfecho: 'matriculou', valor: g('m-valor'), curso: g('m-curso'), pagamento: ESC.pagamento, turma_id: g('m-turma'), aluno_nome: g('m-aluno'), observacao: `desfecho: matriculou · ${ESC.pagamento}${g('m-valor')?' · R$ '+g('m-valor'):''}` }); ABERTO = null; await carregar(); }
   catch(e){ toast(e.message,{tipo:'erro'}); }
 }
-async function desfazer(id){ try { await api('desfazer', { agendamento_id: id }); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
-async function cancelar(id){ if (!confirm('Cancelar esta aula?')) return; try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pela recepção' }); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
-async function reagendar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'reagendado pela recepção' }); ABERTO = null; VAGAS3 = null; await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+async function cancelar(id){ if (!confirm('Cancelar esta aula?')) return; try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pela recepção' }); toast('Aula cancelada · lead voltou de etapa · Kommo atualizado'); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+async function reagendar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'reagendado pela recepção' }); ABERTO = null; VAGAS3 = null; toast('Aula remarcada · Kommo atualizado', { tipo:'ok' }); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+async function desfazer(id){ try { await api('desfazer', { agendamento_id: id }); toast('Desfeito · aula voltou a agendada'); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
 
 // conversa do lead (drawer à direita)
 async function script(id){
