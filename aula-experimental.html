@@ -222,6 +222,7 @@ const hoje = new Date().toISOString().slice(0,10);
 const MOTIVOS = ['Orçamento','Horário não bate','Vai pensar','Distância','Criança não se adaptou','Só pesquisando'];
 const PAGTOS = ['Pix','cartão','boleto','recorrente'];
 const KITS = ['First','OneBot','TechBot','Autobot','App Developer','GameBot'];
+let SEMDATA = [], MOSTRA_SD = false;
 let D = { agendamentos: [], turmas: [], leads: [] }, MODO = 'semana', SEL = null, SELDIA = hoje, VAGAS = null, KITS_T = [];
 const addDias = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0,10); };
 const segunda = d => { const x = new Date(d + 'T12:00:00'); const w = x.getDay(); x.setDate(x.getDate() - (w === 0 ? 6 : w - 1)); return x.toISOString().slice(0,10); };
@@ -234,8 +235,8 @@ async function api(acao, extra = {}) {
 async function carregar(){
   try {
     const de = addDias(segunda(SELDIA), -42), ate = addDias(segunda(SELDIA), 49);
-    const [ex, al, ag] = await Promise.all([api('experimentais', { de, ate }), api('alunos').catch(() => ({ kits: [] })), api('agenda', { dias: 42 }).catch(() => null)]);
-    D = ex; KITS_T = al.kits || []; VAGAS = ag && ag.horarios ? ag.horarios : null; desenhar();
+    const [ex, al, ag, sd] = await Promise.all([api('experimentais', { de, ate }), api('alunos').catch(() => ({ kits: [] })), api('agenda', { dias: 42 }).catch(() => null), api('sem_data').catch(() => ({ leads: [] }))]);
+    D = ex; KITS_T = al.kits || []; VAGAS = ag && ag.horarios ? ag.horarios : null; SEMDATA = sd.leads || []; desenhar();
   } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
 function modo(m){ MODO = m; desenhar(); }
@@ -327,6 +328,14 @@ function desenhar(){
   document.getElementById('raiz').innerHTML = `
     <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="irHoje()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}</div>
     <div class="tally"><div><b>${base.length}</b><small>agendadas</small></div><div class="bad"><b>${quentes}</b><small>chega querendo fechar</small></div><div><b>${matric}</b><small>matriculadas</small></div><div class="hot"><b>${D.agendamentos.filter(pendente).length}</b><small>sem desfecho</small></div></div>
+    ${SEMDATA.length ? `<div class="tally" style="display:block;background:#FDF8EC;border-color:#EAD7A5">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:16px;margin:0">${SEMDATA.length} leads em “Aula agendada” sem data</b>
+      <small style="font-weight:600">vieram do Kommo sem dia e hora — marque a aula de verdade ou dê a baixa</small>
+      <button class="nav" style="margin-left:auto" onclick="MOSTRA_SD=!MOSTRA_SD;desenhar()">${MOSTRA_SD?'esconder':'ver lista'}</button></div>
+      ${MOSTRA_SD ? `<div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">${SEMDATA.map(l => `<div class="cardx" style="margin:0"><div class="top"><span class="kid">${esc(l.crianca||l.nome||'Sem nome')}</span>${l.temperatura?`<span class="rot ${ROT[(l.temperatura||'').toLowerCase()]?ROT[(l.temperatura||'').toLowerCase()][1]:'f'}">${esc(l.temperatura)}</span>`:''}</div>
+        <div class="guard">${esc(l.nome||'')}${l.contato?' · '+esc(l.contato):''} · parado há ${Math.floor((Date.now()-new Date(l.etapa_em||l.criado_em))/864e5)} dias</div>
+        <div class="acts mini" style="margin-top:8px"><button onclick="LeadPainel.abrir('${l.id}','agendar')">marcar aula</button><button onclick="LeadPainel.abrir('${l.id}','conversa')">conversa</button></div></div>`).join('')}</div>` : ''}
+    </div>` : ''}
     <div class="corpo"><div>${grade}</div>
       <div class="lado"><h5>Kits disponíveis</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
         <div class="leg"><span><i style="background:var(--exp)"></i>Aula experimental usa o kit First</span><span><i style="background:var(--morno)"></i>laranja = restam 2 ou menos</span><span><i style="background:var(--quente)"></i>vermelho = sem vaga</span></div></div>
@@ -440,7 +449,7 @@ async function reagendar(id, turmaId, data){ try { await api('remarcar', { agend
 async function desfazer(id){ try { await api('desfazer', { agendamento_id: id }); toast('Desfeito · aula voltou a agendada'); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
 
 // conversa do lead: gaveta compartilhada
-LeadPainel.init({ slug: SLUG, token: TOKEN, getLead: id => D.leads.find(x => x.id === id), getEtapas: () => [], onAgendou: () => carregar() });
+LeadPainel.init({ slug: SLUG, token: TOKEN, getLead: id => D.leads.find(x => x.id === id) || SEMDATA.find(x => x.id === id), getEtapas: () => [], onAgendou: () => carregar() });
 function script(id){ const a = D.agendamentos.find(x => x.id === id); if (a && a.lead_id) LeadPainel.abrir(a.lead_id, 'conversa'); }
 
 let ESC = {};

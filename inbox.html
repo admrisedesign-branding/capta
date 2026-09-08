@@ -114,6 +114,21 @@ button{font-family:inherit;cursor:pointer}
 @media(max-width:840px){.voltar-lista{display:block}}
 
 /* inbox v2 */
+
+.conv{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--line-2);background:transparent;cursor:pointer;font-family:inherit}
+.conv:hover{background:var(--brand-softer,rgba(46,91,255,.06))}
+.conv[aria-current="true"]{background:var(--brand-soft,rgba(46,91,255,.1))}
+.conv-mid{min-width:0;display:block}
+.conv-nome{display:block;font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-prev{display:block;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.conv-dir{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.conv-hora{font-size:11px;color:var(--faint);white-space:nowrap}
+.bolha{background:var(--brand);color:#fff;font-size:10.5px;font-weight:800;border-radius:99px;padding:1px 7px;min-width:20px;text-align:center}
+.conv-tags{display:flex;gap:4px;align-items:center}
+.mini-tag{font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:99px;text-transform:uppercase;letter-spacing:.03em}
+.mt-Quente{background:rgba(224,49,39,.12);color:var(--quente)}.mt-Morno{background:rgba(224,147,15,.14);color:var(--morno)}.mt-Frio{background:var(--brand-soft);color:var(--brand)}
+.mt-at{background:var(--line-2);color:var(--muted);text-transform:none;letter-spacing:0}
+
 .fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:70}
 .janela{background:var(--card);border-radius:16px;padding:22px;width:100%;max-width:440px;box-shadow:0 20px 50px rgba(20,26,46,.2)}
 .janela h3{font-size:16px;font-weight:700}.janela p{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.5}
@@ -245,24 +260,31 @@ function desenharLista(){
     if (q && !nome.toLowerCase().includes(q)) return false;
     if (FI.f === 'nao_lidas') return (c.nao_lidas||0) > 0;
     if (FI.f === 'minhas') return FI.eu && c.atendente === FI.eu;
+    if (FI.f === 'quentes') return (c.lead?.temperatura||'').toLowerCase() === 'quente' && !c.resolvida_em;
+    if (FI.f === 'sem_dono') return !c.atendente && !c.resolvida_em;
     if (FI.f === 'resolvidas') return !!c.resolvida_em;
     if (FI.f === 'abertas') return !c.resolvida_em;
     return true;
   });
-  const n = k => k==='nao_lidas' ? CONVS.filter(c=>(c.nao_lidas||0)>0).length : k==='minhas' ? CONVS.filter(c=>FI.eu&&c.atendente===FI.eu).length : k==='resolvidas' ? CONVS.filter(c=>c.resolvida_em).length : CONVS.filter(c=>!c.resolvida_em).length;
-  document.getElementById('filtros').innerHTML = [['abertas','Abertas'],['nao_lidas','Não lidas'],['minhas','Minhas'],['resolvidas','Resolvidas']].map(([k,t]) => `<button class="${FI.f===k?'on':''}" onclick="FI.f='${k}';desenharLista()">${t} <span style="opacity:.7">${n(k)}</span></button>`).join('');
+  const n = k => k==='nao_lidas' ? CONVS.filter(c=>(c.nao_lidas||0)>0).length : k==='minhas' ? CONVS.filter(c=>FI.eu&&c.atendente===FI.eu).length : k==='resolvidas' ? CONVS.filter(c=>c.resolvida_em).length
+    : k==='quentes' ? CONVS.filter(c=>(c.lead?.temperatura||'').toLowerCase()==='quente').length : k==='sem_dono' ? CONVS.filter(c=>!c.atendente&&!c.resolvida_em).length : CONVS.filter(c=>!c.resolvida_em).length;
+  const orfas = CONVS.filter(c => !c.lead).length;
+  document.getElementById('filtros').innerHTML = [['abertas','Abertas'],['nao_lidas','Não lidas'],['minhas','Minhas'],['sem_dono','Sem dono'],['quentes','Quentes'],['resolvidas','Resolvidas']].map(([k,t]) => `<button class="${FI.f===k?'on':''}" onclick="FI.f='${k}';desenharLista()">${t} <span style="opacity:.7">${n(k)}</span></button>`).join('')
+    + (orfas ? `<button style="border-color:var(--brand);color:var(--brand)" onclick="casarConversas()" title="Ligar conversas ao lead pelo telefone">ligar ${orfas} sem nome</button>` : '');
   elCont.textContent = lista.length ? `${lista.length} conversa${lista.length > 1 ? 's' : ''}` : 'Nenhuma conversa';
   if (!lista.length) { elConvs.innerHTML = `<div class="vazio">${CONVS.length ? 'Nada com esse filtro.' : 'Nada por aqui ainda.<br>As mensagens aparecem assim que alguém escrever para o seu WhatsApp.'}</div>`; return; }
   elConvs.innerHTML = lista.map(c => {
-    const nome = c.lead?.nome || fone(c.telefone); const temp = c.lead?.temperatura;
+    const nome = c.lead?.nome || fone(c.telefone); const temp = c.lead?.temperatura; const at = c.atendente || c.lead?.atendente;
     return `<button class="conv ${c.resolvida_em?'res':''}" data-id="${c.id}" aria-current="${c.id === atual}">
       <span class="conv-av">${esc(iniciais(nome))}</span>
-      <span class="conv-mid"><span class="conv-nome">${esc(nome)}${c.atendente?` <span class="conv-at">· ${esc(c.atendente)}</span>`:''}</span><span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span></span>
-      <span class="conv-dir"><span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>` : temp ? `<span class="tag t-${esc(temp)}">${esc(temp)}</span>` : ''}</span></button>`;
+      <span class="conv-mid"><span class="conv-nome">${esc(nome)}</span><span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span>
+        <span class="conv-tags">${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?`<span class="mini-tag mt-at">${esc(at)}</span>`:''}${c.resolvida_em?'<span class="mini-tag mt-at">resolvida</span>':''}</span></span>
+      <span class="conv-dir"><span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>` : ''}</span></button>`;
   }).join('');
   elConvs.querySelectorAll('.conv').forEach(b => { b.onclick = () => abrir(b.dataset.id); });
   if (window.parent !== window) window.parent.postMessage({ capta:'nao_lidas', n: CONVS.reduce((s,c)=>s+(c.nao_lidas||0),0) }, '*');
 }
+async function casarConversas(){ try { const r = await api('casar_conversas'); toast(`${r.ligadas} conversas ligadas ao lead`, { tipo:'ok' }); await carregarLista(); } catch(e){ toast(e.message, { tipo:'erro' }); } }
 async function carregarLista() {
   try { const { conversas } = await api('conversas'); CONVS = conversas || []; desenharLista(); }
   catch (e) { elCont.textContent = 'Erro'; elConvs.innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
