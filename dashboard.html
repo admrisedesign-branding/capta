@@ -51,6 +51,7 @@ h2{font-size:16px;font-weight:700}
 .nav-item:hover{background:var(--line-2);color:var(--ink)}
 .nav-item.on{background:var(--brand-soft);color:var(--brand)}
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
+.nav.pendente{visibility:hidden}
 .btn-zap{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-weight:700;font-size:12.5px;padding:7px 12px;border-radius:10px;cursor:pointer;margin-right:8px}
 .btn-zap:hover{color:var(--brand);border-color:var(--brand)}.btn-zap svg{width:15px;height:15px}
 .btn-zap.on{background:var(--verde-bg,rgba(22,163,74,.12));color:var(--verde,#16A34A);border-color:transparent}
@@ -64,7 +65,7 @@ h2{font-size:16px;font-weight:700}
   .layout.mini .side{width:64px;flex-basis:64px;padding:18px 10px}
   .layout.mini .brand{justify-content:center;padding-left:0;padding-right:0}
   .layout.mini .brand-c{margin:0}
-  .layout.mini .brand span:not(.brand-c),.layout.mini .store,.layout.mini .nav-lbl,.layout.mini .who,.layout.mini .nav-item .breve,.layout.mini .side-toggle .lbl{display:none}
+  .layout.mini .brand-t,.layout.mini .store,.layout.mini .nav-lbl,.layout.mini .who,.layout.mini .nav-item .breve,.layout.mini .side-toggle .lbl{display:none}
   .layout.mini .nav-item{justify-content:center;padding:11px 0;font-size:0;gap:0;position:relative}
   .layout.mini .nav-item svg{width:20px;height:20px}
   .layout.mini .nav-item.sub{padding-left:0}
@@ -335,9 +336,9 @@ h2{font-size:16px;font-weight:700}
 <body>
 <div class="layout">
   <aside class="side" id="side">
-    <div class="brand"><span class="brand-c">C</span>capta</div>
+    <div class="brand"><span class="brand-c">C</span><span class="brand-t">capta</span></div>
     <div class="store" id="store">—</div>
-    <nav class="nav">
+    <nav class="nav pendente">
       <span class="nav-lbl">Menu</span>
       <button class="nav-item on" data-t="painel" data-tip="Painel"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Painel</button>
       <button class="nav-item" data-t="leads" data-tip="Leads"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>Leads</button>
@@ -2825,6 +2826,8 @@ function montarMenuGestao(){
     fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'status',slug:SLUG,token:TOKEN})}).then(r=>r.json()).then(j=>{ if(j&&(j.status==='conectado'||j.conectado)){ bz.classList.add('on'); bz.querySelector('span').textContent='WhatsApp conectado'; } }).catch(()=>{});
   }
 }
+// menu certo desde o primeiro frame, se já conhecemos o plano deste negócio
+(function(){ try{ const pl=localStorage.getItem('capta_plano_'+SLUG); if(['gestao','business'].includes(pl)){ montarMenuGestao(); document.querySelector('.nav').classList.remove('pendente'); } }catch(e){} })();
 async function load(){
   if(SLUG && TOKEN){
     try{
@@ -2836,7 +2839,10 @@ async function load(){
   const _po = params.get('plano'); if(_po) DATA.tenant.plano = _po;
   try { const rc = await fetch(CONFIG_API); if(rc.ok) CONFIG = await rc.json(); } catch(e){}
   applyPlanLimits();
-  if(['gestao','business'].includes((DATA.tenant.plano||'').toLowerCase())) montarMenuGestao();
+  const planoLc=(DATA.tenant.plano||'').toLowerCase();
+  try{ localStorage.setItem('capta_plano_'+SLUG, planoLc); }catch(e){}
+  if(['gestao','business'].includes(planoLc)) { if(!window.__gestao) montarMenuGestao(); }
+  document.querySelector('.nav') && document.querySelector('.nav').classList.remove('pendente');
   document.getElementById('store').textContent = DATA.tenant.nome;
   document.getElementById('who-nome').textContent = DATA.tenant.nome;
   document.getElementById('who-plan').textContent = 'Plano '+planoAtual();

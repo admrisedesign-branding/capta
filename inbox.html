@@ -113,7 +113,7 @@ button{font-family:inherit;cursor:pointer}
   font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:9px}
 @media(max-width:840px){.voltar-lista{display:block}}
 </style>
-<style>body.embed .voltar{display:none}body.embed .topbar{height:52px;background:transparent;backdrop-filter:none;border-bottom:1px solid var(--line);padding:0 18px}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+<style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
 #toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:90;pointer-events:none}
 .toast{pointer-events:auto;background:var(--ink,#141A2E);color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px rgba(20,26,46,.25);display:flex;align-items:center;gap:12px;animation:tin .18s ease-out;max-width:560px}
