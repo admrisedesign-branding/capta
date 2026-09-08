@@ -1039,7 +1039,8 @@ const PAPEIS = {
 async function usuarioDe(tenantId, email) {
   if (!email) return null;
   const u = await sb(`capta_usuarios?tenant_id=eq.${tenantId}&email=eq.${encodeURIComponent(String(email).toLowerCase().trim())}&select=id,nome,email,papel,ativo,telas&limit=1`).catch(() => []);
-  return u?.[0] || null;
+  const r = u?.[0]; if (r && r.papel === 'dono') r.papel = 'gestor';   // cadastro antigo
+  return r || null;
 }
 function podeFazer(papel, acao) {
   const p = PAPEIS[papel] || PAPEIS.gestor;
