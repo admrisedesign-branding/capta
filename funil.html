@@ -35,9 +35,10 @@ button{font-family:inherit;cursor:pointer}
 @media(max-width:760px){.dica{display:none}}
 
 .raia-area{padding:20px 26px 40px;overflow-x:auto}
-.raias{display:flex;gap:14px;min-height:60vh;align-items:flex-start}
+.raias{display:flex;gap:14px;align-items:stretch;min-height:calc(100vh - 150px)}
+body.embed .raias{min-height:calc(100vh - 120px)}
 
-.raia{flex:0 0 258px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+.raia{flex:1 1 240px;min-width:240px;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:var(--r);
   box-shadow:var(--shadow);display:flex;flex-direction:column;max-height:76vh}
 .raia.alvo{border-color:var(--brand);background:var(--brand-softer)}
 .raia-cab{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
@@ -72,9 +73,10 @@ button{font-family:inherit;cursor:pointer}
 /* ---- painel lateral do lead ---- */
 .tela{display:flex;align-items:flex-start}
 .tela > .raia-area,.tela > #raiz{flex:1;min-width:0}
-#painel{flex:0 0 0;width:0;overflow:hidden;transition:.18s;border-left:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;height:calc(100vh - 60px);position:sticky;top:60px}
-#painel.aberto{flex-basis:400px;width:400px}
-body.embed #painel{height:calc(100vh - 52px);top:52px}
+#painel{position:fixed;top:0;right:0;height:100vh;width:0;overflow:hidden;transition:.22s cubic-bezier(.4,0,.2,1);border-left:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;z-index:60;box-shadow:-10px 0 40px rgba(20,26,46,.12)}
+#painel.aberto{width:480px;max-width:94vw}
+#scrim-p{position:fixed;inset:0;background:rgba(20,26,46,.18);z-index:55;display:none}#scrim-p.on{display:block}
+
 .p-cab{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
 .p-cab .av{width:36px;height:36px;border-radius:10px;background:var(--brand-soft);color:var(--brand);font-weight:800;display:grid;place-items:center;flex:0 0 36px}
 .p-cab h3{font-size:14.5px;font-weight:800;line-height:1.2}
@@ -154,7 +156,7 @@ function irPara(pagina){ if(window.parent !== window) window.parent.postMessage(
   <span class="dica">Arraste o card para mudar de etapa</span>
 </div>
 
-<div class="tela"><div id="raiz" class="aviso">Carregando…</div><aside id="painel"></aside></div>
+<div class="tela"><div id="raiz" class="aviso">Carregando…</div><aside id="painel"></aside></div><div id="scrim-p" onclick="fecharLead()"></div>
 <div id="modal"></div>
 
 <script>
@@ -349,12 +351,12 @@ let P = { lead: null, aba: 'conversa', info: null, agenda: null, idx: { manha: 0
 async function abrirLead(id) {
   const l = leads.find(x => x.id === id); if (!l) return;
   P = { lead: l, aba: P.lead && P.lead.id === id ? P.aba : 'conversa', info: null, agenda: null, idx: { manha: 0, tarde: 0, sab: 0 } };
-  document.getElementById('painel').classList.add('aberto');
+  document.getElementById('painel').classList.add('aberto'); document.getElementById('scrim-p').classList.add('on');
   desenharPainel();
   try { P.info = await api('lead', { lead_id: id }); } catch (e) { P.info = { erro: e.message }; }
   desenharPainel();
 }
-function fecharLead() { document.getElementById('painel').classList.remove('aberto'); P.lead = null; clearTimeout(AG_TIMER); }
+function fecharLead() { document.getElementById('painel').classList.remove('aberto'); document.getElementById('scrim-p').classList.remove('on'); P.lead = null; clearTimeout(AG_TIMER); }
 function abaP(a) { P.aba = a; desenharPainel(); if (a === 'agendar' && !P.agenda) carregarAgenda(); }
 
 function desenharPainel() {

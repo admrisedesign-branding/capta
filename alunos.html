@@ -52,7 +52,7 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .gh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);padding:4px 6px}
 .gb{font-size:12px;font-weight:700;color:var(--muted);padding:10px 6px}
 .cel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;min-height:64px}
-.cel.vazia{background:transparent;border-style:dashed}
+.cel.vazia{background:var(--card);border-style:dashed;display:grid;place-items:center;color:var(--faint);font-size:12px;font-weight:600}
 .cel .t{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--faint);margin-bottom:6px}
 .cel .t b{color:var(--ink)}
 .al{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 4px;border-radius:7px;cursor:pointer}
@@ -156,7 +156,7 @@ function grade(filtro){
     h += `<div class="gb">${hh(hi)} – ${hh(hf)}</div>`;
     for (const d of [1,2,3,4,5,6]) {
       const t = D.turmas.find(x => x.dia_semana === d && String(x.hora_inicio).slice(0,5) === hi);
-      if (!t) { h += `<div class="cel vazia"></div>`; continue; }
+      if (!t) { h += `<div class="cel vazia">horário vago</div>`; continue; }
       const als = D.alunos.filter(a => a.turma_id === t.id && a.status !== 'cancelado' && filtro(a)).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome));
       const total = D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo').length;
       const porKit = {}; D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo').forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);

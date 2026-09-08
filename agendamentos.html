@@ -76,6 +76,18 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .dcell .n{font-weight:800;font-size:13px}
 .dcell .i{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.5}
 .dcell .i b{color:var(--ink)}.dcell .i .e{color:var(--exp);font-weight:700}.dcell .i .z{color:var(--quente);font-weight:700}
+.btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer}.btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+.fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
+.janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:520px;box-shadow:0 20px 50px rgba(20,26,46,.2);max-height:92vh;overflow-y:auto}
+.janela h3{font-size:16px;font-weight:700}.janela p{color:var(--muted);font-size:13px;margin-top:4px}
+.campo{margin-top:12px}.campo label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.campo input,.campo select{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:13px;color:var(--ink);background:var(--card);font-family:inherit}
+.l2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fim{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.lista-leads{max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;margin-top:6px}
+.lead-op{padding:8px 11px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line-2);display:flex;justify-content:space-between;gap:8px}.lead-op:hover,.lead-op.on{background:var(--brand-softer)}.lead-op small{color:var(--faint)}
+.vagas3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}.vg{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;cursor:pointer}.vg.on{border-color:var(--brand);background:var(--brand-softer)}.vg b{display:block;font-size:13px}.vg small{color:var(--muted)}
+.pill[draggable]{cursor:grab}
 .vazio{border:1px dashed var(--line);border-radius:var(--r);padding:32px;text-align:center;color:var(--faint);line-height:1.7}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
@@ -106,6 +118,7 @@ function irPara(pagina){ if(window.parent !== window) window.parent.postMessage(
 
 </div>
 <div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
+<div id="modal"></div>
 
 <script>
 const p = new URLSearchParams(location.search);
@@ -186,10 +199,10 @@ function vDia(d){
         <div>${horaCel(h)}${horaCel(h+1)}</div>
         <div class="cel"><div class="bloco"><div class="t">${hh(tIni.hora_inicio)}–${hh(tIni.hora_fim)} · <b>${als.length} em aula</b>${Object.entries(porKit).map(([k,n])=>' · '+KITCUR(k)+' '+n).join('')}</div>
           <div class="pills">${als.map(a=>`<span class="pill">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('') || '<span class="interv">sem alunos</span>'}</div></div></div>
-        <div class="cel">${expBloco(exH, h)}${expBloco(ex2, h+1)}</div></div>`;
+        <div class="cel" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${h})">${expBloco(exH, h)}${expBloco(ex2, h+1)}</div></div>`;
       i += 2; continue;
     }
-    rows += `<div class="linha"><div>${horaCel(h)}</div><div class="cel">${h===12||h===13?'<div class="interv">intervalo</div>':''}</div><div class="cel">${expBloco(exH, h)}</div></div>`;
+    rows += `<div class="linha"><div>${horaCel(h)}</div><div class="cel">${h===12||h===13?'<div class="interv">intervalo</div>':''}</div><div class="cel" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${h})">${expBloco(exH, h)}</div></div>`;
     i++;
   }
   return `<div class="dia"><div class="cab"><div></div><div>Turmas · alunos ativos · 2h</div><div>Aulas experimentais · 1h</div></div>${rows}</div>`;
@@ -197,7 +210,7 @@ function vDia(d){
 function expBloco(list, h){
   if (!list.length) return '';
   return `<div class="bloco exp" style="margin-bottom:6px"><div class="t"><b>${list.length} em aula</b> · ${String(h).padStart(2,'0')}:00</div>
-    <div class="pills">${list.map(e => { const l = leadDe(e); return `<span class="pill cont" title="${esc(l.nome||'')}">${esc(e.crianca_nome||l.nome||'Criança')}${e.crianca_idade?', '+e.crianca_idade:''}<small>${esc(l.nome||'')}</small></span>`; }).join('')}</div></div>`;
+    <div class="pills">${list.map(e => { const l = leadDe(e); return `<span class="pill cont" draggable="true" ondragstart="dragExp(event,'${e.id}')" title="${esc(l.nome||'')}">${esc(e.crianca_nome||l.nome||'Criança')}${e.crianca_idade?', '+e.crianca_idade:''}<small>${esc(l.nome||'')}</small></span>`; }).join('')}</div></div>`;
 }
 
 function vSemana(){
@@ -205,8 +218,8 @@ function vSemana(){
   return `<div class="scrollx"><div class="sem">${dias.map(d => {
     const ts = turmasDo(d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
     const itens = [...ts.map(t => ({ h: hN(t.hora_inicio), html: (() => { const als = alunosDa(t), v = vagasHora(d, hN(t.hora_inicio)); return `<div class="mini"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)} · ${als.length} em aula</b>First: <span class="v ${v&&v.n<=0?'z':''}">${v ? (v.n<=0?'sem vaga':v.n+' vaga'+(v.n>1?'s':'')) : '—'}</span></div>`; })() })),
-      ...expDo(d).map(e => ({ h: hN(e.hora_inicio) + 0.5, html: `<div class="mini exp"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||leadDe(e).nome||'')}</b>experimental${e.crianca_idade?' · '+e.crianca_idade+' anos':''}</div>` }))].sort((a,b)=>a.h-b.h);
-    return `<div class="col ${d===hoje?'hoje':''}"><h4 style="cursor:pointer" onclick="irDia('${d}')">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}</h4>${itens.map(x=>x.html).join('') || '<div class="interv">sem turmas neste dia</div>'}</div>`; }).join('')}</div></div>`;
+      ...expDo(d).map(e => ({ h: hN(e.hora_inicio) + 0.5, html: `<div class="mini exp" draggable="true" ondragstart="dragExp(event,'${e.id}')"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||leadDe(e).nome||'')}</b>experimental${e.crianca_idade?' · '+e.crianca_idade+' anos':''}</div>` }))].sort((a,b)=>a.h-b.h);
+    return `<div class="col ${d===hoje?'hoje':''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',null)"><h4 style="cursor:pointer" onclick="irDia('${d}')">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}</h4>${itens.map(x=>x.html).join('') || '<div class="interv">sem turmas neste dia</div>'}</div>`; }).join('')}</div></div>`;
 }
 
 function vMes(){
@@ -227,10 +240,60 @@ function desenhar(){
   else if (MODO === 'semana') { const s = segunda(SEL); dias = [0,1,2,3,4,5].map(n => addDias(s, n)); periodo = `${fmt(dias[0],{day:'numeric',month:'long'})} a ${fmt(dias[5],{day:'numeric',month:'long'})}`; corpo = vSemana(); }
   else { const x = new Date(SEL+'T12:00:00'); periodo = x.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); const f = iso(new Date(x.getFullYear(), x.getMonth()+1, 0, 12)); dias = []; for (let d = iso(new Date(x.getFullYear(), x.getMonth(), 1, 12)); d <= f; d = addDias(d,1)) dias.push(d); corpo = vMes(); }
   document.getElementById('raiz').innerHTML = `
-    <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}</div>
+    <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}<button class="btn" onclick="novoAgendamento()">+ Novo agendamento</button></div>
     ${tally(dias)}
     <div class="corpo"><div>${corpo}</div>${lado()}</div>`;
 }
+
+// ---- arrastar experimental pra outro dia/hora (confirma antes) ----
+let DRAG = null;
+function dragExp(ev, id){ DRAG = id; ev.dataTransfer.effectAllowed = 'move'; }
+function dropExp(ev, data, hora){
+  ev.preventDefault(); const id = DRAG; DRAG = null; if (!id) return;
+  const a = EXP.find(x => x.id === id); if (!a) return;
+  const h = hora != null ? hora : hN(a.hora_inicio);
+  const ts = turmasDo(data).sort((x,y)=>Math.abs(hN(x.hora_inicio)-h)-Math.abs(hN(y.hora_inicio)-h)); const turma = ts[0];
+  if (!turma) return toast('Não há turma nesse dia.', { tipo:'erro' });
+  if (data === a.data && turma.id === a.turma_id) return;
+  const l = leadDe(a);
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela"><h3>Remarcar ${esc(a.crianca_nome||l.nome||'')}?</h3>
+    <p>De <b>${DIAS3[dow(a.data)]} ${fmt(a.data,{day:'2-digit',month:'2-digit'})} ${hh(a.hora_inicio)}</b> para <b>${DIAS3[dow(data)]} ${fmt(data,{day:'2-digit',month:'2-digit'})} ${hh(turma.hora_inicio)}</b>. O Kommo recebe a nova data, o bloco e a tag <i>reagendado</i>.</p>
+    <div class="fim"><button class="btn g" onclick="fecharModal()">Cancelar</button><button class="btn" onclick="fecharModal();remarcar('${id}','${turma.id}','${data}')">Sim, remarcar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
+}
+function fecharModal(){ document.getElementById('modal').innerHTML = ''; }
+async function remarcar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'remarcado pela agenda' }); toast('Aula remarcada · Kommo atualizado', { tipo:'ok' }); await carregar(); } catch(e){ toast(e.message, { tipo:'erro' }); } }
+
+// ---- novo agendamento: busca o lead, criança, escolhe a vaga ----
+let NA = { leads: null, lead: null, vagas: null, vaga: null, q: '' };
+async function novoAgendamento(){
+  NA = { leads: null, lead: null, vagas: null, vaga: null, q: '' }; desenharNA();
+  try { const [f, ag] = await Promise.all([api('funil'), api('agenda', { dias: 30 })]); NA.leads = f.leads || []; NA.vagas = (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0 && h.data > hoje); }
+  catch(e){ NA.leads = []; NA.vagas = []; toast(e.message, { tipo:'erro' }); }
+  desenharNA();
+}
+function vagaPor(tipo){ return (NA.vagas||[]).filter(h => { const w = dow(h.data), hi = hN(h.hora_inicio); return tipo==='sab'?w===6:tipo==='manha'?(w!==6&&hi<12):(w!==6&&hi>=12); }).sort((x,y)=>(x.data+x.hora_inicio).localeCompare(y.data+y.hora_inicio))[0]; }
+function desenharNA(){
+  const q = NA.q.trim().toLowerCase();
+  const lista = (NA.leads||[]).filter(l => !q || (l.nome||'').toLowerCase().includes(q) || (l.contato||'').includes(q)).slice(0, 40);
+  const vg = (rot, tipo) => { const v = vagaPor(tipo); return `<div class="vg ${NA.vaga && v && NA.vaga.turma_id===v.turma_id && NA.vaga.data===v.data ? 'on':''}" onclick="${v?`NA.vaga=${JSON.stringify(v).replace(/"/g,'&quot;')};desenharNA()`:''}"><small>${rot}</small>${v?`<b>${DIAS3[dow(v.data)]} ${fmt(v.data,{day:'2-digit',month:'2-digit'})} · ${hh(v.hora_inicio)}</b><small>${v.vagas} First livres</small>`:'<b>—</b><small>sem vaga</small>'}</div>`; };
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela">
+    <h3>Novo agendamento</h3><p>Aula experimental de 1 hora, kit First.</p>
+    <div class="campo"><label>Lead</label><input id="na-q" placeholder="Buscar por nome ou telefone" value="${esc(NA.q)}" oninput="NA.q=this.value;NA.lead=null;desenharNA();document.getElementById('na-q').focus();document.getElementById('na-q').setSelectionRange(99,99)">
+      ${NA.leads === null ? '<div class="lista-leads"><div class="lead-op"><small>carregando leads…</small></div></div>' : NA.lead ? `<div class="lista-leads"><div class="lead-op on"><span>${esc(NA.lead.nome||'')}</span><small>${esc(NA.lead.contato||'')}</small></div></div>` :
+        `<div class="lista-leads">${lista.map(l => `<div class="lead-op" onclick="NA.lead=${JSON.stringify({id:l.id,nome:l.nome,contato:l.contato,crianca:l.crianca,idade:l.idade}).replace(/"/g,'&quot;')};desenharNA()"><span>${esc(l.nome||'Sem nome')}</span><small>${esc(l.contato||'')}${l.temperatura?' · '+esc(l.temperatura):''}</small></div>`).join('') || '<div class="lead-op"><small>nenhum lead encontrado</small></div>'}</div>`}</div>
+    <div class="l2"><div class="campo"><label>Criança</label><input id="na-cri" value="${esc(NA.lead && NA.lead.crianca || '')}" placeholder="Nome da criança"></div><div class="campo"><label>Idade</label><input id="na-id" type="number" min="3" max="17" value="${NA.lead && NA.lead.idade || ''}"></div></div>
+    <div class="campo"><label>Vaga — ofereça duas opções</label>${NA.vagas === null ? '<p>Buscando vagas…</p>' : `<div class="vagas3">${vg('Manhã','manha')}${vg('Tarde','tarde')}${vg('Sábado','sab')}</div>`}</div>
+    <div class="fim"><button class="btn g" onclick="fecharModal()">Cancelar</button><button class="btn" onclick="confirmarNA()" ${NA.lead && NA.vaga ? '' : 'disabled'}>Agendar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
+}
+async function confirmarNA(){
+  const crianca = document.getElementById('na-cri').value.trim(), idade = document.getElementById('na-id').value;
+  if (!crianca) return toast('Informe o nome da criança.', { tipo:'erro' });
+  try { await api('agendar', { turma_id: NA.vaga.turma_id, data: NA.vaga.data, crianca_nome: crianca, crianca_idade: idade || null, lead_id: NA.lead.id }); fecharModal(); toast(`<b>${esc(crianca)}</b> agendada · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' }); await carregar(); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
 if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
 </script>
 </body>

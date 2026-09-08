@@ -52,6 +52,15 @@ h2{font-size:16px;font-weight:700}
 .nav-item.on{background:var(--brand-soft);color:var(--brand)}
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
 .nav.pendente{visibility:hidden}
+.conv-box{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.conv-lb{font-size:12px;font-weight:700;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--line);background:var(--line-2)}
+.conv-msgs{max-height:300px;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-height:60px}
+.conv-vazio{color:var(--faint);font-size:12.5px;line-height:1.5;text-align:center;padding:10px}
+.cmsg{max-width:88%;padding:8px 10px;border-radius:12px;font-size:13px;line-height:1.45;background:var(--line-2);align-self:flex-start;white-space:pre-wrap}
+.cmsg.saida{background:var(--brand-soft);align-self:flex-end}.cmsg small{display:block;color:var(--faint);font-size:10.5px;margin-top:3px}
+.conv-envio{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--line)}
+.conv-envio input{flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-family:inherit;font-size:13px}
+.btn-conv{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer;font-family:inherit}
 .btn-zap{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-weight:700;font-size:12.5px;padding:7px 12px;border-radius:10px;cursor:pointer;margin-right:8px}
 .btn-zap:hover{color:var(--brand);border-color:var(--brand)}.btn-zap svg{width:15px;height:15px}
 .btn-zap.on{background:var(--verde-bg,rgba(22,163,74,.12));color:var(--verde,#16A34A);border-color:transparent}
@@ -332,6 +341,24 @@ h2{font-size:16px;font-weight:700}
 }
 @media(max-width:400px){ .metrics{grid-template-columns:1fr} }
 </style>
+<style>
+#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:90;pointer-events:none}
+.toast{pointer-events:auto;background:var(--ink,#141A2E);color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px rgba(20,26,46,.25);display:flex;align-items:center;gap:12px;animation:tin .18s ease-out;max-width:560px}
+.toast.erro{background:#B3261E}.toast.ok{background:#1F7A4D}
+.toast button{border:0;background:rgba(255,255,255,.14);color:#fff;font-weight:700;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
+.toast button:hover{background:rgba(255,255,255,.24)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+<script>
+// aviso discreto no rodapé, com ação opcional (ex.: desfazer)
+function toast(msg, opts){ opts = opts || {}; let box = document.getElementById('toasts'); if(!box){ box = document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
+  const el = document.createElement('div'); el.className = 'toast' + (opts.tipo?' '+opts.tipo:''); el.innerHTML = `<span>${msg}</span>${opts.acao?`<button type="button">${opts.acao}</button>`:''}`;
+  if(opts.acao) el.querySelector('button').onclick = () => { el.remove(); opts.onAcao && opts.onAcao(); };
+  box.appendChild(el); setTimeout(() => el.remove(), opts.ms || (opts.acao ? 7000 : 3500)); return el; }
+// mensagem pro painel (quando embutido): trocar de tela sem sair
+function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
+</script>
+
 </head>
 <body>
 <div class="layout">
@@ -3195,7 +3222,7 @@ function leadRow(l,i){
     <td>${temp}</td>
     <td class="score-cell">${score}</td>
     <td><span class="status ${l.status||'novo'}">${l.status||'novo'}</span></td>
-    <td>${zap?`<a class="zap-mini" href="${zap}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Chamar no WhatsApp">💬</a>`:''}</td>
+    <td>${zap?`<a class="zap-mini" href="#" onclick="event.stopPropagation();event.preventDefault();openLeadById('${l.id}',true)" title="Abrir conversa">💬</a>`:''}</td>
   </tr>`;
 }
 
@@ -3218,14 +3245,14 @@ function leadCard(l, i){
       <div class="meta">${l.origem?'<span>'+esc(l.origem)+'</span>·':''}<span>${timeAgo(l.criado_em)}</span>${l.status&&l.status!=='novo'?'·<span class="stbadge">'+esc(l.status)+'</span>':''}</div>
       ${tagsHtml(l)}
     </div>
-    <div class="right">${right}${zap?`<a class="zap-mini" href="${zap}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Chamar no WhatsApp">💬</a>`:''}</div>
+    <div class="right">${right}${zap?`<a class="zap-mini" href="#" onclick="event.stopPropagation();event.preventDefault();openLeadById('${l.id}',true)" title="Abrir conversa">💬</a>`:''}</div>
   </div>`;
 }
 
 function emptyState(){ return `<div class="empty">Nenhum lead ainda.<br>Divulgue seu link e eles aparecem aqui — já pontuados.</div>`; }
 function bindLeads(){ document.querySelectorAll('tr[data-i], .lead[data-i]').forEach(el => el.onclick=()=>openLead(+el.dataset.i)); }
 
-function openLead(i){
+function openLead(i, focoConversa){
   const l = DATA.leads[i];
   const respostas = Object.values(l.respostas||{});
   const msg = encodeURIComponent(zapMsg(l));
@@ -3258,12 +3285,42 @@ function openLead(i){
       <div class="notas-lb">📝 Suas anotações <span id="notas-st" class="notas-st"></span></div>
       <textarea id="lead-notas" class="notas-ta" rows="3" placeholder="O que rolou na conversa? Ex: quer proposta de site, tem clínica, retomar segunda…">${esc(l.notas||'')}</textarea>
     </div>
-    <a class="zap" href="https://wa.me/${zapNum}?text=${msg}" target="_blank" rel="noopener">💬 Responder no WhatsApp</a>
+    <div class="conv-box" id="d-conv"><div class="conv-lb">💬 Conversa</div><div class="conv-msgs" id="d-conv-msgs"><span class="conv-vazio">carregando…</span></div><div class="conv-envio" id="d-conv-envio" style="display:none"><input id="d-conv-txt" placeholder="Escreva uma mensagem…" onkeydown="if(event.key==='Enter')enviarConversa()"><button class="btn-conv" onclick="enviarConversa()">Enviar</button></div></div>
+    <a class="zap" id="d-zap-link" href="https://wa.me/${zapNum}?text=${msg}" target="_blank" rel="noopener">💬 Responder no WhatsApp</a>
     <button class="del-lead" data-id="${l.id}" style="width:100%;margin-top:10px;background:none;border:1px solid var(--line);color:var(--muted);border-radius:11px;padding:11px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">🗑 Excluir este lead</button>`;
   dbody.querySelectorAll('.stbtns button').forEach(b => b.onclick=()=>setStatus(l,b.dataset.s));
   const delBtn = dbody.querySelector('.del-lead'); if(delBtn) delBtn.onclick=()=>excluirLead(l);
   ligarNotas(l);
   scrim.classList.add('on'); drawer.classList.add('on');
+  carregarConversa(l);
+  if(focoConversa){ setTimeout(()=>{ const c=document.getElementById('d-conv'); if(c) c.scrollIntoView({behavior:'smooth',block:'start'}); }, 150); }
+}
+function openLeadById(id, focoConversa){ const i = DATA.leads.findIndex(x => x.id === id); if(i >= 0) openLead(i, focoConversa); }
+let CONV = { lead: null, conversa: null, canal: null };
+async function carregarConversa(l){
+  CONV = { lead: l, conversa: null, canal: null };
+  const box = document.getElementById('d-conv-msgs'); if(!box) return;
+  try {
+    const r = await fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'lead',slug:SLUG,token:TOKEN,lead_id:l.id})});
+    const d = await r.json(); if(!r.ok) throw new Error(d.erro||('Erro '+r.status));
+    CONV.conversa = d.conversa; CONV.canal = d.canal;
+    const conectado = d.canal === 'conectado';
+    box.innerHTML = d.mensagens && d.mensagens.length
+      ? d.mensagens.map(m=>`<div class="cmsg ${m.direcao==='saida'?'saida':''}">${esc(m.texto||m.transcricao||'['+(m.tipo||'mídia')+']')}<small>${esc(m.autor||'')} · ${new Date(m.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div>`).join('')
+      : `<span class="conv-vazio">${conectado?'Ainda não há conversa com este lead pelo Capta.':'A conversa aparece aqui quando o WhatsApp do negócio estiver conectado ao Capta.'}</span>`;
+    box.scrollTop = box.scrollHeight;
+    document.getElementById('d-conv-envio').style.display = conectado ? 'flex' : 'none';
+    const zl = document.getElementById('d-zap-link'); if(zl) zl.style.display = conectado ? 'none' : '';
+  } catch(e){ box.innerHTML = `<span class="conv-vazio">${esc(e.message)}</span>`; }
+}
+async function enviarConversa(){
+  const inp = document.getElementById('d-conv-txt'); const texto = (inp.value||'').trim(); if(!texto || !CONV.lead) return; inp.value = '';
+  try {
+    const body = CONV.conversa ? { conversa_id: CONV.conversa.id, texto } : { telefone: CONV.lead.contato, texto };
+    const r = await fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'enviar',slug:SLUG,token:TOKEN,...body})});
+    const d = await r.json(); if(!r.ok) throw new Error(d.erro||('Erro '+r.status));
+    carregarConversa(CONV.lead);
+  } catch(e){ toast ? toast(e.message,{tipo:'erro'}) : alert(e.message); }
 }
 
 // salva a anotação sozinha, pouco depois de parar de digitar

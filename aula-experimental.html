@@ -119,6 +119,13 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .acts.quatro .yes{background:#3C8C5A;border-color:#3C8C5A}
 .acts.quatro .nope{background:#FCF1EF;border-color:#F1CFC9;color:#C5392E}
 .acts.mini{margin-top:6px;gap:12px}.acts.mini button{border:0;background:transparent;padding:2px 0;font-size:12px;color:var(--faint);text-decoration:underline}
+.acts-mini{display:flex;gap:4px;margin-top:6px}
+.acts-mini button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:7px;padding:4px 0;font-weight:800;font-size:11px;color:var(--muted);cursor:pointer}
+.acts-mini .yes{background:var(--verde);border-color:var(--verde);color:#fff}.acts-mini .nope{background:rgba(224,49,39,.1);border-color:rgba(224,49,39,.25);color:var(--quente)}
+.mes{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;min-width:760px}.mes .hd{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:2px 6px}
+.dcell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;min-height:84px;cursor:pointer}.dcell:hover,.dcell.hoje{border-color:var(--brand)}.dcell.fora{opacity:.4}
+.dcell .n{font-weight:800;font-size:13px}.dcell .i{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.5}.dcell .i b{color:var(--ink)}.dcell .i .e{color:var(--verde);font-weight:700}.dcell .i .z{color:var(--quente);font-weight:700}
+.ev[draggable]{cursor:grab}.cardx[draggable]{cursor:grab}.cardx[draggable] button,.cardx[draggable] input,.cardx[draggable] textarea{cursor:pointer}
 /* drawer da conversa */
 #drawer{position:fixed;top:0;right:0;bottom:0;width:380px;max-width:100%;background:var(--card);border-left:1px solid var(--line);box-shadow:-10px 0 30px rgba(20,26,46,.08);transform:translateX(100%);transition:.18s;z-index:45;display:flex;flex-direction:column}
 #drawer.aberto{transform:none}
@@ -206,14 +213,14 @@ async function api(acao, extra = {}) {
 }
 async function carregar(){
   try {
-    const de = addDias(segunda(SELDIA), -28), ate = addDias(segunda(SELDIA), 35);
+    const de = addDias(segunda(SELDIA), -42), ate = addDias(segunda(SELDIA), 49);
     const [ex, al, ag] = await Promise.all([api('experimentais', { de, ate }), api('alunos').catch(() => ({ kits: [] })), api('agenda', { dias: 42 }).catch(() => null)]);
     D = ex; KITS_T = al.kits || []; VAGAS = ag && ag.horarios ? ag.horarios : null; desenhar();
   } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
 function modo(m){ MODO = m; desenhar(); }
-const abasHtml = () => `<div class="abas" style="margin-left:auto">${[['dia','Dia'],['semana','Semana']].map(([k,t])=>`<button class="${MODO===k?'on':''}" onclick="modo('${k}')">${t}</button>`).join('')}</div>`;
-function mover(n){ SELDIA = addDias(SELDIA, MODO === 'dia' ? n : 7*n); const de = addDias(segunda(SELDIA), -28), ate = addDias(segunda(SELDIA), 35); const min = D.agendamentos[0] && D.agendamentos[0].data; if (SELDIA < de + 0 || SELDIA > ate) carregar(); else desenhar(); }
+const abasHtml = () => `<div class="abas" style="margin-left:auto">${[['dia','Dia'],['semana','Semana'],['mes','Mês']].map(([k,t])=>`<button class="${MODO===k?'on':''}" onclick="modo('${k}')">${t}</button>`).join('')}</div>`;
+function mover(n){ if (MODO === 'mes') { const x = new Date(SELDIA + 'T12:00:00'); x.setMonth(x.getMonth() + n, 1); SELDIA = x.toISOString().slice(0,10); } else SELDIA = addDias(SELDIA, MODO === 'dia' ? n : 7*n); const de = addDias(segunda(SELDIA), -42), ate = addDias(segunda(SELDIA), 49); const min = D.agendamentos[0] && D.agendamentos[0].data; if (SELDIA < de + 0 || SELDIA > ate) carregar(); else desenhar(); }
 function irHoje(){ SELDIA = hoje; carregar(); }
 const leadDe = a => D.leads.find(l => l.id === a.lead_id) || {};
 const turmaDe = a => D.turmas.find(t => t.id === a.turma_id) || {};
@@ -233,11 +240,48 @@ function ev0(a){
     <div class="m">${a.crianca_idade ? a.crianca_idade + ' anos · ' : ''}${esc(l.nome||'')}${l.atendente?' · '+esc(l.atendente):''}</div>
     ${estoque(a)}</div>`;
 }
-function ev(a){ return ev0(a).replace(`onclick="abrir('${a.id}')"`, `onclick="SELDIA='${a.data}';modo('dia')"`); }
+function ev(a){
+  const D_ = desfechoDe(a); const feito = D_ || a.status === 'faltou';
+  const btns = feito ? '' : `<div class="acts-mini"><button class="yes" onclick="event.stopPropagation();abrirMenuDialog('${a.id}','matriculou')" title="Matriculou">M</button><button class="nope" onclick="event.stopPropagation();abrirMenuDialog('${a.id}','nao')" title="Não matriculou">N</button><button onclick="event.stopPropagation();abrirMenuDialog('${a.id}','andamento')" title="Em andamento">A</button><button onclick="event.stopPropagation();registrar('${a.id}','faltou',{})" title="Faltou">F</button></div>`;
+  let h = ev0(a).replace(`onclick="abrir('${a.id}')"`, `draggable="true" ondragstart="dragAula(event,'${a.id}')" onclick="detalhes('${a.id}')"`);
+  const k = h.lastIndexOf('</div>'); return h.slice(0, k) + btns + h.slice(k);
+}
+// arrastar aula pra outro dia (semana) ou hora (dia): confirma antes de remarcar
+let DRAG = null;
+function dragAula(ev, id){ DRAG = id; ev.dataTransfer.effectAllowed = 'move'; }
+function dropDia(ev, data, hora){
+  ev.preventDefault(); const id = DRAG; DRAG = null; if (!id) return;
+  const a = D.agendamentos.find(x => x.id === id); if (!a) return;
+  const h = hora != null ? hora : parseInt(a.hora_inicio);
+  const turma = D.turmas.filter(t => t.dia_semana === new Date(data+'T12:00').getDay()).sort((x,y)=>Math.abs(parseInt(x.hora_inicio)-h)-Math.abs(parseInt(y.hora_inicio)-h))[0];
+  if (!turma) return toast('Não há turma nesse dia.', { tipo:'erro' });
+  if (data === a.data && parseInt(turma.hora_inicio) === parseInt(a.hora_inicio)) return;
+  const l = leadDe(a);
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela"><h3>Remarcar ${esc(a.crianca_nome||l.nome||'')}?</h3>
+    <p>De <b>${DIAS[new Date(a.data+'T12:00').getDay()]} ${new Date(a.data+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} ${hh(a.hora_inicio)}</b> para <b>${DIAS[new Date(data+'T12:00').getDay()]} ${new Date(data+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} ${hh(turma.hora_inicio)}</b>. O Kommo recebe a nova data e a tag <i>reagendado</i>.</p>
+    <div class="fim"><button class="btn g" onclick="fechar()">Cancelar</button><button class="btn" onclick="fechar();reagendar('${id}','${turma.id}','${data}')">Sim, remarcar</button></div></div></div>`;
+}
+// detalhes da aula (dialog) com as quatro opções + reagendar/cancelar + script
+function detalhes(id){
+  const a = D.agendamentos.find(x => x.id === id); if (!a) return; const l = leadDe(a), t = turmaDe(a); const D_ = desfechoDe(a);
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela" style="max-width:520px">
+    <h3>${esc(a.crianca_nome||l.nome||'Criança')}${a.crianca_idade?` <span style="color:var(--faint);font-weight:600;font-size:13px">${a.crianca_idade} anos</span>`:''}</h3>
+    <p>${DIAS[new Date(a.data+'T12:00').getDay()]} ${new Date(a.data+'T12:00').toLocaleDateString('pt-BR')} · ${hh(a.hora_inicio)}–${hh(a.hora_fim)}${t.nome?' · '+esc(t.nome):''}<br>com ${esc(l.nome||'responsável')}${l.contato?' · '+esc(l.contato):''}${l.atendente?' · atendido por '+esc(l.atendente):''}${l.temperatura?' · '+esc(l.temperatura):''}</p>
+    ${a.observacao ? `<div class="sinal">${esc(a.observacao)}</div>` : ''}
+    ${D_ || a.status==='faltou' ? `<p style="margin-top:10px"><b>${a.status==='faltou'?'Faltou':D_.t==='matriculou'?'Matriculou':D_.t==='nao'?'Não fechou':'Em andamento'}</b>${D_&&D_.obs?' · '+esc(D_.obs):''}</p>` : `<div class="acts quatro" style="margin-top:14px">
+      <button class="yes" onclick="fechar();abrirMenu('${a.id}','matriculou');SELDIA='${a.data}';modo('dia')">Matriculou</button><button class="nope" onclick="fechar();abrirMenu('${a.id}','nao');SELDIA='${a.data}';modo('dia')">Não matriculou</button>
+      <button onclick="fechar();abrirMenu('${a.id}','andamento');SELDIA='${a.data}';modo('dia')">Em andamento</button><button onclick="fechar();registrar('${a.id}','faltou',{})">Faltou</button></div>`}
+    <div class="acts mini" style="margin-top:10px"><button onclick="fechar();script('${a.id}')">ver conversa</button><button onclick="fechar();SELDIA='${a.data}';ABERTO={id:'${a.id}',tipo:'reagendar'};modo('dia')">reagendar</button><button onclick="fechar();cancelar('${a.id}')">cancelar aula</button></div>
+    <div class="fim"><button class="btn g" onclick="fechar()">Fechar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fechar(); };
+}
+function abrirMenuDialog(id, tipo){ const a = D.agendamentos.find(x => x.id === id); SELDIA = a.data; ABERTO = { id, tipo }; ESC = {}; modo('dia'); }
+function fechar(){ document.getElementById('modal').innerHTML = ''; }
 function desenhar(){
   const seg = segunda(SELDIA), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
-  const base = D.agendamentos.filter(viva).filter(a => MODO === 'dia' ? a.data === SELDIA : dias.includes(a.data));
-  const periodo = MODO === 'dia' ? fmt(SELDIA, { weekday:'long', day:'numeric', month:'long' }) : `${fmt(dias[0])} a ${fmt(dias[5])}`;
+  const mesK = SELDIA.slice(0,7);
+  const base = D.agendamentos.filter(viva).filter(a => MODO === 'dia' ? a.data === SELDIA : MODO === 'mes' ? a.data.slice(0,7) === mesK : dias.includes(a.data));
+  const periodo = MODO === 'dia' ? fmt(SELDIA, { weekday:'long', day:'numeric', month:'long' }) : MODO === 'mes' ? new Date(SELDIA+'T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}) : `${fmt(dias[0])} a ${fmt(dias[5])}`;
   const quentes = base.filter(a => (leadDe(a).temperatura||'').toLowerCase()==='quente').length;
   const matric = base.filter(a => /desfecho: matriculou/i.test(a.observacao||'')).length;
   const kits = KITS_T.length ? KITS_T : [{kit:'First',capacidade:8},{kit:'OneBot',capacidade:6},{kit:'TechBot',capacidade:5},{kit:'Autobot',capacidade:4},{kit:'App Developer',capacidade:4},{kit:'GameBot',capacidade:2}];
@@ -249,10 +293,16 @@ function desenhar(){
       const its = base.filter(a => parseInt(a.hora_inicio) === h).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
       const v = vg(h)[0]; const liv = v ? v.vagas : null;
       return `<div class="h ${its.length?'tem':''}"><b>${String(h).padStart(2,'0')}:00</b><div class="vg ${liv==null?'n':liv<=0?'z':''}">${liv==null?'sem turma':liv<=0?'sem vaga':liv+' vaga'+(liv>1?'s':'')}</div>${v?`<div class="kf ${liv<=0?'cheio':liv<=2?'alerta':''}">FIRST ${liv} livre${liv===1?'':'s'}</div>`:''}</div>
-        <div class="c ${its.length>1?'dois':''}">${its.length ? its.map(cartao).join('') : '<div class="livre">livre · <a href="#" onclick="irPara(\'/funil.html\');return false" style="color:var(--brand);font-weight:700;text-decoration:none">marcar aula</a></div>'}</div>`; }).join('')}</div>`;
+        <div class="c ${its.length>1?'dois':''}" ondragover="event.preventDefault()" ondrop="dropDia(event,SELDIA,${h})">${its.length ? its.map(cartao).join('') : '<div class="livre">livre · <a href="#" onclick="irPara(\'/funil.html\');return false" style="color:var(--brand);font-weight:700;text-decoration:none">marcar aula</a></div>'}</div>`; }).join('')}</div>`;
+  } else if (MODO === 'mes') {
+    const x = new Date(SELDIA + 'T12:00:00'); const m = x.getMonth();
+    const ini = segunda(new Date(x.getFullYear(), m, 1, 12).toISOString().slice(0,10)); const fim = new Date(x.getFullYear(), m+1, 0, 12).toISOString().slice(0,10);
+    const ds = []; for (let d = ini; d <= addDias(fim, 6); d = addDias(d,1)) { if (new Date(d+'T12:00').getDay() !== 0) ds.push(d); if (d >= fim && new Date(d+'T12:00').getDay() === 6) break; }
+    grade = `<div class="scrollx"><div class="mes">${['Seg','Ter','Qua','Qui','Sex','Sáb'].map(n=>`<div class="hd">${n}</div>`).join('')}${ds.map(d => { const its = D.agendamentos.filter(viva).filter(a => a.data === d); const fora = new Date(d+'T12:00').getMonth() !== m; const ok = its.filter(a => /desfecho: matriculou/i.test(a.observacao||'')).length, fal = its.filter(a => a.status==='faltou').length;
+      return `<div class="dcell ${d===hoje?'hoje':''} ${fora?'fora':''}" onclick="SELDIA='${d}';modo('dia')" ondragover="event.preventDefault()" ondrop="dropDia(event,'${d}')"><div class="n">${new Date(d+'T12:00').getDate()}</div><div class="i">${its.length ? `<b>${its.length}</b> experimental${its.length>1?'is':''}${ok?`<br><span class="e">${ok} matriculou</span>`:''}${fal?`<br><span class="z">${fal} faltou</span>`:''}` : '<span style="color:var(--faint)">—</span>'}</div></div>`; }).join('')}</div></div>`;
   } else {
     grade = `<div class="scrollx"><div class="semana">${dias.map(d => { const its = base.filter(a => a.data === d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
-      return `<div class="colw ${d===hoje?'hoje':''}"><h4>${DIAS[new Date(d+'T12:00').getDay()]} ${new Date(d+'T12:00').getDate()}</h4>${its.length ? its.map(ev).join('') : '<div class="nada">sem aulas</div>'}</div>`; }).join('')}</div></div>`;
+      return `<div class="colw ${d===hoje?'hoje':''}" ondragover="event.preventDefault()" ondrop="dropDia(event,'${d}')"><h4>${DIAS[new Date(d+'T12:00').getDay()]} ${new Date(d+'T12:00').getDate()}</h4>${its.length ? its.map(ev).join('') : '<div class="nada">sem aulas</div>'}</div>`; }).join('')}</div></div>`;
   }
   document.getElementById('raiz').innerHTML = `
     <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="irHoje()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}</div>
@@ -323,7 +373,7 @@ function cartao(a){
         <button onclick="registrar('${a.id}','faltou',{})">Faltou</button></div>
       <div class="acts mini"><button onclick="abrirMenu('${a.id}','reagendar')">reagendar</button><button onclick="cancelar('${a.id}')">cancelar aula</button></div>${menu}`;
   }
-  return `<div class="cardx${est}" data-id="${a.id}">
+  return `<div class="cardx${est}" data-id="${a.id}" draggable="true" ondragstart="dragAula(event,'${a.id}')">
     <button class="scriptbtn" onclick="script('${a.id}')" title="Ver a conversa">script</button>
     <div class="top"><span class="kid">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade?`<em>${a.crianca_idade} anos</em>`:''}</span>${rot}</div>
     <div class="guard">com ${esc(l.nome||'responsável')}${l.atendente?' · atendido por '+esc(l.atendente):''}</div>
