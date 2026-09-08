@@ -52,6 +52,8 @@ h2{font-size:16px;font-weight:700}
 .nav-item.on{background:var(--brand-soft);color:var(--brand)}
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
 .nav.pendente{visibility:hidden}
+.badge-n{margin-left:auto;background:var(--quente,#E03127);color:#fff;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 7px;min-width:20px;text-align:center}
+.layout.mini .badge-n{position:absolute;top:4px;right:6px;margin:0;padding:1px 5px;font-size:9.5px}
 .conv-box{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .conv-lb{font-size:12px;font-weight:700;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--line);background:var(--line-2)}
 .conv-msgs{max-height:300px;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-height:60px}
@@ -2848,7 +2850,10 @@ function montarMenuGestao(){
   const home=nav.querySelector('.nav-item[data-page="/atendimento.html"]'); if(home){ home.classList.add('on'); setTimeout(()=>{ if(activeTab!=='embed') home.click(); }, 0); }
   window.__gestao=true;
   // telas embutidas pedem pra trocar de tela (ex.: "marcar aula no Pipeline")
-  window.addEventListener('message', ev => { const d = ev.data || {}; if (d.capta !== 'ir' || !d.pagina) return; const b = document.querySelector(`.nav-item[data-page="${d.pagina}"]`); if (b) b.click(); });
+  window.addEventListener('message', ev => { const d = ev.data || {}; if (d.capta === 'nao_lidas') return badgeConversas(d.n); if (d.capta !== 'ir' || !d.pagina) return; const b = document.querySelector(`.nav-item[data-page="${d.pagina}"]`); if (b) b.click(); });
+  function badgeConversas(n){ const b = document.querySelector('.nav-item[data-page="/inbox.html"]'); if(!b) return; let x = b.querySelector('.badge-n'); if(!n){ if(x) x.remove(); return; } if(!x){ x = document.createElement('span'); x.className='badge-n'; b.appendChild(x); } x.textContent = n > 99 ? '99+' : n; }
+  async function pollNaoLidas(){ try { const r = await fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'conversas',slug:SLUG,token:TOKEN})}); if(!r.ok) return; const j = await r.json(); badgeConversas((j.conversas||[]).reduce((s,c)=>s+(c.nao_lidas||0),0)); } catch(e){} }
+  pollNaoLidas(); setInterval(pollNaoLidas, 60000);
   // Conectar WhatsApp vira botão no canto superior direito (abre a tela embutida)
   const bz=document.getElementById('btn-zap');
   if(bz){ bz.style.display='inline-flex'; bz.onclick=()=>{ document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('on')); document.getElementById('page-title').textContent='Conectar WhatsApp'; activeTab='embed'; view.innerHTML=`<iframe class="embed" src="/whatsapp.html${qs}&embed=1" title="Conectar WhatsApp"></iframe>`; window.scrollTo(0,0); };

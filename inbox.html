@@ -112,6 +112,24 @@ button{font-family:inherit;cursor:pointer}
 .voltar-lista{display:none;border:1px solid var(--line);background:var(--card);color:var(--muted);
   font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:9px}
 @media(max-width:840px){.voltar-lista{display:block}}
+
+/* inbox v2 */
+.lista-ferr{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.lista-ferr input{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-family:inherit;font-size:13px;width:100%}
+.filtros{display:flex;gap:4px;flex-wrap:wrap}.filtros button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:4px 10px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer}.filtros button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.conv-at{font-size:10.5px;color:var(--faint);font-weight:700}
+.conv.res{opacity:.55}
+.painel-acoes{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.painel-acoes select,.painel-acoes button{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 9px;font-size:12px;font-weight:700;color:var(--muted);font-family:inherit;cursor:pointer}
+.painel-acoes button.ok{background:var(--verde,#16A34A);border-color:var(--verde,#16A34A);color:#fff}
+.escrever .ico{border:1px solid var(--line);background:var(--card);border-radius:10px;width:38px;height:38px;display:grid;place-items:center;font-size:16px;cursor:pointer;color:var(--muted)}
+.rapidas{position:absolute;left:18px;right:18px;bottom:66px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(20,26,46,.15);max-height:260px;overflow-y:auto;z-index:5}
+.rapidas .rp{padding:9px 12px;border-bottom:1px solid var(--line-2);cursor:pointer;font-size:13px}.rapidas .rp:hover{background:var(--brand-softer)}.rapidas .rp b{display:block;font-size:12px}.rapidas .rp small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.rapidas .rp.nova{color:var(--brand);font-weight:700;text-align:center}
+.painel{position:relative}
+.lado-lead{border-top:1px solid var(--line);padding:10px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted);background:var(--bg)}
+.lado-lead b{color:var(--ink)}.lado-lead .bt{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--brand);cursor:pointer;font-family:inherit}
+.wrap{grid-template-columns:340px 1fr}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -142,6 +160,8 @@ function irPara(pagina){ if(window.parent !== window) window.parent.postMessage(
 <div class="wrap">
   <div class="lista">
     <div class="lista-topo" id="contagem">Carregando…</div>
+    <div class="lista-ferr"><input id="busca" placeholder="Buscar nome ou telefone" oninput="FI.q=this.value;desenharLista()">
+      <div class="filtros" id="filtros"></div></div>
     <div class="lista-rolagem" id="convs"></div>
   </div>
 
@@ -188,43 +208,38 @@ function hora(iso) {
 }
 const iniciais = t => (t || '?').trim().slice(0, 2).toUpperCase();
 
+const FI = { q: '', f: 'abertas', eu: '' };
+try { FI.eu = localStorage.getItem('capta_atendente') || ''; } catch(e){}
+const ATEND = ['Rafael','Bento','RISE'];
+let CONVS = [], RAPIDAS = null;
+function desenharLista(){
+  const q = FI.q.trim().toLowerCase();
+  const lista = CONVS.filter(c => {
+    const nome = (c.lead?.nome || '') + ' ' + (c.telefone || '');
+    if (q && !nome.toLowerCase().includes(q)) return false;
+    if (FI.f === 'nao_lidas') return (c.nao_lidas||0) > 0;
+    if (FI.f === 'minhas') return FI.eu && c.atendente === FI.eu;
+    if (FI.f === 'resolvidas') return !!c.resolvida_em;
+    if (FI.f === 'abertas') return !c.resolvida_em;
+    return true;
+  });
+  const n = k => k==='nao_lidas' ? CONVS.filter(c=>(c.nao_lidas||0)>0).length : k==='minhas' ? CONVS.filter(c=>FI.eu&&c.atendente===FI.eu).length : k==='resolvidas' ? CONVS.filter(c=>c.resolvida_em).length : CONVS.filter(c=>!c.resolvida_em).length;
+  document.getElementById('filtros').innerHTML = [['abertas','Abertas'],['nao_lidas','Não lidas'],['minhas','Minhas'],['resolvidas','Resolvidas']].map(([k,t]) => `<button class="${FI.f===k?'on':''}" onclick="FI.f='${k}';desenharLista()">${t} <span style="opacity:.7">${n(k)}</span></button>`).join('');
+  elCont.textContent = lista.length ? `${lista.length} conversa${lista.length > 1 ? 's' : ''}` : 'Nenhuma conversa';
+  if (!lista.length) { elConvs.innerHTML = `<div class="vazio">${CONVS.length ? 'Nada com esse filtro.' : 'Nada por aqui ainda.<br>As mensagens aparecem assim que alguém escrever para o seu WhatsApp.'}</div>`; return; }
+  elConvs.innerHTML = lista.map(c => {
+    const nome = c.lead?.nome || fone(c.telefone); const temp = c.lead?.temperatura;
+    return `<button class="conv ${c.resolvida_em?'res':''}" data-id="${c.id}" aria-current="${c.id === atual}">
+      <span class="conv-av">${esc(iniciais(nome))}</span>
+      <span class="conv-mid"><span class="conv-nome">${esc(nome)}${c.atendente?` <span class="conv-at">· ${esc(c.atendente)}</span>`:''}</span><span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span></span>
+      <span class="conv-dir"><span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>` : temp ? `<span class="tag t-${esc(temp)}">${esc(temp)}</span>` : ''}</span></button>`;
+  }).join('');
+  elConvs.querySelectorAll('.conv').forEach(b => { b.onclick = () => abrir(b.dataset.id); });
+  if (window.parent !== window) window.parent.postMessage({ capta:'nao_lidas', n: CONVS.reduce((s,c)=>s+(c.nao_lidas||0),0) }, '*');
+}
 async function carregarLista() {
-  try {
-    const { conversas } = await api('conversas');
-    elCont.textContent = conversas.length
-      ? `${conversas.length} conversa${conversas.length > 1 ? 's' : ''}`
-      : 'Nenhuma conversa';
-
-    if (!conversas.length) {
-      elConvs.innerHTML = `<div class="vazio">Nada por aqui ainda.<br>
-        As mensagens aparecem assim que alguém escrever para o seu WhatsApp.</div>`;
-      return;
-    }
-
-    elConvs.innerHTML = conversas.map(c => {
-      const nome = c.lead?.nome || fone(c.telefone);
-      const temp = c.lead?.temperatura;
-      return `<button class="conv" data-id="${c.id}" aria-current="${c.id === atual}">
-        <span class="conv-av">${esc(iniciais(nome))}</span>
-        <span class="conv-mid">
-          <span class="conv-nome">${esc(nome)}</span>
-          <span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span>
-        </span>
-        <span class="conv-dir">
-          <span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>
-          ${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>`
-            : temp ? `<span class="tag t-${esc(temp)}">${esc(temp)}</span>` : ''}
-        </span>
-      </button>`;
-    }).join('');
-
-    elConvs.querySelectorAll('.conv').forEach(b => {
-      b.onclick = () => abrir(b.dataset.id);
-    });
-  } catch (e) {
-    elCont.textContent = 'Erro';
-    elConvs.innerHTML = `<div class="vazio">${esc(e.message)}</div>`;
-  }
+  try { const { conversas } = await api('conversas'); CONVS = conversas || []; desenharLista(); }
+  catch (e) { elCont.textContent = 'Erro'; elConvs.innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
 
 async function abrir(id) {
@@ -245,8 +260,10 @@ async function abrir(id) {
             <div class="painel-fone">${fone(conversa.telefone)}</div>
           </div>
         </div>
-        <div class="robo ${conversa.agente_ativo ? 'on' : 'off'}">
-          <span class="ponto"></span>${conversa.agente_ativo ? 'Robô respondendo' : 'Você assumiu'}
+        <div class="painel-acoes">
+          <div class="robo ${conversa.agente_ativo ? 'on' : 'off'}"><span class="ponto"></span>${conversa.agente_ativo ? 'Robô' : 'Você'}</div>
+          <select onchange="atribuir('${conversa.id}', this.value)" title="Quem está atendendo"><option value="">— atendente —</option>${ATEND.map(a=>`<option ${conversa.atendente===a?'selected':''}>${a}</option>`).join('')}</select>
+          ${conversa.resolvida_em ? `<button onclick="resolver('${conversa.id}', false)">Reabrir</button>` : `<button class="ok" onclick="resolver('${conversa.id}', true)">Resolver ✓</button>`}
         </div>
       </div>
 
@@ -258,8 +275,14 @@ async function abrir(id) {
       ${conversa.agente_ativo
         ? '<div class="aviso">Se você responder por aqui, o robô para de responder nesta conversa.</div>' : ''}
 
+      ${conversa.lead ? `<div class="lado-lead"><b>${esc(conversa.lead.nome||'')}</b>${conversa.lead.temperatura?' · '+esc(conversa.lead.temperatura):''}${conversa.lead.crianca?' · '+esc(conversa.lead.crianca)+(conversa.lead.idade?', '+conversa.lead.idade+' anos':''):''}${conversa.lead.notas?' · '+esc(conversa.lead.notas.slice(0,80)):''}
+        <span style="margin-left:auto;display:flex;gap:6px"><button class="bt" onclick="irLead('${conversa.lead.id}','agendar')">marcar aula</button><button class="bt" onclick="irLead('${conversa.lead.id}','dados')">dados</button>${conversa.lead.kommo_lead_id?`<a class="bt" style="text-decoration:none" href="https://roboticanorte.kommo.com/leads/detail/${conversa.lead.kommo_lead_id}" target="_blank" rel="noopener">Kommo ↗</a>`:''}</span></div>` : ''}
+      <div id="rapidas"></div>
       <div class="escrever">
-        <textarea id="txt" rows="1" placeholder="Escreva uma mensagem" aria-label="Mensagem"></textarea>
+        <button class="ico" title="Respostas prontas (ou digite /)" onclick="abrirRapidas()">⚡</button>
+        <button class="ico" title="Anexar imagem, áudio ou arquivo" onclick="document.getElementById('anexo').click()">📎</button>
+        <input type="file" id="anexo" style="display:none" accept="image/*,audio/*,.pdf,.doc,.docx" onchange="enviarAnexo(this)">
+        <textarea id="txt" rows="1" placeholder="Escreva uma mensagem — / para respostas prontas" aria-label="Mensagem"></textarea>
         <button class="enviar" id="btn">Enviar</button>
       </div>`;
 
@@ -269,7 +292,8 @@ async function abrir(id) {
 
     const txt = document.getElementById('txt');
     txt.oninput = () => { txt.style.height = 'auto'; txt.style.height = Math.min(txt.scrollHeight, 120) + 'px'; };
-    txt.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } };
+    txt.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } if (e.key === 'Escape') fecharRapidas(); };
+    txt.addEventListener('input', () => { if (txt.value === '/') { txt.value = ''; abrirRapidas(); } });
     document.getElementById('btn').onclick = enviar;
     const vb = document.getElementById('volta');
     if (vb) vb.onclick = () => { document.body.classList.remove('aberta'); atual = null; };
@@ -330,6 +354,48 @@ async function carregarMidias() {
       el.innerHTML = '<span class="carregando-midia">arquivo indisponível</span>';
     }
   }
+}
+
+
+// ---- atribuir / resolver ----
+async function atribuir(id, quem){ try { await api('conversa_atualizar', { conversa_id: id, atendente: quem }); if (quem) { FI.eu = quem; try{ localStorage.setItem('capta_atendente', quem); }catch(e){} } toast(quem ? `Conversa com ${esc(quem)}` : 'Sem atendente'); carregarLista(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+async function resolver(id, sim){ try { await api('conversa_atualizar', { conversa_id: id, resolvida: sim }); toast(sim ? 'Conversa resolvida' : 'Conversa reaberta', sim ? { acao:'desfazer', onAcao:() => resolver(id, false) } : {}); await abrir(id); carregarLista(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+function irLead(id, aba){ try { localStorage.setItem('capta_abrir_lead', JSON.stringify({ id, aba, t: Date.now() })); } catch(e){} irPara('/funil.html'); }
+
+// ---- respostas prontas ----
+async function abrirRapidas(){
+  if (!RAPIDAS) { try { RAPIDAS = (await api('respostas')).respostas || []; } catch(e){ RAPIDAS = []; } }
+  const box = document.getElementById('rapidas'); if (!box) return;
+  box.innerHTML = `<div class="rapidas">${RAPIDAS.map(r => `<div class="rp" onclick="usarRapida('${r.id}')"><b>${esc(r.titulo)}${r.atalho?` <span style="color:var(--faint);font-weight:600">/${esc(r.atalho)}</span>`:''}</b><small>${esc(r.texto)}</small></div>`).join('')}
+    <div class="rp nova" onclick="novaRapida()">+ nova resposta pronta</div>${RAPIDAS.length?`<div class="rp nova" style="color:var(--faint)" onclick="apagarRapida()">apagar uma…</div>`:''}</div>`;
+}
+function fecharRapidas(){ const b = document.getElementById('rapidas'); if (b) b.innerHTML = ''; }
+function usarRapida(id){ const r = RAPIDAS.find(x => x.id === id); const txt = document.getElementById('txt'); if (r && txt) { const nome = (CONVS.find(c=>c.id===atual)?.lead?.nome || '').split(' ')[0]; txt.value = (txt.value ? txt.value + ' ' : '') + r.texto.replace(/\{nome\}/g, nome); txt.focus(); txt.dispatchEvent(new Event('input')); } fecharRapidas(); }
+async function novaRapida(){
+  const titulo = prompt('Nome da resposta (ex.: Valor, Horários, Endereço):'); if (!titulo) return;
+  const texto = prompt('Texto da mensagem (use {nome} pra colocar o nome da pessoa):'); if (!texto) return;
+  const atalho = prompt('Atalho curto (opcional, ex.: valor):') || '';
+  try { RAPIDAS = (await api('respostas', { salvar: { titulo, texto, atalho } })).respostas; toast('Resposta salva',{tipo:'ok'}); abrirRapidas(); } catch(e){ toast(e.message,{tipo:'erro'}); }
+}
+async function apagarRapida(){
+  const nomes = RAPIDAS.map((r,i)=>`${i+1}. ${r.titulo}`).join('\n'); const n = parseInt(prompt('Qual apagar? Digite o número:\n'+nomes)||'0'); const r = RAPIDAS[n-1]; if (!r) return;
+  try { RAPIDAS = (await api('respostas', { apagar: r.id })).respostas; abrirRapidas(); } catch(e){ toast(e.message,{tipo:'erro'}); }
+}
+document.addEventListener('click', e => { if (!e.target.closest('.rapidas') && !e.target.closest('.ico')) fecharRapidas(); });
+
+// ---- anexos: imagem, áudio, documento (base64) ----
+function enviarAnexo(input){
+  const f = input.files && input.files[0]; input.value = ''; if (!f || !atual) return;
+  if (f.size > 8 * 1024 * 1024) return toast('Arquivo acima de 8 MB.', { tipo:'erro' });
+  const tipo = f.type.startsWith('image/') ? 'imagem' : f.type.startsWith('audio/') ? 'audio' : 'documento';
+  const rd = new FileReader();
+  rd.onload = async () => {
+    const btn = document.getElementById('btn'); if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+    try { await api('enviar_midia', { conversa_id: atual, tipo, dados: rd.result, nome: f.name, legenda: (document.getElementById('txt')?.value || '').trim() || undefined }); const t = document.getElementById('txt'); if (t) t.value = ''; await abrir(atual); carregarLista(); toast('Enviado',{tipo:'ok'}); }
+    catch(e){ toast(e.message,{tipo:'erro'}); }
+    finally { const b = document.getElementById('btn'); if (b) { b.disabled = false; b.textContent = 'Enviar'; } }
+  };
+  rd.readAsDataURL(f);
 }
 
 async function enviar() {
