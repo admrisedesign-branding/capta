@@ -158,15 +158,22 @@ const KITCUR = k => (k||'').replace('App Developer','APP').replace('Bot','').toU
 
 let MODO = 'dia', SEL = hoje, D = { turmas: [], alunos: [], kits: [] }, EXP = [], LEADS = [], VAGAS = [], carregadoDe = null, carregadoAte = null;
 
-async function api(acao, extra = {}) {
+const CACHE = new Map();
+async function api(acao, extra = {}, cacheMs) {
+  const chave = acao + JSON.stringify(extra);
+  if (cacheMs) { const c = CACHE.get(chave); if (c && Date.now() - c.t < cacheMs) return c.d; }
   const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, email_atual: (window.CaptaUser && CaptaUser.email && CaptaUser.email()) || undefined, ...extra }) });
-  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`);
+  if (cacheMs) CACHE.set(chave, { t: Date.now(), d });
+  return d;
 }
 async function carregar(){
   try {
     const de = addDias(segunda(SEL), -35), ate = addDias(segunda(SEL), 42);
-    const [al, ex, ag] = await Promise.all([api('alunos'), api('experimentais', { de, ate }), api('agenda', { dias: 60 }).catch(() => ({ horarios: [] }))]);
-    D = al; EXP = ex.agendamentos || []; LEADS = ex.leads || []; VAGAS = ag.horarios || []; carregadoDe = de; carregadoAte = ate; desenhar();
+    const [al, ex] = await Promise.all([api('alunos', {}, 60000), api('experimentais', { de, ate }, 20000)]);
+    D = al; EXP = ex.agendamentos || []; LEADS = ex.leads || []; carregadoDe = de; carregadoAte = ate; desenhar();
+    // vagas vêm depois: a grade já aparece, os números de vaga entram em seguida
+    api('agenda', { dias: 45 }, 45000).then(ag => { VAGAS = ag.horarios || []; desenhar(); }).catch(() => {});
   } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
 function modo(m){ MODO = m; desenhar(); }
@@ -174,7 +181,7 @@ const abasHtml = () => `<div class="abas" style="margin-left:auto">${[['dia','Di
 function mover(n){
   if (MODO === 'dia') SEL = addDias(SEL, n); else if (MODO === 'semana') SEL = addDias(SEL, 7*n);
   else { const x = new Date(SEL + 'T12:00:00'); x.setMonth(x.getMonth() + n, 1); SEL = iso(x); }
-  if (SEL < carregadoDe || SEL > carregadoAte) carregar(); else desenhar();
+  if (!carregadoDe || SEL < carregadoDe || SEL > carregadoAte) carregar(); else desenhar();
 }
 function irDia(d){ SEL = d; modo('dia'); }
 const turmasDo = d => D.turmas.filter(t => t.ativa !== false && t.dia_semana === dow(d));
@@ -260,7 +267,7 @@ function desenhar(){
   else if (MODO === 'semana') { const s = segunda(SEL); dias = [0,1,2,3,4,5].map(n => addDias(s, n)); periodo = `${fmt(dias[0],{day:'numeric',month:'long'})} a ${fmt(dias[5],{day:'numeric',month:'long'})}`; corpo = vSemana(); }
   else { const x = new Date(SEL+'T12:00:00'); periodo = x.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); const f = iso(new Date(x.getFullYear(), x.getMonth()+1, 0, 12)); dias = []; for (let d = iso(new Date(x.getFullYear(), x.getMonth(), 1, 12)); d <= f; d = addDias(d,1)) dias.push(d); corpo = vMes(); }
   document.getElementById('raiz').innerHTML = `
-    <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}<button class="btn" onclick="novoAgendamento()">+ Novo agendamento</button></div>
+    <div class="barra">${VAGAS.length?'':'<span style="font-size:12px;color:var(--faint)">carregando vagas…</span>'}<button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}<button class="btn" onclick="novoAgendamento()">+ Novo agendamento</button></div>
     ${tally(dias)}
     <div class="corpo"><div>${corpo}</div>${lado()}</div>`;
 }

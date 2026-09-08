@@ -397,7 +397,7 @@ function cartao(a){
     <button class="scriptbtn" onclick="script('${a.id}')" title="Ver a conversa">script</button>
     <div class="top"><span class="kid">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade?`<em>${a.crianca_idade} anos</em>`:''}</span>${rot}</div>
     <div class="guard">com ${esc(l.nome||'responsável')}${l.atendente?' · atendido por '+esc(l.atendente):''}</div>
-    <div class="top" style="margin-top:8px">${org?`<span class="org ${org[1]}">${esc(org[0])}</span>`:''}${rea?`<span class="rea">remarcou ${rea}×</span>`:''}${a.status==='confirmado'?'<span class="rea">confirmou</span>':''}</div>
+    <div class="top" style="margin-top:8px">${org?`<span class="org ${org[1]}">${esc(org[0])}</span>`:''}${rea?`<span class="rea">remarcou ${rea}×</span>`:''}${a.status==='confirmado'?'<span class="rea" style="background:var(--verde-bg);color:var(--verde)">confirmou ✓</span>':''}${/pediu para remarcar/i.test(a.observacao||'')?'<span class="rea" style="background:rgba(224,49,39,.1);color:var(--quente)">pediu remarcar</span>':''}</div>
     ${sinal ? `<div class="sinal">${esc(sinal)}</div>` : ''}
     ${pe}</div>`;
 }
