@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Eventos — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--brand:#2E5BFF;--brand-2:#5B8DEF;--brand-soft:rgba(46,91,255,.10);--brand-softer:rgba(46,91,255,.06);
+--bg:#F4F6FB;--card:#FFFFFF;--line:#E9ECF3;--line-2:#F1F3F8;--ink:#141A2E;--muted:#697089;--faint:#9AA1B4;
+--quente:#E03127;--morno:#C47A08;--verde:#16A34A;--verde-bg:rgba(22,163,74,.12);--exp:#E8734A;--exp-bg:#FDEFE7;
+--r:16px;--shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
+button,input,select,textarea{font-family:inherit}button{cursor:pointer}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px;font-weight:700}
+.voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;padding:7px 13px;border-radius:10px;text-decoration:none}
+.wrap{padding:20px 26px 48px}
+.barra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.barra h2{font-size:19px;font-weight:800}
+.btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:9px}
+.btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}.btn.sm{padding:5px 10px;font-size:12px}
+.tally{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 18px;display:flex;gap:26px;margin-bottom:14px;flex-wrap:wrap}
+.tally b{font-size:22px;font-weight:800;margin-right:6px}.tally small{color:var(--muted);font-weight:600;font-size:12.5px}.tally .ok b{color:var(--verde)}.tally .hot b{color:var(--exp)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.ev{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;cursor:pointer;transition:.14s}
+.ev:hover{border-color:var(--brand)}.ev.off{opacity:.6}
+.ev h3{font-size:15px;font-weight:800}.ev .q{font-size:12.5px;color:var(--muted);margin-top:2px}
+.ev .tp{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--exp-bg);color:var(--exp);margin-left:6px;vertical-align:middle}
+.ev .nums{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap}
+.ev .nums div b{font-size:17px;font-weight:800;display:block}.ev .nums div small{font-size:11px;color:var(--muted);font-weight:600}
+.ev .barra-conv{height:6px;border-radius:99px;background:var(--line-2);margin-top:10px;overflow:hidden}.ev .barra-conv i{display:block;height:100%;background:var(--verde)}
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line-2)}tr:hover td{background:var(--brand-softer);cursor:pointer}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--line-2);color:var(--muted)}
+.t-Quente{background:rgba(224,49,39,.12);color:var(--quente)}.t-Morno{background:rgba(224,147,15,.14);color:var(--morno)}.t-Frio{background:var(--brand-soft);color:var(--brand)}
+.vazio{border:1px dashed var(--line);border-radius:var(--r);padding:34px;text-align:center;color:var(--faint);line-height:1.7}
+.fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
+.janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:480px;box-shadow:0 20px 50px rgba(20,26,46,.2);max-height:92vh;overflow-y:auto}
+.janela h3{font-size:16px;font-weight:700}.janela p{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.5}
+.campo{margin-top:12px}.campo label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.campo input,.campo select,.campo textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:13px;color:var(--ink);background:var(--card)}
+.l2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fim{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.dica{font-size:12.5px;color:var(--muted);background:var(--line-2);border-radius:10px;padding:10px 12px;line-height:1.55;margin-top:12px}
+</style>
+<style>body.embed .voltar,body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}</style>
+<script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+<script src="/lead-painel.js"></script>
+<script>
+// Quem está usando: vem do login (?u=Nome&papel=) e fica salvo por negócio.
+window.CaptaUser = (function(){
+  const q = new URLSearchParams(location.search); const slug = q.get('t') || '';
+  const K = 'capta_user_' + slug;
+  let u = null; try { u = JSON.parse(localStorage.getItem(K) || 'null'); } catch(e){}
+  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente', email: q.get('e') || (u&&u.email) || '' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
+  return {
+    nome: () => (u && u.nome) || '',
+    papel: () => (u && u.papel) || '',
+    email: () => (u && u.email) || '',
+    telas: () => (u && u.telas) || null,
+    definir: nome => { u = { ...(u||{}), nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    setar: o => { u = { ...(u||{}), ...o }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    sair: () => { try { localStorage.removeItem(K); } catch(e){} }
+  };
+})();
+</script>
+<style>
+#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:90;pointer-events:none}
+.toast{pointer-events:auto;background:var(--ink,#141A2E);color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px rgba(20,26,46,.25);display:flex;align-items:center;gap:12px;animation:tin .18s ease-out;max-width:560px}
+.toast.erro{background:#B3261E}.toast.ok{background:#1F7A4D}
+.toast button{border:0;background:rgba(255,255,255,.14);color:#fff;font-weight:700;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
+.toast button:hover{background:rgba(255,255,255,.24)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+<script>
+// aviso discreto no rodapé, com ação opcional (ex.: desfazer)
+function toast(msg, opts){ opts = opts || {}; let box = document.getElementById('toasts'); if(!box){ box = document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
+  const el = document.createElement('div'); el.className = 'toast' + (opts.tipo?' '+opts.tipo:''); el.innerHTML = `<span>${msg}</span>${opts.acao?`<button type="button">${opts.acao}</button>`:''}`;
+  if(opts.acao) el.querySelector('button').onclick = () => { el.remove(); opts.onAcao && opts.onAcao(); };
+  box.appendChild(el); setTimeout(() => el.remove(), opts.ms || (opts.acao ? 7000 : 3500)); return el; }
+// mensagem pro painel (quando embutido): trocar de tela sem sair
+function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
+</script>
+
+</head>
+<body>
+<div class="topbar"><a class="voltar" id="voltar" href="/dashboard.html">← Painel</a><h1>Eventos</h1></div>
+<div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
+<div id="modal"></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const brl = v => (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
+const dataBR = d => d ? new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '';
+const TIPOS = ['feira','shopping','escola','ação de rua','parceria','outro'];
+let EV = [], NUM = {}, ABERTO = null, LEADS = [], ETAPAS = [];
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, email_atual: (window.CaptaUser && CaptaUser.email && CaptaUser.email()) || undefined, ...extra }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
+}
+async function carregar(){ try { const d = await api('eventos'); EV = d.eventos || []; NUM = d.numeros || {}; desenhar(); } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; } }
+LeadPainel.init({ slug: SLUG, token: TOKEN, getLead: id => LEADS.find(x => x.id === id), getEtapas: () => ETAPAS, onAtualizou: () => abrirEvento(ABERTO.id), onAgendou: () => abrirEvento(ABERTO.id) });
+
+function desenhar(){
+  const t = EV.reduce((s,e) => { const n = NUM[e.id]||{}; s.leads+=n.leads||0; s.aulas+=n.aulas||0; s.mat+=n.matriculas||0; s.rec+=n.receita||0; return s; }, {leads:0,aulas:0,mat:0,rec:0});
+  document.getElementById('raiz').innerHTML = `
+    <div class="barra"><h2>Eventos</h2><span style="color:var(--muted);font-size:13px">feiras, shoppings, escolas — cada lead ligado ao evento que o trouxe</span>
+      <button class="btn" style="margin-left:auto" onclick="editar(null)">+ Novo evento</button></div>
+    <div class="tally"><div><b>${EV.length}</b><small>eventos</small></div><div><b>${t.leads}</b><small>leads captados</small></div><div class="hot"><b>${t.aulas}</b><small>aulas marcadas</small></div><div class="ok"><b>${t.mat}</b><small>matrículas</small></div><div><b>${brl(t.rec)}</b><small>receita</small></div></div>
+    ${EV.length ? `<div class="cards">${EV.map(cardEvento).join('')}</div>` : `<div class="vazio">Nenhum evento cadastrado.<br>Cadastre o evento e ligue os leads que vieram dele — aí dá pra comparar shopping, feira e escola pelo que cada um traz de matrícula.<br><button class="btn" style="margin-top:12px" onclick="editar(null)">+ Novo evento</button></div>`}`;
+}
+function cardEvento(e){
+  const n = NUM[e.id] || { leads:0, aulas:0, matriculas:0, receita:0 };
+  const conv = n.leads ? Math.round(n.matriculas / n.leads * 100) : 0;
+  return `<div class="ev ${e.ativo===false?'off':''}" onclick="abrirEvento('${e.id}')">
+    <h3>${esc(e.nome)}${e.tipo?`<span class="tp">${esc(e.tipo)}</span>`:''}</h3>
+    <div class="q">${esc(e.local||'')}${e.local&&e.data_inicio?' · ':''}${dataBR(e.data_inicio)}${e.data_fim&&e.data_fim!==e.data_inicio?' a '+dataBR(e.data_fim):''}${e.isca?' · isca: '+esc(e.isca):''}</div>
+    <div class="nums"><div><b>${n.leads}</b><small>leads</small></div><div><b>${n.aulas}</b><small>aulas</small></div><div><b>${n.matriculas}</b><small>matrículas</small></div><div><b>${brl(n.receita)}</b><small>receita</small></div></div>
+    <div class="barra-conv"><i style="width:${conv}%"></i></div>
+    <div class="q" style="margin-top:6px">${conv}% dos leads viraram matrícula</div></div>`;
+}
+async function abrirEvento(id){
+  ABERTO = EV.find(e => e.id === id); if (!ABERTO) return;
+  document.getElementById('raiz').innerHTML = `<div class="vazio">Carregando leads…</div>`;
+  try { const d = await api('evento_leads', { evento_id: id }); LEADS = d.leads || []; ETAPAS = d.etapas || []; } catch(e){ LEADS = []; }
+  const n = NUM[id] || {};
+  const etapa = l => (ETAPAS.find(e => e.id === l.etapa_id) || {}).nome || '—';
+  document.getElementById('raiz').innerHTML = `
+    <div class="barra"><button class="btn g" onclick="voltar()">← Eventos</button><h2>${esc(ABERTO.nome)}</h2>
+      <span style="color:var(--muted);font-size:13px">${esc(ABERTO.local||'')} ${dataBR(ABERTO.data_inicio)}</span>
+      <span style="margin-left:auto;display:flex;gap:8px"><button class="btn g" onclick="vincular()">Ligar leads a este evento</button><button class="btn g" onclick="editar('${id}')">Editar</button></span></div>
+    <div class="tally"><div><b>${LEADS.length}</b><small>leads</small></div><div class="hot"><b>${n.aulas||0}</b><small>aulas marcadas</small></div><div class="ok"><b>${n.matriculas||0}</b><small>matrículas</small></div><div><b>${brl(n.receita||0)}</b><small>receita</small></div><div><b>${n.quentes||0}</b><small>quentes</small></div></div>
+    ${LEADS.length ? `<table><tr><th>Lead</th><th>Etapa</th><th>Temperatura</th><th>Aula</th><th>Atendente</th></tr>
+      ${LEADS.map(l => `<tr onclick="LeadPainel.abrir('${l.id}','conversa')"><td><b>${esc(l.nome||'Sem nome')}</b><br><span style="color:var(--faint);font-size:12px">${esc(l.contato||'')}</span></td>
+        <td>${esc(etapa(l))}</td><td>${l.temperatura?`<span class="tag t-${esc(l.temperatura)}">${esc(l.temperatura)}</span>`:'—'}</td>
+        <td>${l.data_aula ? new Date(l.data_aula).toLocaleDateString('pt-BR') : '—'}</td><td>${esc(l.atendente||'—')}</td></tr>`).join('')}</table>`
+      : `<div class="vazio">Nenhum lead ligado a este evento ainda.<br>Use <b>Ligar leads a este evento</b> pra marcar os que já estão no Capta (por tag ou período), ou capte pelo formulário do evento.</div>`}`;
+}
+function voltar(){ ABERTO = null; carregar(); }
+function editar(id){
+  const e = id ? EV.find(x => x.id === id) : { cidade:'Manaus', ativo:true, data_inicio: new Date().toISOString().slice(0,10) };
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela">
+    <h3>${id ? 'Editar evento' : 'Novo evento'}</h3><p>Depois é só ligar os leads captados — o Capta mostra quantos viraram aula e matrícula.</p>
+    <div class="campo"><label>Nome</label><input id="f-nome" value="${esc(e.nome||'')}" placeholder="Ex.: Shopping Manauara — férias"></div>
+    <div class="l2"><div class="campo"><label>Local</label><input id="f-local" value="${esc(e.local||'')}" placeholder="Shopping Manauara"></div><div class="campo"><label>Tipo</label><select id="f-tipo"><option value="">—</option>${TIPOS.map(t=>`<option ${e.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
+    <div class="l2"><div class="campo"><label>Começa</label><input id="f-ini" type="date" value="${e.data_inicio||''}"></div><div class="campo"><label>Termina</label><input id="f-fim" type="date" value="${e.data_fim||''}"></div></div>
+    <div class="campo"><label>Isca / oferta</label><input id="f-isca" value="${esc(e.isca||'')}" placeholder="Ex.: voucher de aula experimental"></div>
+    <div class="campo"><label>Observação</label><textarea id="f-obs" rows="2">${esc(e.observacao||'')}</textarea></div>
+    <div class="campo"><label><input type="checkbox" id="f-ativo" ${e.ativo!==false?'checked':''} style="width:auto;margin-right:6px">Evento ativo</label></div>
+    <div class="fim">${id?`<button class="btn g" style="margin-right:auto" onclick="apagar('${id}')">Excluir</button>`:''}<button class="btn g" onclick="fechar()">Cancelar</button><button class="btn" onclick="salvar('${id||''}')">Salvar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = ev => { if (ev.target.id === 'fundo') fechar(); };
+}
+function fechar(){ document.getElementById('modal').innerHTML = ''; }
+async function salvar(id){
+  const g = x => document.getElementById(x).value;
+  const ev = { id: id||undefined, nome: g('f-nome').trim(), local: g('f-local'), tipo: g('f-tipo'), data_inicio: g('f-ini'), data_fim: g('f-fim'), isca: g('f-isca'), observacao: g('f-obs'), ativo: document.getElementById('f-ativo').checked };
+  if (!ev.nome) return toast('Informe o nome do evento.', { tipo:'erro' });
+  try { const d = await api('evento_salvar', { evento: ev }); EV = d.eventos; NUM = d.numeros; fechar(); ABERTO ? abrirEvento(id) : desenhar(); toast(`<b>${esc(ev.nome)}</b> ${id?'atualizado':'criado'}`, { tipo:'ok' }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function apagar(id){ const e = EV.find(x => x.id === id); if (!confirm(`Excluir "${e?.nome}"? Os leads continuam, só perdem o vínculo.`)) return;
+  try { const d = await api('evento_salvar', { apagar: id }); EV = d.eventos; NUM = d.numeros; fechar(); voltar(); toast('Evento excluído'); } catch(err){ toast(err.message, { tipo:'erro' }); } }
+function vincular(){
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela">
+    <h3>Ligar leads a "${esc(ABERTO.nome)}"</h3><p>Marca leads que já estão no Capta como vindos deste evento (e ajusta "por onde veio" para evento).</p>
+    <div class="campo"><label>Pela tag do Kommo</label><input id="v-tag" placeholder="Ex.: evento-shopping"></div>
+    <div class="l2"><div class="campo"><label>Criados de</label><input id="v-de" type="date" value="${ABERTO.data_inicio||''}"></div><div class="campo"><label>até</label><input id="v-ate" type="date" value="${ABERTO.data_fim||ABERTO.data_inicio||''}"></div></div>
+    <div class="dica">Pode usar os dois juntos: a tag filtra e o período limita. Sem tag, liga todos os leads criados no período.</div>
+    <div class="fim"><button class="btn g" onclick="fechar()">Cancelar</button><button class="btn" onclick="confirmarVinculo()">Ligar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = ev => { if (ev.target.id === 'fundo') fechar(); };
+}
+async function confirmarVinculo(){
+  const tag = document.getElementById('v-tag').value.trim(), de = document.getElementById('v-de').value, ate = document.getElementById('v-ate').value;
+  if (!tag && !de) return toast('Informe a tag ou o período.', { tipo:'erro' });
+  try { const r = await api('evento_leads', { vincular: { evento_id: ABERTO.id, tag: tag||undefined, de: de||undefined, ate: ate||undefined } });
+    fechar(); toast(`${r.vinculados} leads ligados ao evento`, { tipo:'ok' }); const d = await api('eventos'); EV = d.eventos; NUM = d.numeros; abrirEvento(ABERTO.id); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
+</script>
+</body>
+</html>

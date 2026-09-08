@@ -2855,10 +2855,10 @@ function montarMenuGestao(){
     ${item('cal','Agenda',go('/agendamentos.html'))}
     ${item('aula','Aula experimental',go('/aula-experimental.html'))}
     ${item('alunos','Alunos',go('/alunos.html'))}
-    ${item('evento','Eventos','disabled',false,true)}
+    ${item('evento','Eventos',go('/eventos.html'))}
     ${item('ajustes','Ajustes',go('/ajustes.html'))}`;
   // esconde o que o perfil da pessoa não pode ver
-  const MAPA = { '/atendimento.html':'atendimento', '/gestao.html':'painel', '/funil.html':'pipeline', '/inbox.html':'conversas', '/agendamentos.html':'agenda', '/aula-experimental.html':'aula', '/alunos.html':'alunos', '/ajustes.html':'ajustes' };
+  const MAPA = { '/atendimento.html':'atendimento', '/gestao.html':'painel', '/funil.html':'pipeline', '/inbox.html':'conversas', '/agendamentos.html':'agenda', '/aula-experimental.html':'aula', '/alunos.html':'alunos', '/eventos.html':'eventos', '/ajustes.html':'ajustes' };
   fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'eu',slug:SLUG,token:TOKEN,email:CaptaUser.email()})})
     .then(r=>r.json()).then(j=>{ if(!j || !j.telas) return; CaptaUser.setar({ papel: j.papel, telas: j.telas });
       nav.querySelectorAll('.nav-item').forEach(b => { const pg = b.dataset.page; const chave = pg ? MAPA[pg] : (b.dataset.t === 'leads' ? 'leads' : null); if (chave && !j.telas.includes(chave)) b.style.display = 'none'; });
