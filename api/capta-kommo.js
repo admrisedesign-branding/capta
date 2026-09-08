@@ -22,6 +22,7 @@ const CAMPOS = {
   fonte: 'Fonte', porta: 'Porta', atendente: 'Quem atendeu', crianca: 'Filho',
   curso: 'Curso', data_aula: 'Data da aula', bloco: 'Bloco', pagamento: 'Pagamento',
   score: 'Score', categoria: 'Categoria', origem: 'Origem', bairro: 'Bairro',
+  area: 'Área', trilha: 'Trilha', momento: 'Momento',
 };
 // etapa do Kommo → status do Capta (novo · contatado · fechado · perdido)
 function statusDe(st) {
@@ -30,6 +31,22 @@ function statusDe(st) {
   return /novo lead|incoming/i.test(st.nome || '') ? 'novo' : 'contatado';
 }
 const cap = s => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1).toLowerCase() : null);
+
+// O bot do WhatsApp grava o NÚMERO da opção; o formulário do site já grava o texto.
+// Estas são as listas do bot (QUALIFICA_WHATSAPP): traduzimos na leitura.
+const LEGENDA = {
+  bairro: { '1':'Adrianópolis', '2':'Ponta Negra', '3':'Nossa Senhora das Graças / Vieiralves', '4':'Parque Dez', '5':'Flores', '6':'Aleixo', '7':'Outro bairro' },
+  area:   { '1':'Robótica', '2':'Programação', '3':'Inteligência Artificial', '4':'Jogos', '5':'Ainda não sei' },
+  momento:{ '1':'Quero matricular', '2':'Quero aula experimental', '3':'Pesquisando opções', '4':'Só conhecendo' },
+};
+const traduz = (campo, v) => { const t = String(v ?? '').trim(); if (!t) return null; return (LEGENDA[campo] && LEGENDA[campo][t]) || t; };
+// "João Vitor, 8 anos" / "Lucas 7" → { nome, idade }
+function criancaDe(texto) {
+  const t = String(texto || '').trim(); if (!t) return {};
+  const m = t.match(/^(.*?)[,\s-]+(\d{1,2})\s*(anos?|a)?\.?$/i);
+  if (m && Number(m[2]) >= 2 && Number(m[2]) <= 18) return { nome: m[1].trim().replace(/[,\-]$/, ''), idade: Number(m[2]) };
+  return { nome: t.replace(/\s*\d{1,2}\s*anos?\.?$/i, '').trim() || null };
+}
 // no CONTATO (não no lead): idade da criança
 const CAMPO_IDADE_CONTATO = 'Idade da criança';
 
@@ -148,12 +165,17 @@ async function espelhar(leadId) {
     score: valorCampo(lead, CAMPOS.score) != null ? Number(valorCampo(lead, CAMPOS.score)) : null,
     temperatura: cap(valorCampo(lead, CAMPOS.categoria)),   // Quente · Morno · Frio
     status: statusDe(st),
-    notas: [valorCampo(lead, CAMPOS.bairro) ? 'Bairro: ' + valorCampo(lead, CAMPOS.bairro) : null].filter(Boolean).join('\n') || null,
+    notas: [
+      traduz('bairro',  valorCampo(lead, CAMPOS.bairro))  ? 'Bairro: '   + traduz('bairro',  valorCampo(lead, CAMPOS.bairro))  : null,
+      traduz('area',    valorCampo(lead, CAMPOS.area))    ? 'Interesse: '+ traduz('area',    valorCampo(lead, CAMPOS.area))    : null,
+      traduz('momento', valorCampo(lead, CAMPOS.momento)) ? 'Momento: '  + traduz('momento', valorCampo(lead, CAMPOS.momento)) : null,
+      valorCampo(lead, CAMPOS.trilha) ? 'Trilha: ' + valorCampo(lead, CAMPOS.trilha) : null,
+    ].filter(Boolean).join(' · ') || null,
     fonte: valorCampo(lead, CAMPOS.fonte),
     porta: valorCampo(lead, CAMPOS.porta),
     atendente: valorCampo(lead, CAMPOS.atendente),
-    crianca: valorCampo(lead, CAMPOS.crianca),
-    idade: idadeContato(contato),
+    crianca: criancaDe(valorCampo(lead, CAMPOS.crianca)).nome,
+    idade: idadeContato(contato) ?? criancaDe(valorCampo(lead, CAMPOS.crianca)).idade ?? null,
     curso: valorCampo(lead, CAMPOS.curso),
     data_aula: typeof dataAula === 'number' ? ts(dataAula) : dataAula,
     bloco: valorCampo(lead, CAMPOS.bloco),

@@ -85,7 +85,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -110,6 +110,8 @@ module.exports = async function handler(req, res) {
         case 'eventos':  return await acaoEventos(tenant, body, res);
         case 'evento_salvar': return await acaoEventoSalvar(tenant, body, res);
         case 'evento_leads':  return await acaoEventoLeads(tenant, body, res);
+        case 'casar_conversas': return await acaoCasarConversas(tenant, body, res);
+        case 'sem_data':      return await acaoSemData(tenant, body, res);
       }
     }
 
@@ -317,7 +319,7 @@ async function acaoConversas(tenant, res) {
   const rows = await sb(
     `capta_conversas?tenant_id=eq.${tenant.id}` +
     `&select=id,telefone,agente_ativo,status,nao_lidas,ultima_mensagem,ultima_mensagem_em,atendente,resolvida_em,` +
-    `lead:lead_id(id,nome,temperatura,status,etapa_id,atendente,notas,contato,crianca,idade)` +
+    `lead:lead_id(id,nome,temperatura,status,etapa_id,atendente,notas,contato,crianca,idade,kommo_lead_id)` +
     `&order=ultima_mensagem_em.desc.nullslast&limit=100`
   );
   return res.status(200).json({ conversas: rows || [] });
@@ -1149,6 +1151,37 @@ async function acaoEventoLeads(tenant, body, res) {
   const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&evento_id=eq.${id}&select=id,nome,contato,temperatura,score,etapa_id,atendente,data_aula,ganho_em,valor,criado_em,kommo_lead_id,tags&order=criado_em.desc`).catch(() => []);
   const etapas = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome,tipo&order=ordem`).catch(() => []);
   return res.status(200).json({ leads: leads || [], etapas: etapas || [] });
+}
+
+
+// Liga conversas sem lead ao lead certo, comparando os últimos 8 dígitos do telefone.
+async function acaoCasarConversas(tenant, body, res) {
+  const convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=is.null&select=id,telefone&limit=500`).catch(() => []);
+  if (!convs?.length) return res.status(200).json({ ok: true, ligadas: 0 });
+  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&contato=not.is.null&select=id,contato,criado_em&order=criado_em.desc&limit=2000`).catch(() => []);
+  const chave = t => String(t || '').replace(/\D/g, '').slice(-8);
+  const mapa = new Map(); for (const l of leads || []) { const k = chave(l.contato); if (k && !mapa.has(k)) mapa.set(k, l.id); }
+  let ligadas = 0;
+  for (const c of convs) {
+    const id = mapa.get(chave(c.telefone)); if (!id) continue;
+    await sb(`capta_conversas?id=eq.${c.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lead_id: id }) }).catch(() => null);
+    ligadas++;
+  }
+  return res.status(200).json({ ok: true, ligadas, total: convs.length });
+}
+
+// Leads parados em "Aula agendada" sem agendamento no Capta (a coluna herdada do Kommo).
+async function acaoSemData(tenant, body, res) {
+  const et = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Aula%20agendada&select=id&limit=1`).catch(() => []);
+  if (!et?.[0]) return res.status(200).json({ leads: [] });
+  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&etapa_id=eq.${et[0].id}&select=id,nome,contato,temperatura,crianca,idade,atendente,etapa_em,criado_em,data_aula,kommo_lead_id&order=etapa_em.desc&limit=200`).catch(() => []);
+  const ids = (leads || []).map(l => l.id);
+  let comAula = new Set();
+  if (ids.length) {
+    const ags = await sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&lead_id=in.(${ids.join(',')})&status=in.(agendado,confirmado)&select=lead_id`).catch(() => []);
+    comAula = new Set((ags || []).map(a => a.lead_id));
+  }
+  return res.status(200).json({ leads: (leads || []).filter(l => !comAula.has(l.id)) });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
