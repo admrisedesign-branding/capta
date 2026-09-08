@@ -114,11 +114,14 @@ window.CaptaUser = (function(){
   const q = new URLSearchParams(location.search); const slug = q.get('t') || '';
   const K = 'capta_user_' + slug;
   let u = null; try { u = JSON.parse(localStorage.getItem(K) || 'null'); } catch(e){}
-  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
+  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente', email: q.get('e') || (u&&u.email) || '' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
   return {
     nome: () => (u && u.nome) || '',
     papel: () => (u && u.papel) || '',
-    definir: nome => { u = { nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    email: () => (u && u.email) || '',
+    telas: () => (u && u.telas) || null,
+    definir: nome => { u = { ...(u||{}), nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    setar: o => { u = { ...(u||{}), ...o }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
     sair: () => { try { localStorage.removeItem(K); } catch(e){} }
   };
 })();
@@ -143,7 +146,7 @@ const hh = t => String(t||'').slice(0,2).replace(/^0/,'') + 'h';
 let D = { turmas: [], alunos: [], kits: [] }, MODO = 'grade';
 
 async function api(acao, extra = {}) {
-  const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, ...extra }) });
+  const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, email_atual: (window.CaptaUser && CaptaUser.email && CaptaUser.email()) || undefined, ...extra }) });
   const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
 }
 async function carregar(){ try { D = await api('alunos'); desenhar(); } catch(e){ document.getElementById('raiz').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; } }

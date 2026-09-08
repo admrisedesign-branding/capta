@@ -371,11 +371,14 @@ window.CaptaUser = (function(){
   const q = new URLSearchParams(location.search); const slug = q.get('t') || '';
   const K = 'capta_user_' + slug;
   let u = null; try { u = JSON.parse(localStorage.getItem(K) || 'null'); } catch(e){}
-  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
+  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente', email: q.get('e') || (u&&u.email) || '' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
   return {
     nome: () => (u && u.nome) || '',
     papel: () => (u && u.papel) || '',
-    definir: nome => { u = { nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    email: () => (u && u.email) || '',
+    telas: () => (u && u.telas) || null,
+    definir: nome => { u = { ...(u||{}), nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    setar: o => { u = { ...(u||{}), ...o }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
     sair: () => { try { localStorage.removeItem(K); } catch(e){} }
   };
 })();
@@ -2838,7 +2841,8 @@ function montarMenuGestao(){
     cal:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>',
     aula:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>',
     alunos:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M19 8l2 2 3-3"/></svg>',
-    evento:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 21l1.5-6L15 4.5l4.5 4.5L9 19.5 3 21z"/><path d="M13 6.5l4.5 4.5"/></svg>'
+    evento:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 21l1.5-6L15 4.5l4.5 4.5L9 19.5 3 21z"/><path d="M13 6.5l4.5 4.5"/></svg>',
+    ajustes:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
   };
   const item=(icon,txt,attrs,sub,breve)=>`<button class="nav-item${sub?' sub':''}" data-tip="${txt}" ${attrs}>${I[icon]}${txt}${breve?'<span class="breve">em breve</span>':''}</button>`;
   const go=(pagina)=>`data-page="${pagina}"`;
@@ -2851,7 +2855,15 @@ function montarMenuGestao(){
     ${item('cal','Agenda',go('/agendamentos.html'))}
     ${item('aula','Aula experimental',go('/aula-experimental.html'))}
     ${item('alunos','Alunos',go('/alunos.html'))}
-    ${item('evento','Eventos','disabled',false,true)}`;
+    ${item('evento','Eventos','disabled',false,true)}
+    ${item('ajustes','Ajustes',go('/ajustes.html'))}`;
+  // esconde o que o perfil da pessoa não pode ver
+  const MAPA = { '/atendimento.html':'atendimento', '/gestao.html':'painel', '/funil.html':'pipeline', '/inbox.html':'conversas', '/agendamentos.html':'agenda', '/aula-experimental.html':'aula', '/alunos.html':'alunos', '/ajustes.html':'ajustes' };
+  fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'eu',slug:SLUG,token:TOKEN,email:CaptaUser.email()})})
+    .then(r=>r.json()).then(j=>{ if(!j || !j.telas) return; CaptaUser.setar({ papel: j.papel, telas: j.telas });
+      nav.querySelectorAll('.nav-item').forEach(b => { const pg = b.dataset.page; const chave = pg ? MAPA[pg] : (b.dataset.t === 'leads' ? 'leads' : null); if (chave && !j.telas.includes(chave)) b.style.display = 'none'; });
+      const q0 = document.getElementById('quem'); if (q0 && j.usuario) q0.innerHTML = `Você: <b>${j.usuario.nome}</b> · ${ (j.papeis[j.papel]||{}).nome || j.papel }<br><a onclick="CaptaUser.sair();location.href='/login.html'">sair</a>`;
+    }).catch(()=>{});
   const st=document.createElement('style');
   st.textContent='.nav-item.sub{padding-left:34px;font-size:13px}.nav-item[disabled]{opacity:.55;cursor:default}.nav-item .breve{margin-left:auto;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);background:var(--line-2);border-radius:99px;padding:2px 6px}';
   document.head.appendChild(st);

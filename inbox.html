@@ -164,11 +164,14 @@ window.CaptaUser = (function(){
   const q = new URLSearchParams(location.search); const slug = q.get('t') || '';
   const K = 'capta_user_' + slug;
   let u = null; try { u = JSON.parse(localStorage.getItem(K) || 'null'); } catch(e){}
-  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
+  if (q.get('u')) { u = { nome: q.get('u'), papel: q.get('papel') || 'atendente', email: q.get('e') || (u&&u.email) || '' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} }
   return {
     nome: () => (u && u.nome) || '',
     papel: () => (u && u.papel) || '',
-    definir: nome => { u = { nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    email: () => (u && u.email) || '',
+    telas: () => (u && u.telas) || null,
+    definir: nome => { u = { ...(u||{}), nome, papel: (u && u.papel) || 'atendente' }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
+    setar: o => { u = { ...(u||{}), ...o }; try { localStorage.setItem(K, JSON.stringify(u)); } catch(e){} },
     sair: () => { try { localStorage.removeItem(K); } catch(e){} }
   };
 })();

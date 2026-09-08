@@ -58,7 +58,7 @@
   let cfg = {}, S = { lead: null, aba: 'conversa', info: null, agenda: null, idx: { manha:0, tarde:0, sab:0 }, etapas: [], rapidas: null, timer: null, timerMsg: null };
 
   async function api(acao, extra = {}) {
-    const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug: cfg.slug, token: cfg.token, ...extra }) });
+    const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug: cfg.slug, token: cfg.token, email_atual: (window.CaptaUser && CaptaUser.email && CaptaUser.email()) || undefined, ...extra }) });
     const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
   }
   function monta() {
