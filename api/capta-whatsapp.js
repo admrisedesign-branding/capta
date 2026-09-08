@@ -78,7 +78,7 @@ module.exports = async function handler(req, res) {
 
     // Funil, agenda e presença não dependem de WhatsApp: valem em qualquer
     // plano, com ou sem canal conectado.
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -94,6 +94,9 @@ module.exports = async function handler(req, res) {
         case 'experimentais': return await acaoExperimentais(tenant, body, res);
         case 'desfecho': return await acaoDesfecho(tenant, body, res);
         case 'desfazer': return await acaoDesfazer(tenant, body, res);
+        case 'conversa_atualizar': return await acaoConversaAtualizar(tenant, body, res);
+        case 'respostas': return await acaoRespostas(tenant, body, res);
+        case 'importar_historico': return await acaoImportarHistorico(tenant, body, res);
       }
     }
 
@@ -127,6 +130,7 @@ module.exports = async function handler(req, res) {
       case 'desconectar': return await acaoDesconectar(canal, res);
       case 'webhooks':    return await acaoWebhooks(canal, res);
       case 'enviar':      return await acaoEnviar(tenant, canal, body, res);
+      case 'enviar_midia': return await acaoEnviarMidia(tenant, canal, body, res);
       case 'conversas':   return await acaoConversas(tenant, res);
       case 'mensagens':   return await acaoMensagens(tenant, body, res);
       case 'midia':       return await acaoMidia(tenant, body, res);
@@ -299,8 +303,8 @@ async function acaoEnviar(tenant, canal, body, res) {
 async function acaoConversas(tenant, res) {
   const rows = await sb(
     `capta_conversas?tenant_id=eq.${tenant.id}` +
-    `&select=id,telefone,agente_ativo,status,nao_lidas,ultima_mensagem,ultima_mensagem_em,` +
-    `lead:lead_id(id,nome,temperatura,status)` +
+    `&select=id,telefone,agente_ativo,status,nao_lidas,ultima_mensagem,ultima_mensagem_em,atendente,resolvida_em,` +
+    `lead:lead_id(id,nome,temperatura,status,etapa_id,atendente,notas,contato,crianca,idade)` +
     `&order=ultima_mensagem_em.desc.nullslast&limit=100`
   );
   return res.status(200).json({ conversas: rows || [] });
@@ -315,7 +319,7 @@ async function acaoMensagens(tenant, body, res) {
 
   const conv = await sb(
     `capta_conversas?id=eq.${id}&tenant_id=eq.${tenant.id}` +
-    `&select=id,telefone,agente_ativo,nao_lidas,lead:lead_id(id,nome,temperatura)&limit=1`
+    `&select=id,telefone,agente_ativo,nao_lidas,atendente,resolvida_em,lead:lead_id(id,nome,temperatura,etapa_id,atendente,notas,contato,crianca,idade,kommo_lead_id)&limit=1`
   );
   if (!conv?.[0]) return res.status(404).json({ erro: 'Conversa não encontrada.' });
 
@@ -912,6 +916,103 @@ async function acaoDesfazer(tenant, body, res) {
     await sb(`capta_leads?id=eq.${a.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ motivo_perda: null }) }).catch(() => null);
   }
   return res.status(200).json({ ok: true });
+}
+
+
+// ---------------------------------------------------------------------
+// INBOX — atribuir / resolver / reabrir · respostas prontas · anexos
+// ---------------------------------------------------------------------
+async function acaoConversaAtualizar(tenant, body, res) {
+  const id = (body.conversa_id || '').trim(); if (!id) return res.status(400).json({ erro: 'Informe conversa_id.' });
+  const patch = {};
+  if (body.atendente !== undefined) patch.atendente = body.atendente || null;
+  if (body.resolvida === true) patch.resolvida_em = new Date().toISOString();
+  if (body.resolvida === false) patch.resolvida_em = null;
+  if (body.lida) patch.nao_lidas = 0;
+  if (!Object.keys(patch).length) return res.status(400).json({ erro: 'Nada para atualizar.' });
+  await sb(`capta_conversas?id=eq.${id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+  return res.status(200).json({ ok: true });
+}
+async function acaoRespostas(tenant, body, res) {
+  if (body.salvar) {
+    const r = body.salvar;
+    if (r.id) await sb(`capta_respostas?id=eq.${r.id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ titulo: r.titulo, texto: r.texto, atalho: r.atalho || null }) });
+    else await sb('capta_respostas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ tenant_id: tenant.id, titulo: r.titulo, texto: r.texto, atalho: r.atalho || null }) });
+  }
+  if (body.apagar) await sb(`capta_respostas?id=eq.${body.apagar}&tenant_id=eq.${tenant.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  const lista = await sb(`capta_respostas?tenant_id=eq.${tenant.id}&select=id,titulo,texto,atalho&order=titulo`).catch(() => []);
+  return res.status(200).json({ respostas: lista || [] });
+}
+async function acaoEnviarMidia(tenant, canal, body, res) {
+  const { conversa_id, tipo, dados, nome, legenda } = body;
+  if (!conversa_id || !dados || !['imagem', 'audio', 'documento'].includes(tipo)) return res.status(400).json({ erro: 'Dados incompletos.' });
+  const conv = (await sb(`capta_conversas?id=eq.${conversa_id}&tenant_id=eq.${tenant.id}&select=id,telefone,lead_id&limit=1`))?.[0];
+  if (!conv) return res.status(404).json({ erro: 'Conversa não encontrada.' });
+  const envio = await prov.enviarMidia(canal, conv.telefone, tipo, dados, { nome, legenda });
+  await sb('capta_mensagens', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    tenant_id: tenant.id, conversa_id: conv.id, direcao: 'saida', autor: body.autor || 'atendente', tipo, texto: legenda || nome || null,
+    provedor_msg_id: envio.provedor_msg_id, entrega: 'enviada', criado_em: new Date().toISOString() }) }).catch(() => null);
+  await sb(`capta_conversas?id=eq.${conv.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ultima_mensagem: legenda || (tipo === 'imagem' ? '📷 imagem' : tipo === 'audio' ? '🎤 áudio' : '📎 ' + (nome || 'arquivo')), ultima_mensagem_em: new Date().toISOString(), agente_ativo: false }) }).catch(() => null);
+  contatoHumano(tenant.id, conv.lead_id).catch(() => null);
+  return res.status(200).json({ ok: true });
+}
+
+
+// ---------------------------------------------------------------------
+// IMPORTAR HISTÓRICO — .txt exportado do WhatsApp (Android e iPhone)
+// body: { lead_id?, telefone?, texto, nomes_escola: ['Rafa','My Robot'] , previa: true|false }
+// ---------------------------------------------------------------------
+function parseWhatsappTxt(txt) {
+  const linhas = String(txt || '').replace(/\r/g, '').replace(/\u200e/g, '').split('\n');
+  const msgs = [];
+  const reA = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(?:[ap]\.?m\.?)?\s*-\s*([^:]+?):\s(.*)$/i;        // Android: 08/09/2026 14:03 - Nome: msg
+  const reI = /^\[(\d{1,2})\/(\d{1,2})\/(\d{2,4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\]\s*([^:]+?):\s(.*)$/;                    // iPhone: [08/09/2026 14:03:10] Nome: msg
+  for (const l of linhas) {
+    const m = l.match(reA) || l.match(reI);
+    if (m) {
+      const [_, d, mo, y, h, mi, se, autor, texto] = m; const ano = y.length === 2 ? 2000 + Number(y) : Number(y);
+      const quando = new Date(ano, Number(mo) - 1, Number(d), Number(h), Number(mi), Number(se || 0));
+      msgs.push({ quando, autor: autor.trim(), texto });
+    } else if (msgs.length && l.trim()) msgs[msgs.length - 1].texto += '\n' + l;
+  }
+  return msgs.filter(m => !/^(Mensagens e chamadas s[ãa]o protegidas|As mensagens e as chamadas)/i.test(m.texto));
+}
+async function acaoImportarHistorico(tenant, body, res) {
+  const msgs = parseWhatsappTxt(body.texto);
+  if (!msgs.length) return res.status(400).json({ erro: 'Não reconheci o formato. Exporte a conversa pelo WhatsApp (sem mídia) e envie o .txt.' });
+  const autores = {}; msgs.forEach(m => autores[m.autor] = (autores[m.autor] || 0) + 1);
+  if (body.previa) return res.status(200).json({ total: msgs.length, autores, de: msgs[0].quando, ate: msgs[msgs.length - 1].quando });
+
+  const escola = (body.nomes_escola || []).map(x => String(x).trim().toLowerCase()).filter(Boolean);
+  let telefone = body.telefone ? prov.comDDI(body.telefone) : null;
+  let lead = null;
+  if (body.lead_id) { lead = (await sb(`capta_leads?id=eq.${body.lead_id}&tenant_id=eq.${tenant.id}&select=id,contato&limit=1`))?.[0]; if (lead && !telefone) telefone = prov.comDDI(lead.contato); }
+  if (!telefone) return res.status(400).json({ erro: 'Sem telefone pra ligar a conversa.' });
+  let conv = (await sb(`capta_conversas?tenant_id=eq.${tenant.id}&telefone=eq.${telefone}&select=id,lead_id&limit=1`))?.[0];
+  if (!conv) {
+    const canal = (await sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&select=id&limit=1`))?.[0];
+    conv = (await sb('capta_conversas', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ tenant_id: tenant.id, canal_id: canal?.id || null, telefone, lead_id: lead?.id || null, agente_ativo: false, status: 'aberta' }) }))[0];
+  } else if (lead && !conv.lead_id) await sb(`capta_conversas?id=eq.${conv.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lead_id: lead.id }) }).catch(() => null);
+
+  const crypto = require('crypto');
+  const linhas = msgs.map(m => ({
+    tenant_id: tenant.id, conversa_id: conv.id,
+    direcao: escola.includes(m.autor.toLowerCase()) ? 'saida' : 'entrada',
+    autor: escola.includes(m.autor.toLowerCase()) ? m.autor : 'lead',
+    tipo: /<M[ií]dia oculta>|\(arquivo anexado\)|imagem omitida|áudio omitido|<Media omitted>/i.test(m.texto) ? 'midia' : 'texto',
+    texto: m.texto.slice(0, 4000), entrega: 'importada', criado_em: m.quando.toISOString(),
+    provedor_msg_id: 'import:' + crypto.createHash('md5').update(`${telefone}|${m.quando.toISOString()}|${m.autor}|${m.texto}`).digest('hex').slice(0, 24)
+  }));
+  let gravadas = 0;
+  for (let i = 0; i < linhas.length; i += 200) {
+    const lote = linhas.slice(i, i + 200);
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/capta_mensagens?on_conflict=provedor_msg_id`, { method: 'POST', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(lote) });
+    if (!r.ok) { const t = await r.text(); if (/provedor_msg_id/.test(t) && /unique|conflict/i.test(t)) { /* sem índice único: insere sem on_conflict */ await sb('capta_mensagens', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(lote) }); } else throw new Error(`Supabase ${r.status}: ${t.slice(0, 200)}`); }
+    gravadas += lote.length;
+  }
+  const ultima = msgs[msgs.length - 1];
+  await sb(`capta_conversas?id=eq.${conv.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ultima_mensagem: (ultima.texto || '').slice(0, 120) }) }).catch(() => null);
+  return res.status(200).json({ ok: true, conversa_id: conv.id, importadas: gravadas });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
