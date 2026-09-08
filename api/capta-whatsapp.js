@@ -1136,6 +1136,15 @@ async function acaoEventoLeads(tenant, body, res) {
     }
     return res.status(200).json({ ok: true, vinculados: alvo.length });
   }
+  if (body.parados) {
+    const evs = await sb(`capta_eventos?tenant_id=eq.${tenant.id}&ativo=is.true&select=id,nome`).catch(() => []);
+    if (!evs?.length) return res.status(200).json({ leads: [], eventos: [] });
+    const novo = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=ilike.novo%20lead&select=id&limit=1`).catch(() => []);
+    let q = `capta_leads?tenant_id=eq.${tenant.id}&evento_id=in.(${evs.map(e => e.id).join(',')})&select=id,nome,contato,temperatura,evento_id,etapa_id,etapa_em,criado_em,atendente&order=criado_em.desc&limit=200`;
+    if (novo?.[0]) q += `&etapa_id=eq.${novo[0].id}`;
+    const leads = await sb(q).catch(() => []);
+    return res.status(200).json({ leads: leads || [], eventos: evs });
+  }
   const id = body.evento_id; if (!id) return res.status(400).json({ erro: 'Informe o evento.' });
   const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&evento_id=eq.${id}&select=id,nome,contato,temperatura,score,etapa_id,atendente,data_aula,ganho_em,valor,criado_em,kommo_lead_id,tags&order=criado_em.desc`).catch(() => []);
   const etapas = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome,tipo&order=ordem`).catch(() => []);
