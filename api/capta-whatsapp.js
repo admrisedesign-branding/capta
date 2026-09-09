@@ -1122,7 +1122,7 @@ async function acaoEventos(tenant, body, res) {
       const b = porEvento[l.evento_id] || (porEvento[l.evento_id] = { leads: 0, aulas: 0, matriculas: 0, receita: 0, quentes: 0 });
       b.leads++;
       if (l.data_aula || /aula agendada|matr|aluno/i.test(nome(l.etapa_id))) b.aulas++;
-      if (l.ganho_em || /aluno ativo/i.test(nome(l.etapa_id))) { b.matriculas++; b.receita += Number(l.valor) || 0; }
+      if (l.ganho_em || /venda ganha|aluno ativo|matriculado/i.test(nome(l.etapa_id))) { b.matriculas++; b.receita += Number(l.valor) || 0; }
       if ((l.temperatura || '').toLowerCase() === 'quente') b.quentes++;
     }
   }

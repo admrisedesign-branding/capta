@@ -24,10 +24,14 @@ const CAMPOS = {
   score: 'Score', categoria: 'Categoria', origem: 'Origem', bairro: 'Bairro',
   area: 'Área', trilha: 'Trilha', momento: 'Momento',
 };
+// No Kommo, 142 = Venda ganha e 143 = Venda perdida em qualquer funil; o campo "type"
+// só vem preenchido na etapa de entrada, então não dá pra confiar só nele.
+const ehGanho  = st => st.id === 142 || st.tipo === 1 || /ganha|aluno ativo|matriculado/i.test(st.nome || '');
+const ehPerda  = st => st.id === 143 || st.tipo === 2 || /perdida|perdido|closed.?lost/i.test(st.nome || '');
 // etapa do Kommo → status do Capta (novo · contatado · fechado · perdido)
 function statusDe(st) {
-  if (st.tipo === 1) return 'fechado';
-  if (st.tipo === 2) return 'perdido';
+  if (ehGanho(st)) return 'fechado';
+  if (ehPerda(st)) return 'perdido';
   return /novo lead|incoming/i.test(st.nome || '') ? 'novo' : 'contatado';
 }
 const cap = s => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1).toLowerCase() : null);
@@ -69,7 +73,7 @@ async function carregarMeta() {
   for (const f of cf?._embedded?.custom_fields || []) cache.fields[f.name.trim().toLowerCase()] = f.id;
   cache.statuses = {};
   for (const p of pipes?._embedded?.pipelines || [])
-    for (const s of p._embedded?.statuses || []) cache.statuses[s.id] = { nome: s.name, tipo: s.type, pipeline: p.id };
+    for (const s of p._embedded?.statuses || []) cache.statuses[s.id] = { id: s.id, nome: s.name, tipo: s.type, pipeline: p.id };
   cache.at = Date.now();
 }
 
@@ -182,8 +186,8 @@ async function espelhar(leadId) {
     pagamento: valorCampo(lead, CAMPOS.pagamento),
     valor: lead.price || 0,
     tags: (lead._embedded?.tags || []).map(t => t.name),
-    ganho_em: st.tipo === 1 ? ts(lead.closed_at) : null,        // type 1 = ganho
-    perdido_em: st.tipo === 2 ? ts(lead.closed_at) : null,      // type 2 = perdido
+    ganho_em: ehGanho(st) ? (ts(lead.closed_at) || ts(lead.updated_at)) : null,
+    perdido_em: ehPerda(st) ? (ts(lead.closed_at) || ts(lead.updated_at)) : null,
     motivo_perda: lead._embedded?.loss_reason?.[0]?.name || null,
     kommo_criado_em: ts(lead.created_at),
     criado_em: ts(lead.created_at),      // data real do lead, não a hora do espelho
@@ -197,7 +201,7 @@ async function espelhar(leadId) {
   });
   if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
   // ganho no Kommo (Aluno Ativo) → vira aluno em Alunos, se ainda não for
-  if (st.tipo === 1) {
+  if (ehGanho(st)) {
     try {
       const lr = await fetch(`${SB_URL}/rest/v1/capta_leads?tenant_id=eq.${linha.tenant_id}&kommo_lead_id=eq.${lead.id}&select=id&limit=1`, { headers: H_SB }).then(x => x.json());
       const leadId = lr?.[0]?.id;
