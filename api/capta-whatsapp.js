@@ -85,7 +85,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'recepcao', 'checkin', 'feedback'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'recepcao', 'checkin', 'feedback', 'visita_avulsa'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -116,6 +116,7 @@ module.exports = async function handler(req, res) {
         case 'recepcao':      return await acaoRecepcao(tenant, body, res);
         case 'checkin':       return await acaoCheckin(tenant, body, res);
         case 'feedback':      return await acaoFeedback(tenant, body, res);
+        case 'visita_avulsa': return await acaoVisitaAvulsa(tenant, body, res);
       }
     }
 
@@ -1273,6 +1274,39 @@ async function acaoFeedback(tenant, body, res) {
   if (paga_hoje === true) return acaoDesfecho(tenant, { agendamento_id, desfecho: 'matriculou', pagamento: pagamento || null, valor: valor || null, atendente: body.atendente, observacao: `desfecho: matriculou · ${pagamento || 'na recepção'}` }, res);
   if (paga_hoje === false && motivo) return acaoDesfecho(tenant, { agendamento_id, desfecho: 'nao', motivo, atendente: body.atendente, observacao: `desfecho: nao · ${motivo}` }, res);
   return res.status(200).json({ ok: true });
+}
+
+
+// Visitante que chegou sem agendamento: cria o lead, a aula de hoje e já marca presença.
+async function acaoVisitaAvulsa(tenant, body, res) {
+  const fone = String(body.telefone || '').replace(/\D/g, '');
+  const crianca = String(body.crianca || '').trim();
+  if (!crianca || fone.length < 10) return res.status(400).json({ erro: 'Informe o nome da criança e o WhatsApp.' });
+  const dia = new Date().toISOString().slice(0, 10), dow = new Date(dia + 'T12:00:00').getDay();
+  const agoraMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const turmas = await sb(`capta_turmas?tenant_id=eq.${tenant.id}&ativa=is.true&dia_semana=eq.${dow}&select=id,hora_inicio,hora_fim&order=hora_inicio`).catch(() => []);
+  const turma = (turmas || []).find(t => { const ini = Number(String(t.hora_inicio).slice(0,2)) * 60 + Number(String(t.hora_inicio).slice(3,5)); const fim = Number(String(t.hora_fim).slice(0,2)) * 60 + Number(String(t.hora_fim).slice(3,5)); return agoraMin >= ini - 30 && agoraMin <= fim; }) || (turmas || [])[0];
+  if (!turma) return res.status(409).json({ erro: 'Não há turma hoje pra registrar a visita.' });
+  // lead: reaproveita se o telefone já existir
+  const existente = (await sb(`capta_leads?tenant_id=eq.${tenant.id}&contato=eq.${fone}&select=id&limit=1`).catch(() => []))?.[0];
+  let leadId = existente?.id;
+  if (!leadId) {
+    const novoLead = await sb('capta_leads', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+      tenant_id: tenant.id, nome: crianca, contato: fone, crianca, idade: body.idade ? Number(body.idade) : null,
+      origem: 'my robot', fonte: 'direto', porta: 'my robot', status: 'contatado', temperatura: 'Quente',
+      notas: 'Visita espontânea registrada na recepção' }) });
+    leadId = novoLead?.[0]?.id;
+  }
+  const ag = await sb('capta_agendamentos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+    tenant_id: tenant.id, lead_id: leadId || null, turma_id: turma.id, data: dia, hora_inicio: turma.hora_inicio, hora_fim: turma.hora_fim,
+    crianca_nome: crianca, crianca_idade: body.idade ? Number(body.idade) : null, status: 'compareceu', compareceu_em: new Date().toISOString(),
+    observacao: 'visita espontânea (recepção)', criado_por: 'recepcao' }) });
+  const agId = ag?.[0]?.id;
+  if (agId) await sb('capta_presencas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    tenant_id: tenant.id, data: dia, agendamento_id: agId, entrada_em: new Date().toISOString() }) }).catch(() => null);
+  if (leadId) { const e = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Aula%20agendada&select=id&limit=1`).catch(() => []))?.[0];
+    if (e) { await moverLead(tenant.id, leadId, e.id, null).catch(() => null); await empurrarKommo(tenant.id, leadId, e.id, null).catch(() => null); } }
+  return res.status(200).json({ ok: true, agendamento_id: agId, lead_id: leadId });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
