@@ -4,150 +4,320 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#2E5BFF">
-<title>Check-in — My Robot</title>
+<meta name="theme-color" content="#E8734A">
+<title>My Robot — Recepção</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{--brand:#2E5BFF;--brand-2:#5B8DEF;--brand-soft:rgba(46,91,255,.10);
---bg:#F4F6FB;--card:#FFFFFF;--line:#E9ECF3;--line-2:#F1F3F8;--ink:#141A2E;--muted:#697089;--faint:#9AA1B4;
---verde:#16A34A;--verde-bg:rgba(22,163,74,.12);--exp:#E8734A;--exp-bg:#FDEFE7;--quente:#E03127;--morno:#C47A08}
+:root{
+  --laranja:#E8734A; --laranja-2:#F59B3C; --laranja-esc:#C4552F;
+  --roxo:#6543BC; --creme:#FFF6F0;
+  --card:#FFFFFF; --linha:#F0E2D8; --ink:#2A1B14; --muted:#8A7568; --faint:#B8A99E;
+  --verde:#16A34A; --verde-bg:#E6F6EC;
+}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:16px;overscroll-behavior:none}
+html,body{height:100%}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--creme);color:var(--ink);-webkit-font-smoothing:antialiased;overflow:hidden;user-select:none}
 button{font-family:inherit;cursor:pointer;border:0}
-.topo{background:var(--card);border-bottom:1px solid var(--line);padding:16px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10}
-.topo h1{font-size:20px;font-weight:900;letter-spacing:-.01em}
-.topo .dia{color:var(--muted);font-size:15px;text-transform:capitalize}
-.topo .rel{margin-left:auto;font-size:26px;font-weight:900;font-variant-numeric:tabular-nums}
-.wrap{padding:20px 24px 60px;max-width:1100px;margin:0 auto}
-.bloco{margin-bottom:26px}
-.bloco h2{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;display:flex;align-items:center;gap:10px}
-.bloco h2 .n{background:var(--line-2);color:var(--ink);border-radius:99px;padding:2px 10px;font-size:12px}
-.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
-.p{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:18px 20px;text-align:left;transition:.12s;min-height:104px;display:flex;flex-direction:column;justify-content:center}
-.p:active{transform:scale(.98)}
-.p .nome{font-size:19px;font-weight:800;line-height:1.2}
-.p .sub{font-size:14px;color:var(--muted);margin-top:4px}
-.p .st{font-size:13px;font-weight:800;margin-top:8px;display:flex;align-items:center;gap:6px}
-.p.exp{border-color:#F3D3C4;background:var(--exp-bg)}
-.p.dentro{border-color:var(--verde);background:var(--verde-bg)}.p.dentro .st{color:var(--verde)}
-.p.saiu{opacity:.55}.p.saiu .st{color:var(--muted)}
-.p .tag{display:inline-block;font-size:11px;font-weight:800;padding:2px 9px;border-radius:99px;background:var(--exp);color:#fff;margin-top:8px;align-self:flex-start}
-.vazio{background:var(--card);border:2px dashed var(--line);border-radius:18px;padding:34px;text-align:center;color:var(--faint);font-size:16px;line-height:1.6}
-/* diálogo */
-.fundo{position:fixed;inset:0;background:rgba(20,26,46,.55);display:grid;place-items:center;padding:22px;z-index:50}
-.jan{background:var(--card);border-radius:24px;padding:28px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto}
-.jan h3{font-size:24px;font-weight:900;line-height:1.2}.jan p{color:var(--muted);font-size:16px;margin-top:6px;line-height:1.5}
-.op{display:grid;gap:10px;margin-top:20px}
-.op button{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:18px;font-size:17px;font-weight:700;color:var(--ink);text-align:left}
-.op button.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
-.op button.sim{border-color:var(--verde);color:var(--verde)}.op button.sim.on{background:var(--verde);color:#fff}
-.op button.nao{border-color:var(--quente);color:var(--quente)}.op button.nao.on{background:var(--quente);color:#fff}
-.caras{display:flex;gap:10px;justify-content:center;margin-top:18px}
-.caras button{font-size:38px;background:transparent;border:2px solid transparent;border-radius:16px;padding:8px 14px;line-height:1}
-.caras button.on{border-color:var(--brand);background:var(--brand-soft)}
-.acoes{display:flex;gap:10px;margin-top:24px}
-.acoes button{flex:1;border-radius:16px;padding:18px;font-size:17px;font-weight:800}
-.acoes .ok{background:var(--brand);color:#fff}.acoes .g{background:var(--line-2);color:var(--muted)}
-.acoes .ok:disabled{opacity:.45}
-.aviso{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:16px 24px;border-radius:16px;font-size:17px;font-weight:700;z-index:60;box-shadow:0 12px 40px rgba(20,26,46,.3)}
-.aviso.ok{background:var(--verde)}
+.tela{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;opacity:0;pointer-events:none;transition:opacity .32s ease}
+.tela.on{opacity:1;pointer-events:auto}
+.tela.rolavel{justify-content:flex-start;overflow-y:auto;padding-top:26px}
+
+/* robô */
+.robo{width:180px;height:180px;position:relative;animation:flutua 3.2s ease-in-out infinite}
+.robo.g{width:230px;height:230px}
+.robo.p{width:96px;height:96px;animation-duration:2.6s}
+@keyframes flutua{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.robo.pula{animation:pula .6s cubic-bezier(.3,1.4,.5,1) 3}
+@keyframes pula{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-26px) rotate(-6deg)}60%{transform:translateY(0) rotate(5deg)}}
+.robo svg{width:100%;height:100%;overflow:visible}
+.olho{transform-origin:center;animation:pisca 4.6s infinite}
+@keyframes pisca{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+.antena{transform-origin:50% 100%;animation:balanca 2.8s ease-in-out infinite}
+@keyframes balanca{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+.braco{animation:acena 1.6s ease-in-out infinite}
+@keyframes acena{0%,100%{transform:rotate(6deg)}50%{transform:rotate(-24deg)}}
+
+/* splash */
+#splash{background:linear-gradient(160deg,var(--laranja) 0%,var(--laranja-2) 100%);color:#fff}
+#splash h1{font-size:min(9vw,54px);font-weight:900;letter-spacing:-.03em;margin-top:26px;text-align:center;line-height:1.05}
+#splash p{font-size:min(4.4vw,21px);font-weight:600;opacity:.92;margin-top:12px;text-align:center}
+.toque{margin-top:38px;font-size:16px;font-weight:700;opacity:.75;animation:respira 2.4s ease-in-out infinite;text-transform:uppercase;letter-spacing:.12em}
+@keyframes respira{0%,100%{opacity:.45}50%{opacity:.95}}
+.bolhas{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.bolhas i{position:absolute;border-radius:50%;background:rgba(255,255,255,.12);animation:sobe linear infinite}
+@keyframes sobe{from{transform:translateY(110vh)}to{transform:translateY(-20vh)}}
+
+/* escolha */
+.escolha{display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;max-width:780px;margin-top:32px}
+@media(max-width:700px){.escolha{grid-template-columns:1fr}}
+.big{background:var(--card);border:3px solid var(--linha);border-radius:28px;padding:34px 26px;text-align:center;transition:.14s}
+.big:active{transform:scale(.97)}
+.big .ic{font-size:52px;line-height:1}
+.big b{display:block;font-size:26px;font-weight:900;margin-top:12px;letter-spacing:-.01em}
+.big span{display:block;font-size:15px;color:var(--muted);margin-top:6px;font-weight:600}
+.big.entrar{border-color:var(--laranja);background:linear-gradient(180deg,#FFF3EC,#fff)}
+.big.sair{border-color:var(--roxo);background:linear-gradient(180deg,#F4F0FF,#fff)}
+h2.tit{font-size:min(7vw,34px);font-weight:900;letter-spacing:-.02em;text-align:center;line-height:1.15}
+p.sub{font-size:17px;color:var(--muted);font-weight:600;margin-top:8px;text-align:center}
+
+/* busca e cards */
+.topo-tela{width:100%;max-width:860px;display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.voltar{background:var(--card);border:2px solid var(--linha);border-radius:16px;padding:12px 18px;font-size:16px;font-weight:800;color:var(--muted)}
+.busca{width:100%;max-width:860px;position:relative;margin-bottom:18px}
+.busca input{width:100%;border:3px solid var(--linha);border-radius:20px;padding:20px 22px 20px 58px;font-size:20px;font-family:inherit;font-weight:600;background:var(--card);color:var(--ink)}
+.busca input:focus{outline:0;border-color:var(--laranja)}
+.busca .lupa{position:absolute;left:20px;top:50%;transform:translateY(-50%);font-size:22px;opacity:.5}
+.lista{width:100%;max-width:860px;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;padding-bottom:40px}
+.pes{background:var(--card);border:3px solid var(--linha);border-radius:22px;padding:20px 22px;text-align:left;animation:entra .32s backwards;transition:.12s}
+.pes:active{transform:scale(.97)}
+@keyframes entra{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.pes .n{font-size:22px;font-weight:800;line-height:1.15}
+.pes .s{font-size:14.5px;color:var(--muted);margin-top:5px;font-weight:600}
+.pes .et{display:inline-block;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:3px 10px;border-radius:99px;margin-top:10px}
+.et.exp{background:#FFEDE4;color:var(--laranja-esc)}.et.aluno{background:#EFEAFF;color:var(--roxo)}
+.pes.dentro{border-color:var(--verde);background:var(--verde-bg)}
+.pes.dentro .et{background:#D6F0DF;color:var(--verde)}
+.pes.novo{border-style:dashed;display:flex;align-items:center;justify-content:center;min-height:104px;color:var(--laranja);font-weight:800;font-size:18px;text-align:center}
+.nada{grid-column:1/-1;text-align:center;color:var(--faint);font-size:18px;padding:34px;font-weight:600;line-height:1.6}
+
+/* confirmação e comemoração */
+.balao{background:var(--card);border:3px solid var(--linha);border-radius:26px;padding:26px 30px;max-width:560px;text-align:center;margin-top:20px;position:relative}
+.balao:before{content:'';position:absolute;top:-14px;left:50%;transform:translateX(-50%) rotate(45deg);width:24px;height:24px;background:var(--card);border-left:3px solid var(--linha);border-top:3px solid var(--linha)}
+.balao b{font-size:26px;font-weight:900;display:block;line-height:1.2}
+.balao span{font-size:17px;color:var(--muted);font-weight:600;display:block;margin-top:8px}
+.acoes{display:flex;gap:14px;margin-top:26px;width:100%;max-width:560px}
+.acoes button{flex:1;border-radius:20px;padding:20px;font-size:19px;font-weight:800}
+.acoes .ok{background:var(--laranja);color:#fff;box-shadow:0 8px 24px rgba(232,115,74,.35)}
+.acoes .ok:disabled{opacity:.4;box-shadow:none}
+.acoes .g{background:var(--card);border:3px solid var(--linha);color:var(--muted)}
+
+/* feedback */
+.estrelas{display:flex;gap:10px;justify-content:center;margin-top:22px}
+.estrelas button{font-size:46px;background:transparent;line-height:1;filter:grayscale(1) opacity(.35);transition:.14s;padding:4px}
+.estrelas button.on{filter:none;transform:scale(1.12)}
+.ops{display:grid;gap:12px;width:100%;max-width:560px;margin-top:22px}
+.ops button{background:var(--card);border:3px solid var(--linha);border-radius:20px;padding:18px 20px;font-size:18px;font-weight:700;color:var(--ink);text-align:left}
+.ops button.on{border-color:var(--laranja);background:#FFF3EC;color:var(--laranja-esc)}
+.ops.duo{grid-template-columns:1fr 1fr}
+.ops .sim{border-color:var(--verde);color:var(--verde);text-align:center}.ops .sim.on{background:var(--verde);color:#fff;border-color:var(--verde)}
+.ops .nao{text-align:center}.ops .nao.on{background:var(--muted);color:#fff;border-color:var(--muted)}
+.passos{display:flex;gap:6px;justify-content:center;margin-top:24px}
+.passos i{width:8px;height:8px;border-radius:50%;background:var(--linha)}.passos i.on{background:var(--laranja);width:22px;border-radius:99px}
+.campo{width:100%;max-width:560px;margin-top:16px}
+.campo label{display:block;font-size:14px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.campo input{width:100%;border:3px solid var(--linha);border-radius:18px;padding:16px 18px;font-size:18px;font-family:inherit;font-weight:600;background:var(--card)}
+.campo input:focus{outline:0;border-color:var(--laranja)}
+.confete{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:60}
+.confete i{position:absolute;width:10px;height:14px;border-radius:2px;animation:cai linear forwards}
+@keyframes cai{to{transform:translateY(110vh) rotate(720deg);opacity:.2}}
+.rel{position:fixed;top:20px;right:26px;font-size:17px;font-weight:800;color:var(--faint);z-index:5}
+#splash.on ~ .rel{color:rgba(255,255,255,.75)}
 </style>
 </head>
 <body>
-<div class="topo"><h1>Check-in</h1><span class="dia" id="dia"></span><span class="rel" id="rel"></span></div>
-<div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
-<div id="modal"></div>
+
+<div class="tela on" id="splash" onclick="ir('escolha')">
+  <div class="bolhas" id="bolhas"></div>
+  <div class="robo g" id="robo-splash"></div>
+  <h1>Bem-vindo à<br>My Robot Manaus</h1>
+  <p>O futuro é aqui 🤖</p>
+  <div class="toque">toque na tela para começar</div>
+</div>
+
+<div class="tela" id="escolha">
+  <div class="robo" id="robo-escolha"></div>
+  <h2 class="tit" style="margin-top:18px">Oi! O que você quer fazer?</h2>
+  <div class="escolha">
+    <button class="big entrar" onclick="abrirLista('in')"><div class="ic">👋</div><b>Cheguei!</b><span>fazer check-in</span></button>
+    <button class="big sair" onclick="abrirLista('out')"><div class="ic">🎒</div><b>Vou embora</b><span>fazer check-out</span></button>
+  </div>
+  <button class="voltar" style="margin-top:30px" onclick="ir('splash')">voltar</button>
+</div>
+
+<div class="tela rolavel" id="lista">
+  <div class="topo-tela"><button class="voltar" onclick="ir('escolha')">← voltar</button>
+    <div><h2 class="tit" style="text-align:left;font-size:26px" id="lista-tit"></h2><p class="sub" style="text-align:left" id="lista-sub"></p></div></div>
+  <div class="busca"><span class="lupa">🔎</span><input id="q" placeholder="Digite seu nome" oninput="filtrar()" autocomplete="off"></div>
+  <div class="lista" id="cards"></div>
+</div>
+
+<div class="tela" id="confirma">
+  <div class="robo" id="robo-confirma"></div>
+  <div class="balao"><b id="conf-nome"></b><span id="conf-sub"></span></div>
+  <div class="acoes"><button class="g" onclick="ir('lista')">Não sou eu</button><button class="ok" id="conf-ok">Sou eu!</button></div>
+</div>
+
+<div class="tela" id="comemora">
+  <div class="robo g pula" id="robo-festa"></div>
+  <div class="balao"><b id="fim-titulo"></b><span id="fim-sub"></span></div>
+</div>
+
+<div class="tela rolavel" id="feedback" style="align-items:center">
+  <div class="robo p" id="robo-fb" style="margin-top:10px"></div>
+  <h2 class="tit" id="fb-tit" style="margin-top:14px"></h2>
+  <p class="sub" id="fb-sub"></p>
+  <div id="fb-corpo" style="width:100%;display:flex;flex-direction:column;align-items:center"></div>
+  <div class="acoes"><button class="g" onclick="voltarPasso()">Voltar</button><button class="ok" id="fb-ok">Continuar</button></div>
+  <div class="passos" id="fb-passos"></div>
+</div>
+
+<div class="rel" id="rel"></div>
 
 <script>
 const p = new URLSearchParams(location.search);
 const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hh = t => String(t||'').slice(0,5);
-const hoje = () => new Date().toISOString().slice(0,10);
-const PAGTOS = ['Pix','cartão','boleto','recorrente'];
-const MOTIVOS = ['Precisa conversar em casa','Valor','Horário não bate','Distância','Criança não se adaptou','Só conhecendo'];
-let D = null, SEL = null, F = {};
+const primeiro = n => String(n||'').trim().split(/\s+/)[0] || '';
+const PAGTOS = ['Pix','Cartão','Boleto','Mensalidade recorrente'];
+const MOTIVOS = ['Precisa conversar em casa','O valor','O horário não bate','A distância','A criança não se adaptou','Só estávamos conhecendo'];
+let D = null, MODO = 'in', SEL = null, F = {}, PASSO = 0, ocioso = null;
+
+// Robô provisório — trocar pelo mascote oficial da My Robot quando tiver o arquivo
+const ROBO = (cor = '#2A1B14', fundo = '#fff') => `
+<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g class="antena"><line x1="60" y1="26" x2="60" y2="12" stroke="${cor}" stroke-width="5" stroke-linecap="round"/><circle cx="60" cy="9" r="6" fill="#F59B3C"/></g>
+  <rect x="22" y="26" width="76" height="60" rx="20" fill="${fundo}" stroke="${cor}" stroke-width="5"/>
+  <rect x="33" y="40" width="54" height="30" rx="13" fill="${cor}"/>
+  <g class="olho"><circle cx="49" cy="54" r="6" fill="#fff"/><circle cx="71" cy="54" r="6" fill="#fff"/></g>
+  <path d="M52 64 q8 7 16 0" stroke="#F59B3C" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <g class="braco" style="transform-origin:15px 58px"><rect x="8" y="56" width="14" height="30" rx="7" fill="${fundo}" stroke="${cor}" stroke-width="5"/></g>
+  <rect x="98" y="56" width="14" height="30" rx="7" fill="${fundo}" stroke="${cor}" stroke-width="5"/>
+  <rect x="38" y="86" width="44" height="22" rx="10" fill="${fundo}" stroke="${cor}" stroke-width="5"/>
+  <circle cx="60" cy="97" r="4" fill="#F59B3C"/>
+</svg>`;
+document.getElementById('robo-splash').innerHTML = ROBO('#fff', 'rgba(255,255,255,.16)');
+['robo-escolha','robo-confirma','robo-festa','robo-fb'].forEach(id => document.getElementById(id).innerHTML = ROBO());
+(function(){ const c = document.getElementById('bolhas'); for (let i = 0; i < 14; i++) { const b = document.createElement('i');
+  const s = 20 + Math.random()*90; b.style.cssText = `width:${s}px;height:${s}px;left:${Math.random()*100}%;animation-duration:${12+Math.random()*14}s;animation-delay:-${Math.random()*20}s`; c.appendChild(b); } })();
 
 async function api(acao, extra = {}) {
   const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, ...extra }) });
   const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
 }
-function aviso(txt, ok){ const el = document.createElement('div'); el.className = 'aviso' + (ok ? ' ok' : ''); el.textContent = txt; document.body.appendChild(el); setTimeout(() => el.remove(), 2600); }
-function relogio(){ const d = new Date(); document.getElementById('rel').textContent = d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  document.getElementById('dia').textContent = d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}); }
-async function carregar(){ try { D = await api('recepcao'); desenhar(); } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; } }
-const presDe = (alunoId, agId) => (D.presencas||[]).find(x => (alunoId && x.aluno_id === alunoId) || (agId && x.agendamento_id === agId));
-const leadDe = a => (D.leads||[]).find(l => l.id === a.lead_id) || {};
-const agora = () => { const d = new Date(); return d.getHours()*60 + d.getMinutes(); };
-const emMin = t => { const [h,m] = String(t||'0:0').split(':').map(Number); return h*60 + (m||0); };
+function ir(tela){ document.querySelectorAll('.tela').forEach(t => t.classList.toggle('on', t.id === tela));
+  clearTimeout(ocioso); if (tela !== 'splash') ocioso = setTimeout(() => ir('splash'), 90000);
+  if (tela === 'lista') setTimeout(() => document.getElementById('q').focus(), 260); }
+function relogio(){ document.getElementById('rel').textContent = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+async function carregar(){ try { D = await api('recepcao'); } catch(e){} }
+const pres = (alunoId, agId) => (D?.presencas||[]).find(x => (alunoId && x.aluno_id === alunoId) || (agId && x.agendamento_id === agId));
+const leadDe = a => (D?.leads||[]).find(l => l.id === a.lead_id) || {};
 
-function desenhar(){
-  const turmas = D.turmas || [];
-  // turma "de agora": começa daqui a até 30 min ou já começou e não terminou
-  const janela = t => agora() >= emMin(t.hora_inicio) - 30 && agora() <= emMin(t.hora_fim) + 15;
-  const doMomento = turmas.filter(janela); const outras = turmas.filter(t => !janela(t));
-  const exp = (D.agendamentos||[]);
-  const expAgora = exp.filter(a => agora() >= emMin(a.hora_inicio) - 30 && agora() <= emMin(a.hora_fim) + 15);
-  const expDepois = exp.filter(a => !expAgora.includes(a));
-  const bloco = (titulo, cards, extra) => cards.length ? `<div class="bloco"><h2>${titulo} <span class="n">${cards.length}</span>${extra||''}</h2><div class="grade">${cards.join('')}</div></div>` : '';
-  const cardExp = a => { const pr = presDe(null, a.id); const l = leadDe(a);
-    const cls = pr && pr.saida_em ? 'saiu' : pr ? 'dentro' : '';
-    return `<button class="p exp ${cls}" onclick="tocarExp('${a.id}')">
-      <div class="nome">${esc(a.crianca_nome || l.nome || 'Visitante')}</div>
-      <div class="sub">${hh(a.hora_inicio)}${a.crianca_idade?` · ${a.crianca_idade} anos`:''}${l.nome && a.crianca_nome ? ' · com ' + esc(l.nome.split(' ')[0]) : ''}</div>
-      <span class="tag">aula experimental</span>
-      ${pr ? `<div class="st">${pr.saida_em ? '✓ saiu ' + hh(new Date(pr.saida_em).toTimeString()) : '● dentro desde ' + hh(new Date(pr.entrada_em).toTimeString())}</div>` : ''}</button>`; };
-  const cardAluno = (al, t) => { const pr = presDe(al.id, null); const cls = pr && pr.saida_em ? 'saiu' : pr ? 'dentro' : '';
-    return `<button class="p ${cls}" onclick="tocarAluno('${al.id}')">
-      <div class="nome">${esc(al.nome_curto || al.nome)}</div>
-      <div class="sub">${hh(t.hora_inicio)}–${hh(t.hora_fim)}${al.kit?' · '+esc(al.kit):''}</div>
-      ${pr ? `<div class="st">${pr.saida_em ? '✓ saiu' : '● dentro'}</div>` : ''}</button>`; };
-  const alunosDe = t => (D.alunos||[]).filter(a => a.turma_id === t.id).map(a => cardAluno(a, t));
-
-  let html = '';
-  if (expAgora.length) html += bloco('Aula experimental — agora', expAgora.map(cardExp));
-  doMomento.forEach(t => { const c = alunosDe(t); if (c.length) html += bloco(`Turma ${hh(t.hora_inicio)}–${hh(t.hora_fim)} — agora`, c); });
-  if (expDepois.length) html += bloco('Experimentais de hoje', expDepois.map(cardExp));
-  outras.forEach(t => { const c = alunosDe(t); if (c.length) html += bloco(`Turma ${hh(t.hora_inicio)}–${hh(t.hora_fim)}`, c); });
-  document.getElementById('raiz').innerHTML = html || `<div class="vazio">Nenhuma aula hoje.<br>Bom descanso 😊</div>`;
+function pessoas(){
+  if (!D) return [];
+  const out = (D.agendamentos||[]).map(a => { const pr = pres(null, a.id); const l = leadDe(a);
+    return { tipo:'exp', id:a.id, nome:a.crianca_nome || l.nome || 'Visitante', sub:`aula experimental · ${hh(a.hora_inicio)}${a.crianca_idade?` · ${a.crianca_idade} anos`:''}`, dentro: !!pr && !pr.saida_em, fim: !!(pr && pr.saida_em) };
+  });
+  for (const t of (D.turmas||[])) for (const al of (D.alunos||[]).filter(x => x.turma_id === t.id)) {
+    const pr = pres(al.id); out.push({ tipo:'aluno', id:al.id, nome: al.nome_curto || al.nome, sub:`turma ${hh(t.hora_inicio)}${al.kit?` · ${al.kit}`:''}`, dentro: !!pr && !pr.saida_em, fim: !!(pr && pr.saida_em) });
+  }
+  return out;
+}
+function abrirLista(modo){
+  MODO = modo; document.getElementById('q').value = '';
+  document.getElementById('lista-tit').textContent = modo === 'in' ? 'Quem chegou?' : 'Quem está indo embora?';
+  document.getElementById('lista-sub').textContent = modo === 'in' ? 'Toque no seu nome' : 'Toque no seu nome pra finalizar';
+  ir('lista'); filtrar(); carregar().then(filtrar);
+}
+function filtrar(){
+  const q = (document.getElementById('q').value || '').trim().toLowerCase();
+  let lista = pessoas().filter(x => MODO === 'in' ? (!x.dentro && !x.fim) : x.dentro);
+  if (q) lista = lista.filter(x => x.nome.toLowerCase().includes(q));
+  document.getElementById('cards').innerHTML = lista.map((x,i) => `<button class="pes ${x.dentro?'dentro':''}" style="animation-delay:${Math.min(i*40,400)}ms" onclick='escolher(${JSON.stringify(x).replace(/'/g,"&#39;")})'>
+      <div class="n">${esc(x.nome)}</div><div class="s">${esc(x.sub)}</div>
+      <span class="et ${x.tipo==='exp'?'exp':'aluno'}">${x.tipo==='exp'?'aula experimental':'aluno'}</span></button>`).join('')
+    + (MODO === 'in' ? `<button class="pes novo" onclick="novoVisitante()">+ Não achei meu nome</button>` : '')
+    + (!lista.length ? `<div class="nada">${MODO==='in' ? 'Ninguém esperando agora.<br>Se você é visitante, toque em “Não achei meu nome”.' : 'Ninguém em aula no momento 🤖'}</div>` : '');
+}
+function escolher(x){
+  SEL = x; F = {}; PASSO = 0;
+  document.getElementById('conf-nome').textContent = x.nome;
+  document.getElementById('conf-sub').textContent = MODO === 'in' ? 'Vamos fazer seu check-in?' : 'Vamos finalizar sua visita?';
+  document.getElementById('conf-ok').onclick = () => MODO === 'in' ? fazerEntrada() : (SEL.tipo === 'exp' ? iniciarFeedback() : fazerSaida());
+  ir('confirma');
+}
+async function fazerEntrada(){
+  try { await api('checkin', SEL.tipo === 'exp' ? { agendamento_id: SEL.id } : { aluno_id: SEL.id });
+    festa(`Boaaa, ${primeiro(SEL.nome)}! 🎉`, SEL.tipo === 'exp' ? 'Feliz em te ver aqui! Aproveita sua aula experimental 🤖' : 'Bom te ver de novo! Bora aprender 🤖');
+    carregar(); } catch(e){ alert(e.message); }
+}
+async function fazerSaida(){
+  try { await api('checkin', { aluno_id: SEL.id, saida: true });
+    festa(`Até a próxima, ${primeiro(SEL.nome)}! 👋`, 'Foi ótimo ter você aqui hoje.'); carregar(); } catch(e){ alert(e.message); }
+}
+function festa(titulo, sub){
+  document.getElementById('fim-titulo').textContent = titulo;
+  document.getElementById('fim-sub').textContent = sub;
+  ir('comemora'); confete(); setTimeout(() => ir('splash'), 5200);
+}
+function confete(){
+  const c = document.createElement('div'); c.className = 'confete'; document.body.appendChild(c);
+  const cores = ['#E8734A','#F59B3C','#6543BC','#16A34A','#FFD166'];
+  for (let i = 0; i < 60; i++) { const s = document.createElement('i');
+    s.style.cssText = `left:${Math.random()*100}%;top:-20px;background:${cores[i%cores.length]};animation-duration:${1.8+Math.random()*1.6}s;animation-delay:${Math.random()*.6}s;transform:rotate(${Math.random()*360}deg)`; c.appendChild(s); }
+  setTimeout(() => c.remove(), 4200);
+}
+function checarNovo(){ document.getElementById('fb-ok').disabled = !(F.crianca && String(F.fone||'').replace(/\D/g,'').length >= 10); }
+function novoVisitante(){
+  SEL = { tipo:'novo' }; F = {};
+  document.getElementById('fb-tit').textContent = 'Que bom que você veio! 🤖';
+  document.getElementById('fb-sub').textContent = 'Me conta quem é você';
+  document.getElementById('fb-corpo').innerHTML = `
+    <div class="campo"><label>Nome da criança</label><input id="v-crianca" placeholder="Ex.: João Vitor" oninput="F.crianca=this.value;checarNovo()"></div>
+    <div class="campo"><label>Idade</label><input id="v-idade" type="number" inputmode="numeric" placeholder="Ex.: 8" oninput="F.idade=this.value"></div>
+    <div class="campo"><label>WhatsApp do responsável</label><input id="v-fone" type="tel" inputmode="numeric" placeholder="(92) 9 9999-9999" oninput="F.fone=this.value;checarNovo()"></div>`;
+  document.getElementById('fb-passos').innerHTML = '';
+  const ok = document.getElementById('fb-ok'); ok.textContent = 'Pronto!'; ok.disabled = true; ok.onclick = salvarVisitante;
+  ir('feedback');
+}
+async function salvarVisitante(){
+  try { await api('visita_avulsa', { crianca: F.crianca, idade: F.idade || null, telefone: F.fone });
+    await carregar(); festa(`Boaaa, ${primeiro(F.crianca)}! 🎉`, 'Feliz em te ver aqui! Já avisei a recepção 🤖'); }
+  catch(e){ alert(e.message); }
 }
 
-// --- aluno ativo: um toque entra, outro sai ---
-async function tocarAluno(id){
-  const al = (D.alunos||[]).find(a => a.id === id); const pr = presDe(id, null);
-  if (pr && pr.saida_em) return aviso('Já registramos entrada e saída hoje.');
-  try { await api('checkin', { aluno_id: id, saida: !!pr }); await carregar();
-    aviso(pr ? `Até a próxima, ${(al.nome_curto||al.nome).split(' ')[0]}! 👋` : `Bem-vindo, ${(al.nome_curto||al.nome).split(' ')[0]}! 🤖`, true); }
-  catch(e){ aviso(e.message); }
+const PASSOS = ['nota','matricula','detalhe'];
+function iniciarFeedback(){ PASSO = 0; F = {}; ir('feedback'); pintarPasso(); }
+function pintarPasso(){
+  const nome = primeiro(SEL.nome), passo = PASSOS[PASSO], corpo = document.getElementById('fb-corpo'), ok = document.getElementById('fb-ok');
+  ok.onclick = proximoPasso; ok.textContent = PASSO === PASSOS.length - 1 ? 'Concluir' : 'Continuar';
+  if (passo === 'nota') {
+    document.getElementById('fb-tit').textContent = `E aí, ${nome}? Conta pra gente!`;
+    document.getElementById('fb-sub').textContent = 'O que você achou da aula de hoje?';
+    corpo.innerHTML = `<div class="estrelas">${[1,2,3,4,5].map(v => `<button class="${F.nota>=v?'on':''}" onclick="F.nota=${v};pintarPasso()">⭐</button>`).join('')}</div>
+      ${F.nota && F.nota <= 3 ? `<div class="campo"><label>O que faltou pra ficar melhor?</label><input value="${esc(F.comentario||'')}" placeholder="Pode escrever aqui" oninput="F.comentario=this.value"></div>` : ''}`;
+    ok.disabled = !F.nota;
+  } else if (passo === 'matricula') {
+    document.getElementById('fb-tit').textContent = 'Vamos garantir a vaga?';
+    document.getElementById('fb-sub').textContent = 'A matrícula pode ser feita agora, aqui na recepção';
+    corpo.innerHTML = `<div class="ops duo"><button class="sim ${F.paga===true?'on':''}" onclick="F.paga=true;pintarPasso()">Sim! 🎉</button><button class="nao ${F.paga===false?'on':''}" onclick="F.paga=false;pintarPasso()">Agora não</button></div>`;
+    ok.disabled = F.paga === undefined;
+  } else if (F.paga) {
+    document.getElementById('fb-tit').textContent = 'Que alegria! 🎉';
+    document.getElementById('fb-sub').textContent = 'Como vai ser o pagamento?';
+    corpo.innerHTML = `<div class="ops">${PAGTOS.map(v => `<button class="${F.pagamento===v?'on':''}" onclick="F.pagamento='${v}';pintarPasso()">${v}</button>`).join('')}</div>`;
+    ok.disabled = !F.pagamento;
+  } else {
+    document.getElementById('fb-tit').textContent = 'Tudo bem 😊';
+    document.getElementById('fb-sub').textContent = 'O que pesou pra não fechar hoje?';
+    corpo.innerHTML = `<div class="ops">${MOTIVOS.map(v => `<button class="${F.motivo===v?'on':''}" onclick="F.motivo='${v}';pintarPasso()">${v}</button>`).join('')}</div>`;
+    ok.disabled = !F.motivo;
+  }
+  document.getElementById('fb-passos').innerHTML = PASSOS.map((_,i) => `<i class="${i===PASSO?'on':''}"></i>`).join('');
 }
-// --- experimental: entra igual; na saída abre o feedback ---
-async function tocarExp(id){
-  const a = (D.agendamentos||[]).find(x => x.id === id); const pr = presDe(null, id);
-  if (pr && pr.saida_em) return aviso('Essa visita já foi finalizada.');
-  if (!pr) { try { await api('checkin', { agendamento_id: id }); await carregar(); aviso(`Bem-vindo, ${(a.crianca_nome||'').split(' ')[0] || 'visitante'}! 🤖`, true); } catch(e){ aviso(e.message); } return; }
-  SEL = a; F = {}; janelaSaida();
-}
-function janelaSaida(){
-  const a = SEL; const nome = (a.crianca_nome||'').split(' ')[0] || 'a criança';
-  const passo = F.paga === false ? 'motivo' : F.paga === true ? 'pagamento' : F.nota == null ? 'nota' : 'paga';
-  let corpo = '';
-  if (passo === 'nota') corpo = `<p>Como foi a aula ${esc(nome)}?</p><div class="caras">${[['😞',1],['😐',3],['😀',5]].map(([e,v]) => `<button class="${F.nota===v?'on':''}" onclick="F.nota=${v};janelaSaida()">${e}</button>`).join('')}</div>`;
-  else if (passo === 'paga') corpo = `<p>A matrícula vai ser feita agora?</p><div class="op"><button class="sim ${F.paga===true?'on':''}" onclick="F.paga=true;janelaSaida()">Sim, vamos matricular 🎉</button><button class="nao ${F.paga===false?'on':''}" onclick="F.paga=false;janelaSaida()">Agora não</button></div>`;
-  else if (passo === 'pagamento') corpo = `<p>Como vai ser o pagamento?</p><div class="op">${PAGTOS.map(v => `<button class="${F.pagamento===v?'on':''}" onclick="F.pagamento='${v}';janelaSaida()">${v}</button>`).join('')}</div>`;
-  else corpo = `<p>O que pesou pra não fechar hoje?</p><div class="op">${MOTIVOS.map(v => `<button class="${F.motivo===v?'on':''}" onclick="F.motivo='${v}';janelaSaida()">${v}</button>`).join('')}</div>`;
-  const pronto = (passo === 'pagamento' && F.pagamento) || (passo === 'motivo' && F.motivo);
-  document.getElementById('modal').innerHTML = `<div class="fundo"><div class="jan">
-    <h3>Até logo, ${esc(nome)}! 👋</h3>${corpo}
-    <div class="acoes"><button class="g" onclick="fechar()">Voltar</button><button class="ok" onclick="confirmarSaida()" ${pronto?'':'disabled'}>${pronto?'Concluir':'…'}</button></div></div></div>`;
-}
-function fechar(){ document.getElementById('modal').innerHTML = ''; SEL = null; F = {}; }
-async function confirmarSaida(){
-  try { await api('feedback', { agendamento_id: SEL.id, nota: F.nota ?? null, paga_hoje: F.paga, motivo: F.motivo || null, pagamento: F.pagamento || null, atendente: 'recepção' });
-    fechar(); await carregar(); aviso(F.paga ? 'Matrícula registrada 🎉' : 'Obrigado! Registramos tudo.', true); }
-  catch(e){ aviso(e.message); }
+function voltarPasso(){ if (PASSO === 0) return ir('lista'); PASSO--; pintarPasso(); }
+async function proximoPasso(){
+  if (PASSO < PASSOS.length - 1) { PASSO++; return pintarPasso(); }
+  try {
+    await api('feedback', { agendamento_id: SEL.id, nota: F.nota ?? null, paga_hoje: F.paga, motivo: F.motivo || null,
+      pagamento: F.pagamento || null, comentario: F.comentario || null, atendente: 'recepção' });
+    await carregar();
+    festa(F.paga ? `Bem-vindo à família, ${primeiro(SEL.nome)}! 🎉` : `Obrigado, ${primeiro(SEL.nome)}! 🤖`,
+          F.paga ? 'Sua matrícula foi registrada. Até a próxima aula!' : 'Adorei te conhecer. A gente se fala em breve 😊');
+  } catch(e){ alert(e.message); }
 }
 relogio(); setInterval(relogio, 20000);
-if (!SLUG || !TOKEN) document.getElementById('raiz').innerHTML = '<div class="vazio">Abra pelo link da recepção.</div>';
+if (!SLUG || !TOKEN) document.getElementById('splash').innerHTML = '<h1 style="font-size:28px">Abra pelo link da recepção</h1>';
 else { carregar(); setInterval(carregar, 45000); }
 </script>
 </body>
