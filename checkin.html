@@ -74,7 +74,7 @@ p.sub{font-size:17px;color:var(--muted);font-weight:600;margin-top:8px;text-alig
 .pes .n{font-size:22px;font-weight:800;line-height:1.15}
 .pes .s{font-size:14.5px;color:var(--muted);margin-top:5px;font-weight:600}
 .pes .et{display:inline-block;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:3px 10px;border-radius:99px;margin-top:10px}
-.et.exp{background:#FFEDE4;color:var(--laranja-esc)}.et.aluno{background:#EFEAFF;color:var(--roxo)}
+.et.exp{background:#FFEDE4;color:var(--laranja-esc)}.et.aluno{background:#EFEAFF;color:var(--roxo)}.et.saindo{background:#D6F0DF;color:var(--verde)}
 .pes.dentro{border-color:var(--verde);background:var(--verde-bg)}
 .pes.dentro .et{background:#D6F0DF;color:var(--verde)}
 .pes.novo{border-style:dashed;display:flex;align-items:center;justify-content:center;min-height:104px;color:var(--laranja);font-weight:800;font-size:18px;text-align:center}
@@ -126,10 +126,10 @@ p.sub{font-size:17px;color:var(--muted);font-weight:600;margin-top:8px;text-alig
 
 <div class="tela" id="escolha">
   <div class="robo" id="robo-escolha"></div>
-  <h2 class="tit" style="margin-top:18px">Oi! O que você quer fazer?</h2>
+  <h2 class="tit" style="margin-top:18px">Oi! Quem é você?</h2>
   <div class="escolha">
-    <button class="big entrar" onclick="abrirLista('in')"><div class="ic">👋</div><b>Cheguei!</b><span>fazer check-in</span></button>
-    <button class="big sair" onclick="abrirLista('out')"><div class="ic">🎒</div><b>Vou embora</b><span>fazer check-out</span></button>
+    <button class="big entrar" onclick="abrirLista('aluno')"><div class="ic">🤖</div><b>Sou aluno</b><span>já estudo aqui</span></button>
+    <button class="big sair" onclick="abrirLista('exp')"><div class="ic">✨</div><b>Aula experimental</b><span>é minha primeira vez</span></button>
   </div>
   <button class="voltar" style="margin-top:30px" onclick="ir('splash')">voltar</button>
 </div>
@@ -215,35 +215,62 @@ function pessoas(){
 }
 function abrirLista(modo){
   MODO = modo; document.getElementById('q').value = '';
-  document.getElementById('lista-tit').textContent = modo === 'in' ? 'Quem chegou?' : 'Quem está indo embora?';
-  document.getElementById('lista-sub').textContent = modo === 'in' ? 'Toque no seu nome' : 'Toque no seu nome pra finalizar';
+  document.getElementById('lista-tit').textContent = modo === 'aluno' ? 'Qual é o seu nome?' : 'Quem veio conhecer a gente?';
+  document.getElementById('lista-sub').textContent = 'Toque no seu nome — se já estiver aqui, o toque faz o check-out';
   ir('lista'); filtrar(); carregar().then(filtrar);
 }
 function filtrar(){
   const q = (document.getElementById('q').value || '').trim().toLowerCase();
-  let lista = pessoas().filter(x => MODO === 'in' ? (!x.dentro && !x.fim) : x.dentro);
+  let lista = pessoas().filter(x => x.tipo === (MODO === 'aluno' ? 'aluno' : 'exp') && !x.fim);
   if (q) lista = lista.filter(x => x.nome.toLowerCase().includes(q));
   document.getElementById('cards').innerHTML = lista.map((x,i) => `<button class="pes ${x.dentro?'dentro':''}" style="animation-delay:${Math.min(i*40,400)}ms" onclick='escolher(${JSON.stringify(x).replace(/'/g,"&#39;")})'>
       <div class="n">${esc(x.nome)}</div><div class="s">${esc(x.sub)}</div>
-      <span class="et ${x.tipo==='exp'?'exp':'aluno'}">${x.tipo==='exp'?'aula experimental':'aluno'}</span></button>`).join('')
-    + (MODO === 'in' ? `<button class="pes novo" onclick="novoVisitante()">+ Não achei meu nome</button>` : '')
-    + (!lista.length ? `<div class="nada">${MODO==='in' ? 'Ninguém esperando agora.<br>Se você é visitante, toque em “Não achei meu nome”.' : 'Ninguém em aula no momento 🤖'}</div>` : '');
+      <span class="et ${x.dentro?'saindo':(x.tipo==='exp'?'exp':'aluno')}">${x.dentro ? 'tocar para sair' : (x.tipo==='exp'?'aula experimental':'aluno')}</span></button>`).join('')
+    + (MODO === 'exp' ? `<button class="pes novo" onclick="novoVisitante()">+ Não achei meu nome</button>` : '')
+    + (!lista.length ? `<div class="nada">${MODO==='exp' ? 'Nenhuma aula experimental agora.<br>Se você veio conhecer, toque em “Não achei meu nome”.' : 'Nenhuma turma neste horário 🤖'}</div>` : '');
 }
 function escolher(x){
   SEL = x; F = {}; PASSO = 0;
+  const saindo = x.dentro;
   document.getElementById('conf-nome').textContent = x.nome;
-  document.getElementById('conf-sub').textContent = MODO === 'in' ? 'Vamos fazer seu check-in?' : 'Vamos finalizar sua visita?';
-  document.getElementById('conf-ok').onclick = () => MODO === 'in' ? fazerEntrada() : (SEL.tipo === 'exp' ? iniciarFeedback() : fazerSaida());
+  document.getElementById('conf-sub').textContent = saindo ? (x.tipo === 'exp' ? 'Vamos finalizar sua visita?' : 'Já vai? Vamos fazer seu check-out') : 'Vamos fazer seu check-in?';
+  document.getElementById('conf-ok').textContent = saindo ? 'Sim, sou eu' : 'Sou eu!';
+  document.getElementById('conf-ok').onclick = () => {
+    if (!saindo) return fazerEntrada();
+    if (x.tipo === 'exp') return iniciarFeedback();
+    return pesquisaDoMes() ? iniciarPesquisaAluno() : fazerSaida();
+  };
   ir('confirma');
+}
+// pesquisa do aluno: uma vez por mês, na primeira aula do mês
+function pesquisaDoMes(){
+  const mes = new Date().toISOString().slice(0,7);
+  try { return localStorage.getItem('capta_pesquisa_' + SEL.id) !== mes; } catch(e){ return false; }
+}
+function marcarPesquisa(){ try { localStorage.setItem('capta_pesquisa_' + SEL.id, new Date().toISOString().slice(0,7)); } catch(e){} }
+function iniciarPesquisaAluno(){
+  F = {}; const nome = primeiro(SEL.nome);
+  document.getElementById('fb-tit').textContent = `E aí, ${nome}? Como está sendo?`;
+  document.getElementById('fb-sub').textContent = 'Uma vez por mês a gente pergunta 😊';
+  document.getElementById('fb-passos').innerHTML = '';
+  const pinta = () => {
+    document.getElementById('fb-corpo').innerHTML = `<div class="estrelas">${[1,2,3,4,5].map(v => `<button class="${F.nota>=v?'on':''}" onclick="F.nota=${v};window.__pintaAluno()">⭐</button>`).join('')}</div>
+      ${F.nota && F.nota <= 3 ? `<div class="campo"><label>O que a gente pode melhorar?</label><input value="${esc(F.comentario||'')}" placeholder="Pode escrever aqui" oninput="F.comentario=this.value"></div>` : ''}`;
+    document.getElementById('fb-ok').disabled = !F.nota;
+  };
+  window.__pintaAluno = pinta;
+  const ok = document.getElementById('fb-ok'); ok.textContent = 'Concluir';
+  ok.onclick = async () => { marcarPesquisa(); await fazerSaida({ nota: F.nota, comentario: F.comentario }); };
+  pinta(); ir('feedback');
 }
 async function fazerEntrada(){
   try { await api('checkin', SEL.tipo === 'exp' ? { agendamento_id: SEL.id } : { aluno_id: SEL.id });
     festa(`Boaaa, ${primeiro(SEL.nome)}! 🎉`, SEL.tipo === 'exp' ? 'Feliz em te ver aqui! Aproveita sua aula experimental 🤖' : 'Bom te ver de novo! Bora aprender 🤖');
     carregar(); } catch(e){ alert(e.message); }
 }
-async function fazerSaida(){
-  try { await api('checkin', { aluno_id: SEL.id, saida: true });
-    festa(`Até a próxima, ${primeiro(SEL.nome)}! 👋`, 'Foi ótimo ter você aqui hoje.'); carregar(); } catch(e){ alert(e.message); }
+async function fazerSaida(extra){
+  try { await api('checkin', { aluno_id: SEL.id, saida: true, ...(extra || {}) });
+    festa(`Até a próxima, ${primeiro(SEL.nome)}! 👋`, extra && extra.nota ? 'Obrigado por contar pra gente 🤖' : 'Foi ótimo ter você aqui hoje.'); carregar(); } catch(e){ alert(e.message); }
 }
 function festa(titulo, sub){
   document.getElementById('fim-titulo').textContent = titulo;
