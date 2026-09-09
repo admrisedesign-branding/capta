@@ -147,7 +147,7 @@ const chave = d => { const x = new Date(d); return isNaN(x) ? null : `${x.getFul
 const rotulo = k => { const [a,m] = k.split('-'); return `${MESES[+m-1]}/${a}`; };
 
 // Ordem canônica das etapas (as do Kommo); qualquer outra vai depois, na ordem em que aparecer
-const ORDEM = ['Incoming leads','Novo Lead','Em Contato','Qualificado','Aula Agendada','Matrícula em Andamento','Aluno Ativo (matriculado)','Remarketing','Closed - lost'];
+const ORDEM = ['Incoming leads','Novo Lead','Em Contato','Qualificado','Aula Agendada','Matrícula em Andamento','Venda ganha','Aluno Ativo (matriculado)','Remarketing','Venda perdida','Closed - lost'];
 
 let TODOS = [], TENANT = {}, INVEST = [];
 
@@ -181,7 +181,7 @@ function montarMeses(){
 }
 
 function conta(arr, fn){ const m = new Map(); for(const x of arr){ const k = fn(x) || '—'; m.set(k,(m.get(k)||0)+1); } return m; }
-const ganhou = l => !!l.ganho_em || l.status === 'fechado';
+const ganhou = l => !!l.ganho_em || l.status === 'fechado' || /venda ganha|aluno ativo|matriculado/i.test(l.etapa_nome || '');
 const agendou = l => !!l.data_aula || /aula agendada|matr[ií]cula|aluno/i.test(l.etapa_nome||'') || ganhou(l);
 
 function render(){
@@ -228,7 +228,7 @@ function render(){
   const etapas = [...porEtapa.keys()].sort((a,b) => { const ia = ORDEM.indexOf(a), ib = ORDEM.indexOf(b); return (ia<0?99:ia) - (ib<0?99:ib); });
   const maxE = Math.max(1, ...porEtapa.values());
   const funil = `<div class="card full"><h3>Funil por etapa</h3><div class="h">Onde os leads do período estão hoje, na etapa do Kommo</div>
-    ${etapas.length ? `<div class="funil">${etapas.map(e => `<div class="fe ${/aluno ativo/i.test(e)?'ganho':/lost|remarketing/i.test(e)?'perda':''}"><span class="nm" title="${esc(e)}">${esc(e)}</span><div class="bar"><i style="width:${porEtapa.get(e)/maxE*100}%"></i></div><span class="q">${porEtapa.get(e)}</span></div>`).join('')}</div>` : `<div class="vazio">Sem leads neste período.</div>`}
+    ${etapas.length ? `<div class="funil">${etapas.map(e => `<div class="fe ${/venda ganha|aluno ativo|matriculado/i.test(e)?'ganho':/perdida|lost|remarketing/i.test(e)?'perda':''}"><span class="nm" title="${esc(e)}">${esc(e)}</span><div class="bar"><i style="width:${porEtapa.get(e)/maxE*100}%"></i></div><span class="q">${porEtapa.get(e)}</span></div>`).join('')}</div>` : `<div class="vazio">Sem leads neste período.</div>`}
   </div>`;
 
   // quem atendeu
