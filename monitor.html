@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aulas de hoje — My Robot</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--brand:#2E5BFF;--bg:#0E1220;--card:#171C2E;--line:#252B42;--ink:#FFFFFF;--muted:#9AA3BF;--faint:#6B7392;
+--verde:#3DDC84;--exp:#FF8A5B;--morno:#FFC24B}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;overflow:hidden}
+.topo{display:flex;align-items:center;gap:20px;padding:26px 40px 14px}
+.topo h1{font-size:34px;font-weight:900;letter-spacing:-.02em}
+.topo .dia{color:var(--muted);font-size:20px;text-transform:capitalize}
+.topo .rel{margin-left:auto;font-size:52px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.wrap{padding:0 40px 40px;height:calc(100vh - 108px);overflow:hidden}
+.faixa{display:flex;gap:14px;align-items:stretch;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px 26px;flex:1;min-width:0}
+.card.exp{border-color:rgba(255,138,91,.45);background:linear-gradient(180deg,rgba(255,138,91,.09),rgba(23,28,46,1))}
+.card h2{font-size:15px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.card .hora{font-size:30px;font-weight:900;letter-spacing:-.02em}
+.card .hora small{font-size:16px;font-weight:700;color:var(--muted);margin-left:10px}
+.nomes{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.n{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px;padding:10px 16px;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px}
+.n.dentro{background:rgba(61,220,132,.14);border-color:rgba(61,220,132,.4);color:var(--verde)}
+.n.saiu{opacity:.4}
+.n small{font-size:13px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+.n.dentro small{color:var(--verde)}
+.exp .n{background:rgba(255,138,91,.14);border-color:rgba(255,138,91,.35);color:var(--exp)}
+.exp .n.dentro{background:rgba(61,220,132,.16);border-color:rgba(61,220,132,.45);color:var(--verde)}
+.rodape{position:fixed;left:40px;right:40px;bottom:22px;display:flex;gap:26px;align-items:center;color:var(--faint);font-size:16px;font-weight:600}
+.rodape b{color:var(--ink);font-size:20px;margin-right:6px}
+.vazio{display:grid;place-items:center;height:60vh;color:var(--faint);font-size:26px;text-align:center;line-height:1.5}
+.leg{margin-left:auto;display:flex;gap:18px}.leg span{display:flex;align-items:center;gap:8px}.leg i{width:12px;height:12px;border-radius:4px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="topo"><h1>Aulas de hoje</h1><span class="dia" id="dia"></span><span class="rel" id="rel"></span></div>
+<div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
+<div class="rodape" id="rodape"></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hh = t => String(t||'').slice(0,5);
+const emMin = t => { const [h,m] = String(t||'0:0').split(':').map(Number); return h*60 + (m||0); };
+const agora = () => { const d = new Date(); return d.getHours()*60 + d.getMinutes(); };
+let D = null;
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, ...extra }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
+}
+function relogio(){ const d = new Date();
+  document.getElementById('rel').textContent = d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('dia').textContent = d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}); }
+async function carregar(){ try { D = await api('recepcao'); desenhar(); } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; } }
+const pres = (alunoId, agId) => (D.presencas||[]).find(x => (alunoId && x.aluno_id === alunoId) || (agId && x.agendamento_id === agId));
+function desenhar(){
+  const turmas = (D.turmas||[]).filter(t => agora() <= emMin(t.hora_fim) + 20);
+  const exps = (D.agendamentos||[]).filter(a => agora() <= emMin(a.hora_fim) + 20);
+  const nome = x => `<span class="n ${(() => { const pr = pres(x.aluno_id, x.ag_id); return pr ? (pr.saida_em ? 'saiu' : 'dentro') : ''; })()}">${esc(x.txt)}${x.sub?`<small>${esc(x.sub)}</small>`:''}</span>`;
+  let html = '';
+  for (const t of turmas.slice(0, 3)) {
+    const alunos = (D.alunos||[]).filter(a => a.turma_id === t.id);
+    const expT = exps.filter(a => a.turma_id === t.id);
+    if (!alunos.length && !expT.length) continue;
+    const dentro = alunos.filter(a => { const pr = pres(a.id); return pr && !pr.saida_em; }).length + expT.filter(a => { const pr = pres(null, a.id); return pr && !pr.saida_em; }).length;
+    html += `<div class="faixa">
+      <div class="card"><h2>Turma</h2><div class="hora">${hh(t.hora_inicio)}–${hh(t.hora_fim)}<small>${dentro} em sala · ${alunos.length + expT.length} previstos</small></div>
+        <div class="nomes">${alunos.map(a => nome({ txt: a.nome_curto || a.nome, sub: a.kit, aluno_id: a.id })).join('') || '<span class="n" style="opacity:.4">sem alunos</span>'}</div></div>
+      ${expT.length ? `<div class="card exp" style="max-width:38%"><h2>Aula experimental</h2><div class="hora">${hh(expT[0].hora_inicio)}<small>visitantes</small></div>
+        <div class="nomes">${expT.map(a => nome({ txt: a.crianca_nome || 'Visitante', sub: a.crianca_idade ? a.crianca_idade + ' anos' : '', ag_id: a.id })).join('')}</div></div>` : ''}
+    </div>`;
+  }
+  document.getElementById('raiz').innerHTML = html || `<div class="vazio">Sem aulas agora.<br>🤖</div>`;
+  const totalDentro = (D.presencas||[]).filter(x => !x.saida_em).length;
+  const totalExp = (D.agendamentos||[]).length;
+  document.getElementById('rodape').innerHTML = `<span><b>${totalDentro}</b>em sala agora</span><span><b>${totalExp}</b>aulas experimentais hoje</span>
+    <span class="leg"><span><i style="background:var(--verde)"></i>já chegou</span><span><i style="background:rgba(255,255,255,.15)"></i>previsto</span><span><i style="background:var(--exp)"></i>visitante</span></span>`;
+}
+relogio(); setInterval(relogio, 15000);
+if (!SLUG || !TOKEN) document.getElementById('raiz').innerHTML = '<div class="vazio">Abra pelo link do monitor.</div>';
+else { carregar(); setInterval(carregar, 30000); }
+</script>
+</body>
+</html>

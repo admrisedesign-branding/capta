@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2E5BFF">
+<title>Check-in — My Robot</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--brand:#2E5BFF;--brand-2:#5B8DEF;--brand-soft:rgba(46,91,255,.10);
+--bg:#F4F6FB;--card:#FFFFFF;--line:#E9ECF3;--line-2:#F1F3F8;--ink:#141A2E;--muted:#697089;--faint:#9AA1B4;
+--verde:#16A34A;--verde-bg:rgba(22,163,74,.12);--exp:#E8734A;--exp-bg:#FDEFE7;--quente:#E03127;--morno:#C47A08}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:16px;overscroll-behavior:none}
+button{font-family:inherit;cursor:pointer;border:0}
+.topo{background:var(--card);border-bottom:1px solid var(--line);padding:16px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10}
+.topo h1{font-size:20px;font-weight:900;letter-spacing:-.01em}
+.topo .dia{color:var(--muted);font-size:15px;text-transform:capitalize}
+.topo .rel{margin-left:auto;font-size:26px;font-weight:900;font-variant-numeric:tabular-nums}
+.wrap{padding:20px 24px 60px;max-width:1100px;margin:0 auto}
+.bloco{margin-bottom:26px}
+.bloco h2{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.bloco h2 .n{background:var(--line-2);color:var(--ink);border-radius:99px;padding:2px 10px;font-size:12px}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.p{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:18px 20px;text-align:left;transition:.12s;min-height:104px;display:flex;flex-direction:column;justify-content:center}
+.p:active{transform:scale(.98)}
+.p .nome{font-size:19px;font-weight:800;line-height:1.2}
+.p .sub{font-size:14px;color:var(--muted);margin-top:4px}
+.p .st{font-size:13px;font-weight:800;margin-top:8px;display:flex;align-items:center;gap:6px}
+.p.exp{border-color:#F3D3C4;background:var(--exp-bg)}
+.p.dentro{border-color:var(--verde);background:var(--verde-bg)}.p.dentro .st{color:var(--verde)}
+.p.saiu{opacity:.55}.p.saiu .st{color:var(--muted)}
+.p .tag{display:inline-block;font-size:11px;font-weight:800;padding:2px 9px;border-radius:99px;background:var(--exp);color:#fff;margin-top:8px;align-self:flex-start}
+.vazio{background:var(--card);border:2px dashed var(--line);border-radius:18px;padding:34px;text-align:center;color:var(--faint);font-size:16px;line-height:1.6}
+/* diálogo */
+.fundo{position:fixed;inset:0;background:rgba(20,26,46,.55);display:grid;place-items:center;padding:22px;z-index:50}
+.jan{background:var(--card);border-radius:24px;padding:28px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto}
+.jan h3{font-size:24px;font-weight:900;line-height:1.2}.jan p{color:var(--muted);font-size:16px;margin-top:6px;line-height:1.5}
+.op{display:grid;gap:10px;margin-top:20px}
+.op button{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:18px;font-size:17px;font-weight:700;color:var(--ink);text-align:left}
+.op button.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.op button.sim{border-color:var(--verde);color:var(--verde)}.op button.sim.on{background:var(--verde);color:#fff}
+.op button.nao{border-color:var(--quente);color:var(--quente)}.op button.nao.on{background:var(--quente);color:#fff}
+.caras{display:flex;gap:10px;justify-content:center;margin-top:18px}
+.caras button{font-size:38px;background:transparent;border:2px solid transparent;border-radius:16px;padding:8px 14px;line-height:1}
+.caras button.on{border-color:var(--brand);background:var(--brand-soft)}
+.acoes{display:flex;gap:10px;margin-top:24px}
+.acoes button{flex:1;border-radius:16px;padding:18px;font-size:17px;font-weight:800}
+.acoes .ok{background:var(--brand);color:#fff}.acoes .g{background:var(--line-2);color:var(--muted)}
+.acoes .ok:disabled{opacity:.45}
+.aviso{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:16px 24px;border-radius:16px;font-size:17px;font-weight:700;z-index:60;box-shadow:0 12px 40px rgba(20,26,46,.3)}
+.aviso.ok{background:var(--verde)}
+</style>
+</head>
+<body>
+<div class="topo"><h1>Check-in</h1><span class="dia" id="dia"></span><span class="rel" id="rel"></span></div>
+<div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
+<div id="modal"></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hh = t => String(t||'').slice(0,5);
+const hoje = () => new Date().toISOString().slice(0,10);
+const PAGTOS = ['Pix','cartão','boleto','recorrente'];
+const MOTIVOS = ['Precisa conversar em casa','Valor','Horário não bate','Distância','Criança não se adaptou','Só conhecendo'];
+let D = null, SEL = null, F = {};
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, ...extra }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
+}
+function aviso(txt, ok){ const el = document.createElement('div'); el.className = 'aviso' + (ok ? ' ok' : ''); el.textContent = txt; document.body.appendChild(el); setTimeout(() => el.remove(), 2600); }
+function relogio(){ const d = new Date(); document.getElementById('rel').textContent = d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('dia').textContent = d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}); }
+async function carregar(){ try { D = await api('recepcao'); desenhar(); } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; } }
+const presDe = (alunoId, agId) => (D.presencas||[]).find(x => (alunoId && x.aluno_id === alunoId) || (agId && x.agendamento_id === agId));
+const leadDe = a => (D.leads||[]).find(l => l.id === a.lead_id) || {};
+const agora = () => { const d = new Date(); return d.getHours()*60 + d.getMinutes(); };
+const emMin = t => { const [h,m] = String(t||'0:0').split(':').map(Number); return h*60 + (m||0); };
+
+function desenhar(){
+  const turmas = D.turmas || [];
+  // turma "de agora": começa daqui a até 30 min ou já começou e não terminou
+  const janela = t => agora() >= emMin(t.hora_inicio) - 30 && agora() <= emMin(t.hora_fim) + 15;
+  const doMomento = turmas.filter(janela); const outras = turmas.filter(t => !janela(t));
+  const exp = (D.agendamentos||[]);
+  const expAgora = exp.filter(a => agora() >= emMin(a.hora_inicio) - 30 && agora() <= emMin(a.hora_fim) + 15);
+  const expDepois = exp.filter(a => !expAgora.includes(a));
+  const bloco = (titulo, cards, extra) => cards.length ? `<div class="bloco"><h2>${titulo} <span class="n">${cards.length}</span>${extra||''}</h2><div class="grade">${cards.join('')}</div></div>` : '';
+  const cardExp = a => { const pr = presDe(null, a.id); const l = leadDe(a);
+    const cls = pr && pr.saida_em ? 'saiu' : pr ? 'dentro' : '';
+    return `<button class="p exp ${cls}" onclick="tocarExp('${a.id}')">
+      <div class="nome">${esc(a.crianca_nome || l.nome || 'Visitante')}</div>
+      <div class="sub">${hh(a.hora_inicio)}${a.crianca_idade?` · ${a.crianca_idade} anos`:''}${l.nome && a.crianca_nome ? ' · com ' + esc(l.nome.split(' ')[0]) : ''}</div>
+      <span class="tag">aula experimental</span>
+      ${pr ? `<div class="st">${pr.saida_em ? '✓ saiu ' + hh(new Date(pr.saida_em).toTimeString()) : '● dentro desde ' + hh(new Date(pr.entrada_em).toTimeString())}</div>` : ''}</button>`; };
+  const cardAluno = (al, t) => { const pr = presDe(al.id, null); const cls = pr && pr.saida_em ? 'saiu' : pr ? 'dentro' : '';
+    return `<button class="p ${cls}" onclick="tocarAluno('${al.id}')">
+      <div class="nome">${esc(al.nome_curto || al.nome)}</div>
+      <div class="sub">${hh(t.hora_inicio)}–${hh(t.hora_fim)}${al.kit?' · '+esc(al.kit):''}</div>
+      ${pr ? `<div class="st">${pr.saida_em ? '✓ saiu' : '● dentro'}</div>` : ''}</button>`; };
+  const alunosDe = t => (D.alunos||[]).filter(a => a.turma_id === t.id).map(a => cardAluno(a, t));
+
+  let html = '';
+  if (expAgora.length) html += bloco('Aula experimental — agora', expAgora.map(cardExp));
+  doMomento.forEach(t => { const c = alunosDe(t); if (c.length) html += bloco(`Turma ${hh(t.hora_inicio)}–${hh(t.hora_fim)} — agora`, c); });
+  if (expDepois.length) html += bloco('Experimentais de hoje', expDepois.map(cardExp));
+  outras.forEach(t => { const c = alunosDe(t); if (c.length) html += bloco(`Turma ${hh(t.hora_inicio)}–${hh(t.hora_fim)}`, c); });
+  document.getElementById('raiz').innerHTML = html || `<div class="vazio">Nenhuma aula hoje.<br>Bom descanso 😊</div>`;
+}
+
+// --- aluno ativo: um toque entra, outro sai ---
+async function tocarAluno(id){
+  const al = (D.alunos||[]).find(a => a.id === id); const pr = presDe(id, null);
+  if (pr && pr.saida_em) return aviso('Já registramos entrada e saída hoje.');
+  try { await api('checkin', { aluno_id: id, saida: !!pr }); await carregar();
+    aviso(pr ? `Até a próxima, ${(al.nome_curto||al.nome).split(' ')[0]}! 👋` : `Bem-vindo, ${(al.nome_curto||al.nome).split(' ')[0]}! 🤖`, true); }
+  catch(e){ aviso(e.message); }
+}
+// --- experimental: entra igual; na saída abre o feedback ---
+async function tocarExp(id){
+  const a = (D.agendamentos||[]).find(x => x.id === id); const pr = presDe(null, id);
+  if (pr && pr.saida_em) return aviso('Essa visita já foi finalizada.');
+  if (!pr) { try { await api('checkin', { agendamento_id: id }); await carregar(); aviso(`Bem-vindo, ${(a.crianca_nome||'').split(' ')[0] || 'visitante'}! 🤖`, true); } catch(e){ aviso(e.message); } return; }
+  SEL = a; F = {}; janelaSaida();
+}
+function janelaSaida(){
+  const a = SEL; const nome = (a.crianca_nome||'').split(' ')[0] || 'a criança';
+  const passo = F.paga === false ? 'motivo' : F.paga === true ? 'pagamento' : F.nota == null ? 'nota' : 'paga';
+  let corpo = '';
+  if (passo === 'nota') corpo = `<p>Como foi a aula ${esc(nome)}?</p><div class="caras">${[['😞',1],['😐',3],['😀',5]].map(([e,v]) => `<button class="${F.nota===v?'on':''}" onclick="F.nota=${v};janelaSaida()">${e}</button>`).join('')}</div>`;
+  else if (passo === 'paga') corpo = `<p>A matrícula vai ser feita agora?</p><div class="op"><button class="sim ${F.paga===true?'on':''}" onclick="F.paga=true;janelaSaida()">Sim, vamos matricular 🎉</button><button class="nao ${F.paga===false?'on':''}" onclick="F.paga=false;janelaSaida()">Agora não</button></div>`;
+  else if (passo === 'pagamento') corpo = `<p>Como vai ser o pagamento?</p><div class="op">${PAGTOS.map(v => `<button class="${F.pagamento===v?'on':''}" onclick="F.pagamento='${v}';janelaSaida()">${v}</button>`).join('')}</div>`;
+  else corpo = `<p>O que pesou pra não fechar hoje?</p><div class="op">${MOTIVOS.map(v => `<button class="${F.motivo===v?'on':''}" onclick="F.motivo='${v}';janelaSaida()">${v}</button>`).join('')}</div>`;
+  const pronto = (passo === 'pagamento' && F.pagamento) || (passo === 'motivo' && F.motivo);
+  document.getElementById('modal').innerHTML = `<div class="fundo"><div class="jan">
+    <h3>Até logo, ${esc(nome)}! 👋</h3>${corpo}
+    <div class="acoes"><button class="g" onclick="fechar()">Voltar</button><button class="ok" onclick="confirmarSaida()" ${pronto?'':'disabled'}>${pronto?'Concluir':'…'}</button></div></div></div>`;
+}
+function fechar(){ document.getElementById('modal').innerHTML = ''; SEL = null; F = {}; }
+async function confirmarSaida(){
+  try { await api('feedback', { agendamento_id: SEL.id, nota: F.nota ?? null, paga_hoje: F.paga, motivo: F.motivo || null, pagamento: F.pagamento || null, atendente: 'recepção' });
+    fechar(); await carregar(); aviso(F.paga ? 'Matrícula registrada 🎉' : 'Obrigado! Registramos tudo.', true); }
+  catch(e){ aviso(e.message); }
+}
+relogio(); setInterval(relogio, 20000);
+if (!SLUG || !TOKEN) document.getElementById('raiz').innerHTML = '<div class="vazio">Abra pelo link da recepção.</div>';
+else { carregar(); setInterval(carregar, 45000); }
+</script>
+</body>
+</html>
