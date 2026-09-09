@@ -94,7 +94,7 @@
     document.getElementById('lp').innerHTML = `
       <div class="cab"><div class="av">${esc(ini)}</div>
         <div style="min-width:0"><h3>${esc(l.nome || 'Sem nome')}</h3>
-          <div class="sub">${esc(l.contato || '')}${l.temperatura ? ' · ' + esc(l.temperatura) : ''}${l.atendente ? ' · ' + esc(l.atendente) : ''}${etAtual ? ' · ' + esc(etAtual.nome) : ''}${l.kommo_lead_id ? ` · <a class="lnk" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Kommo ↗</a>` : ''}</div></div>
+          <div class="sub">${l.contato ? `<a class="lnk" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">${esc(l.contato)}</a>` : ''}${l.crianca ? ' · ' + esc(l.crianca) + (l.idade ? `, ${l.idade}` : '') : ''}${l.temperatura ? ' · ' + esc(l.temperatura) : ''}${l.atendente ? ' · ' + esc(l.atendente) : ''}${etAtual ? ' · ' + esc(etAtual.nome) : ''}${l.kommo_lead_id ? ` · <a class="lnk" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Kommo ↗</a>` : ''}</div></div>
         <button class="x" onclick="LeadPainel.fechar()" title="Fechar">×</button></div>
       <div class="abas">${abas.map(([k,t]) => `<button class="${S.aba===k?'on':''}" onclick="LeadPainel.aba('${k}')">${t}</button>`).join('')}</div>
       ${S.aba === 'conversa' ? vConversa(l, et) : S.aba === 'dados' ? vDados(l, et) : vAgendar(l)}`;
@@ -228,6 +228,27 @@
       <div class="acs"><button class="btn" onclick="LeadPainel.confirmarAgenda('${v.turma_id}','${v.data}')">Agendar nessa</button><button class="btn g" onclick="LeadPainel.idx('${tipo}',${idx+1},${lista.length})" ${idx>=lista.length-1?'disabled':''}>Outra →</button>${idx>0?`<button class="btn g" onclick="LeadPainel.idx('${tipo}',${idx-1},${lista.length})">←</button>`:''}</div></div>`;
   }
   function idx(t, i, n) { S.idx[t] = Math.max(0, Math.min(i, n-1)); desenhar(); }
+  function historico(l) {
+    const ags = (S.info && S.info.agendamentos || []).slice().sort((a,b) => (b.data||'').localeCompare(a.data||''));
+    const pres = S.info?.presencas || [], mats = S.info?.matriculas || [], al = S.info?.aluno;
+    if (!ags.length && !mats.length && !al) return '';
+    const dfc = a => { const m = /desfecho:\s*(matriculou|nao|andamento|faltou)(?:\s*·\s*(.*))?/i.exec(a.observacao||''); return m ? { t:m[1].toLowerCase(), obs:(m[2]||'').trim() } : null; };
+    const linha = a => {
+      const p = pres.find(x => x.agendamento_id === a.id); const d = dfc(a);
+      const chip = a.status === 'faltou' ? '<b style="color:var(--quente,#E03127)">faltou</b>'
+        : d && d.t === 'matriculou' ? '<b style="color:var(--verde,#16A34A)">matriculou</b>'
+        : d && d.t === 'nao' ? `<b style="color:var(--quente,#E03127)">não fechou</b>${d.obs?' · '+esc(d.obs):''}`
+        : d && d.t === 'andamento' ? '<b style="color:var(--morno,#C47A08)">em andamento</b>'
+        : a.status === 'cancelado' ? '<span style="color:var(--faint)">cancelada</span>' : esc(a.status);
+      const presTxt = p ? `${p.entrada_em ? 'entrou ' + new Date(p.entrada_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : ''}${p.saida_em ? ' · saiu ' + new Date(p.saida_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : ''}${p.feedback ? ' · ' + '⭐'.repeat(p.feedback) : ''}${p.comentario ? ' · “' + esc(p.comentario) + '”' : ''}` : '<span style="color:var(--faint)">sem registro de presença</span>';
+      return `<div class="ag-item" style="display:block"><div>${nomeDia(a.data)} ${dataBR(a.data)} · ${hhmm(a.hora_inicio)}${a.crianca_nome?' · '+esc(a.crianca_nome):''} — ${chip}</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${presTxt}</div></div>`;
+    };
+    return `<div class="sec">Histórico</div>
+      ${al ? `<div class="ag-item"><span>Aluno: <b>${esc(al.nome)}</b>${al.kit?' · '+esc(al.kit):''}</span><span class="st">${esc(al.status)}</span></div>` : ''}
+      ${mats.map(m => `<div class="ag-item"><span>Matrícula ${m.fechada_em ? new Date(m.fechada_em+'T12:00').toLocaleDateString('pt-BR') : ''}${m.fechada_por?' · '+esc(m.fechada_por):''}</span><span class="st">${m.valor_bruto ? 'R$ ' + Number(m.valor_bruto).toLocaleString('pt-BR') : ''}</span></div>`).join('')}
+      ${ags.map(linha).join('')}`;
+  }
   function vAgendar(l) {
     const ag = (S.info && S.info.agendamentos || []).filter(a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para);
     return `<div class="corpo">
@@ -237,7 +258,8 @@
       <div class="sec">2 · Kit</div><div class="chips"><span class="chip on">First</span><span class="chip" style="border:0;color:var(--faint)">a experimental é sempre no First; o nivelamento é no dia</span></div>
       <div class="sec">3 · Ofereça duas opções</div>
       ${!S.agenda ? `<div class="aviso-p">Buscando vagas…</div>` : S.agenda.erro ? `<div class="aviso-p">${esc(S.agenda.erro)}</div>` : cardVaga('manha','Manhã') + cardVaga('tarde','Tarde') + cardVaga('sab','Sábado')}
-      <div class="aviso-p" style="margin-top:10px;border:0;padding:6px 0;text-align:left">Estoque atualiza sozinho a cada minuto e a cada aula marcada.</div></div>`;
+      <div class="aviso-p" style="margin-top:10px;border:0;padding:6px 0;text-align:left">Estoque atualiza sozinho a cada minuto e a cada aula marcada.</div>
+      ${historico(l)}</div>`;
   }
   async function confirmarAgenda(turmaId, data) {
     const l = S.lead; const crianca = document.getElementById('lp-a-cri').value.trim(), idade = document.getElementById('lp-a-id').value;

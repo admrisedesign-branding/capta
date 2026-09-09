@@ -206,7 +206,7 @@ const leadDe = a => (D?.leads||[]).find(l => l.id === a.lead_id) || {};
 function pessoas(){
   if (!D) return [];
   const out = (D.agendamentos||[]).map(a => { const pr = pres(null, a.id); const l = leadDe(a);
-    return { tipo:'exp', id:a.id, nome:a.crianca_nome || l.nome || 'Visitante', sub:`aula experimental · ${hh(a.hora_inicio)}${a.crianca_idade?` · ${a.crianca_idade} anos`:''}`, dentro: !!pr && !pr.saida_em, fim: !!(pr && pr.saida_em) };
+    return { tipo:'exp', id:a.id, nome:a.crianca_nome || l.nome || 'Visitante', sub:`aula experimental · ${hh(a.hora_inicio)}${a.crianca_idade?` · ${a.crianca_idade} anos`:''}${l.nome?` · com ${primeiro(l.nome)}`:''}`, dentro: !!pr && !pr.saida_em, fim: !!(pr && pr.saida_em) };
   });
   for (const t of (D.turmas||[])) for (const al of (D.alunos||[]).filter(x => x.turma_id === t.id)) {
     const pr = pres(al.id); out.push({ tipo:'aluno', id:al.id, nome: al.nome_curto || al.nome, sub:`turma ${hh(t.hora_inicio)}${al.kit?` · ${al.kit}`:''}`, dentro: !!pr && !pr.saida_em, fim: !!(pr && pr.saida_em) });
