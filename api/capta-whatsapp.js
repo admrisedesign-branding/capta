@@ -85,7 +85,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -112,6 +112,7 @@ module.exports = async function handler(req, res) {
         case 'evento_leads':  return await acaoEventoLeads(tenant, body, res);
         case 'casar_conversas': return await acaoCasarConversas(tenant, body, res);
         case 'sem_data':      return await acaoSemData(tenant, body, res);
+        case 'saude':         return await acaoSaude(tenant, body, res);
       }
     }
 
@@ -280,6 +281,10 @@ async function acaoEnviar(tenant, canal, body, res) {
     }))[0];
   }
 
+  if (conversa && body.autor && body.autor !== 'bot') {
+    const dono = (await sb(`capta_conversas?id=eq.${conversa.id}&select=atendente&limit=1`).catch(() => []))?.[0]?.atendente;
+    if (dono && dono !== body.autor && !body.forcar) return res.status(409).json({ erro: `${dono} está atendendo esta conversa. Quer assumir mesmo assim?`, atendente: dono, confirmar: true });
+  }
   const envio = await prov.enviarTexto(canal, telefone, texto);
   if (body.autor !== 'bot') { const cl = await sb(`capta_conversas?id=eq.${conversa.id}&select=lead_id&limit=1`).catch(() => []); contatoHumano(tenant.id, cl?.[0]?.lead_id).catch(() => null); }
 
@@ -694,7 +699,7 @@ async function empurrarKommo(tenantId, leadId, etapaId, motivo) {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ status_id: Number(etapa.kommo_status_id), ...(lead.kommo_pipeline ? { pipeline_id: Number(lead.kommo_pipeline) } : {}) })
   });
-  if (!r.ok) throw new Error(`Kommo ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) { const t = await r.text(); await registrarFalha(tenantId, 'kommo', `mover etapa: ${r.status} ${t.slice(0,200)}`); throw new Error(`Kommo ${r.status}: ${t.slice(0, 200)}`); }
   if (motivo) {
     await fetch(`https://${dominio}/api/v4/leads/${lead.kommo_lead_id}/notes`, {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -756,7 +761,7 @@ async function kommoCampos(tenantId, leadId, valores) {
     method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ custom_fields_values: cfv })
   });
-  if (!r.ok) throw new Error(`Kommo ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) { const t = await r.text(); await registrarFalha(tenantId, 'kommo', `campos: ${r.status} ${t.slice(0,200)}`); throw new Error(`Kommo ${r.status}: ${t.slice(0, 200)}`); }
   return { campos: cfv.length };
 }
 
@@ -939,6 +944,13 @@ async function acaoDesfazer(tenant, body, res) {
 // ---------------------------------------------------------------------
 async function acaoConversaAtualizar(tenant, body, res) {
   const id = (body.conversa_id || '').trim(); if (!id) return res.status(400).json({ erro: 'Informe conversa_id.' });
+  // assumir: só entra se estiver livre (ou for a própria pessoa) — evita dois atendentes na mesma conversa
+  if (body.assumir) {
+    const c = (await sb(`capta_conversas?id=eq.${id}&tenant_id=eq.${tenant.id}&select=atendente&limit=1`))?.[0];
+    if (c && c.atendente && c.atendente !== body.assumir) return res.status(409).json({ erro: `${c.atendente} está atendendo esta conversa.`, atendente: c.atendente });
+    await sb(`capta_conversas?id=eq.${id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ atendente: body.assumir }) });
+    return res.status(200).json({ ok: true, atendente: body.assumir });
+  }
   const patch = {};
   if (body.atendente !== undefined) patch.atendente = body.atendente || null;
   if (body.resolvida === true) patch.resolvida_em = new Date().toISOString();
@@ -1182,6 +1194,28 @@ async function acaoSemData(tenant, body, res) {
     comAula = new Set((ags || []).map(a => a.lead_id));
   }
   return res.status(200).json({ leads: (leads || []).filter(l => !comAula.has(l.id)) });
+}
+
+
+// ---------------------------------------------------------------------
+// SAÚDE — o painel avisa quando o WhatsApp cai ou o Kommo recusa
+// ---------------------------------------------------------------------
+async function registrarFalha(tenantId, onde, mensagem) {
+  await sb('capta_falhas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    tenant_id: tenantId, onde, mensagem: String(mensagem || '').slice(0, 400), criado_em: new Date().toISOString() }) }).catch(() => null);
+}
+async function acaoSaude(tenant, body, res) {
+  const canal = (await sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&select=id,status,numero,atualizado_em,instancia_id,instancia_token,client_token&limit=1`).catch(() => []))?.[0];
+  let whats = { conectado: false, status: canal?.status || 'sem canal' };
+  if (canal) {
+    try { const st = await prov.obterStatus(canal); whats = { conectado: st.status === 'conectado', status: st.status, numero: canal.numero };
+      if (st.status !== canal.status) await sb(`capta_canais?id=eq.${canal.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: st.status, atualizado_em: new Date().toISOString() }) }).catch(() => null);
+      if (st.status !== 'conectado') await registrarFalha(tenant.id, 'whatsapp', 'canal ' + st.status);
+    } catch (e) { whats = { conectado: false, status: 'erro', erro: e.message }; await registrarFalha(tenant.id, 'whatsapp', e.message); }
+  }
+  const falhas = await sb(`capta_falhas?tenant_id=eq.${tenant.id}&criado_em=gte.${new Date(Date.now() - 864e5).toISOString()}&select=onde,mensagem,criado_em&order=criado_em.desc&limit=20`).catch(() => []);
+  const kommo = !!process.env.KOMMO_TOKEN;
+  return res.status(200).json({ whatsapp: whats, kommo, falhas: falhas || [] });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
