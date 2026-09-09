@@ -74,6 +74,31 @@ tr:last-child td{border-bottom:0}
 .fe.ganho .bar i{background:var(--verde)} .fe.perda .bar i{background:var(--faint)}
 .fe .q{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
 
+
+.conv{display:flex;flex-direction:column;gap:8px}
+.cv{display:grid;grid-template-columns:170px 1fr 130px;align-items:center;gap:10px;font-size:13px}
+.cv .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cv .bar{height:22px;background:var(--line-2);border-radius:6px;overflow:hidden;position:relative}
+.cv .bar i{display:block;height:100%;background:var(--brand-2);border-radius:6px}
+.cv .bar b{position:absolute;left:8px;top:0;line-height:22px;font-size:11.5px;color:#fff;font-weight:800}
+.cv .taxa{text-align:right;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cv .taxa b{color:var(--ink)}
+.cv.perde .bar i{background:var(--faint)}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.meta{grid-template-columns:1fr}}
+.mt{border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.mt .lb{font-size:12px;font-weight:700;color:var(--muted)}
+.mt .vl{font-size:24px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
+.mt .barra{height:10px;border-radius:99px;background:var(--line-2);margin-top:10px;overflow:hidden}
+.mt .barra i{display:block;height:100%;border-radius:99px;background:var(--verde)}
+.mt .barra i.baixo{background:var(--morno)}.mt .barra i.critico{background:var(--quente)}
+.mt .obs{font-size:12px;color:var(--faint);margin-top:6px}
+.mt input{width:110px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px;font-family:inherit;margin-left:6px}
+.tempo{display:flex;gap:20px;flex-wrap:wrap;margin-top:4px}
+.tempo div b{font-size:20px;font-weight:800;display:block;font-variant-numeric:tabular-nums}
+.tempo div small{font-size:11.5px;color:var(--muted);font-weight:600}
+.delta{font-size:11.5px;font-weight:700;margin-left:6px}
+.delta.up{color:var(--verde)}.delta.down{color:var(--quente)}
 .vazio{color:var(--faint);text-align:center;padding:22px;font-size:13px;line-height:1.6}
 .aviso{margin:20px 26px 0;border:1px dashed var(--line);border-radius:var(--r);padding:36px;text-align:center;color:var(--faint);font-size:13.5px;line-height:1.7}
 .nota{font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.5}
@@ -180,6 +205,10 @@ function montarMeses(){
   sel.onchange = render;
 }
 
+const dias = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 864e5));
+const META_K = 'capta_meta_' + SLUG;
+function metas(){ try { return JSON.parse(localStorage.getItem(META_K) || '{}'); } catch(e){ return {}; } }
+function salvarMeta(campo, v){ const m = metas(); m[campo] = Number(v) || 0; try { localStorage.setItem(META_K, JSON.stringify(m)); } catch(e){} render(); }
 function conta(arr, fn){ const m = new Map(); for(const x of arr){ const k = fn(x) || '—'; m.set(k,(m.get(k)||0)+1); } return m; }
 const ganhou = l => !!l.ganho_em || l.status === 'fechado' || /venda ganha|aluno ativo|matriculado/i.test(l.etapa_nome || '');
 const agendou = l => !!l.data_aula || /aula agendada|matr[ií]cula|aluno/i.test(l.etapa_nome||'') || ganhou(l);
@@ -217,7 +246,9 @@ function render(){
       ${linhas.length ? `<table><tr><th>${titulo}</th><th>Leads</th><th class="n">Matr.</th></tr>
       ${linhas.map(([nome,q]) => {
         const mq = doMes.filter(l => ((titulo==='Por onde veio' ? (l.fonte || (l.origem && l.origem!=='kommo' ? l.origem : null) || 'não informado') : (l.porta || 'não informado')) === nome) && ganhou(l)).length;
-        return `<tr><td>${esc(nome)}</td><td><div style="display:flex;align-items:center"><div class="bar" style="flex:1"><i style="width:${q/max*100}%"></i></div><span class="pct">${q}</span></div></td><td class="n">${mq}</td></tr>`;
+        const antQ = ant ? ant.filter(l => ((titulo==='Por onde veio' ? (l.fonte || (l.origem && l.origem!=='kommo' ? l.origem : null) || 'não informado') : (l.porta || 'não informado')) === nome)).length : null;
+        const d = antQ === null ? '' : q - antQ ? `<span class="delta ${q>antQ?'up':'down'}">${q>antQ?'+':''}${q-antQ}</span>` : '';
+        return `<tr><td>${esc(nome)}${d}</td><td><div style="display:flex;align-items:center"><div class="bar" style="flex:1"><i style="width:${q/max*100}%"></i></div><span class="pct">${q}</span></div></td><td class="n">${mq}</td></tr>`;
       }).join('')}
       <tr class="tot"><td>Total</td><td class="n">${leads}</td><td class="n">${mat}</td></tr></table>` : `<div class="vazio">Sem leads neste período.</div>`}
     </div>`;
@@ -276,6 +307,63 @@ function render(){
               return bate && ganhou(l); }).length;
             return `<tr><td>${esc(NOME[c]||c)}</td><td class="n">${brl(v)}</td><td class="n">${nl||'—'}</td><td class="n">${nl?brl(v/nl):'—'}</td><td class="n">${nm||'—'}</td><td class="n">${nm?brl(v/nm):'—'}</td></tr>`; }).join('')}
           </table></div>`; })()}
+      ${(() => {
+        // ---- conversão entre etapas: de todos os leads do período, quantos chegaram a cada estágio
+        const passouContato = l => !!l.etapa_nome && !/novo lead|incoming/i.test(l.etapa_nome) || l.status !== 'novo';
+        const passouQualif  = l => /qualificado|aula agendada|matr|aluno|venda ganha/i.test(l.etapa_nome||'') || agendou(l) || ganhou(l);
+        const passouAula    = l => agendou(l);
+        const passouMat     = l => ganhou(l);
+        const etapasFunil = [['Entrou', doMes.length, null], ['Teve contato', doMes.filter(passouContato).length, doMes.length],
+          ['Qualificado', doMes.filter(passouQualif).length, doMes.filter(passouContato).length],
+          ['Aula marcada', doMes.filter(passouAula).length, doMes.filter(passouQualif).length],
+          ['Matriculou', doMes.filter(passouMat).length, doMes.filter(passouAula).length]];
+        const max = doMes.length || 1;
+        return `<div class="card full"><h3>Do primeiro contato à matrícula</h3><div class="h">Quantos leads chegam em cada estágio — e quanto se perde no caminho</div>
+          <div class="conv">${etapasFunil.map(([nome, n, base]) => `<div class="cv ${base && n/base < .4 ? 'perde' : ''}">
+            <span class="nm">${nome}</span><div class="bar"><i style="width:${Math.max(n/max*100, n?6:0)}%"></i><b>${n}</b></div>
+            <span class="taxa">${base ? `<b>${Math.round(n/base*100)}%</b> do anterior · ${Math.round(n/max*100)}% do total` : '100%'}</span></div>`).join('')}</div>
+          ${(() => { const pior = etapasFunil.slice(1).filter(e => e[2]).sort((a,b) => (a[1]/a[2]) - (b[1]/b[2]))[0];
+            return pior ? `<div class="nota" style="margin-top:12px">Maior perda: <b>${pior[0].toLowerCase()}</b> — só ${Math.round(pior[1]/pior[2]*100)}% do estágio anterior avança. É onde mexer primeiro.</div>` : ''; })()}
+        </div>`; })()}
+
+      ${(() => {
+        // ---- tempo médio até cada marco
+        const comAula = doMes.filter(l => l.data_aula && dataLead(l));
+        const comMat  = doMes.filter(l => l.ganho_em && dataLead(l));
+        const contatados = doMes.filter(l => l.etapa_em && dataLead(l) && !/novo lead|incoming/i.test(l.etapa_nome||''));
+        const med = arr => arr.length ? Math.round(arr.reduce((s,x) => s + x, 0) / arr.length) : null;
+        const tContato = med(contatados.map(l => dias(dataLead(l), l.etapa_em)));
+        const tAula = med(comAula.map(l => dias(dataLead(l), l.data_aula)));
+        const tMat = med(comMat.map(l => dias(dataLead(l), l.ganho_em)));
+        const parados = doMes.filter(l => !ganhou(l) && l.etapa_em && dias(l.etapa_em, new Date()) >= 7).length;
+        if (tContato === null && tAula === null && tMat === null) return '';
+        return `<div class="card"><h3>Quanto tempo leva</h3><div class="h">Da entrada do lead até cada passo</div>
+          <div class="tempo">
+            ${tContato !== null ? `<div><b>${tContato}d</b><small>até o primeiro contato</small></div>` : ''}
+            ${tAula !== null ? `<div><b>${tAula}d</b><small>até a aula</small></div>` : ''}
+            ${tMat !== null ? `<div><b>${tMat}d</b><small>até a matrícula</small></div>` : ''}
+            <div><b>${parados}</b><small>parados há 7+ dias</small></div>
+          </div></div>`; })()}
+
+      ${(() => {
+        // ---- meta do mês
+        const m = metas(); const alvoM = m.matriculas || 0, alvoR = m.receita || 0;
+        const pc = (v, a) => a ? Math.min(100, Math.round(v / a * 100)) : 0;
+        const cls = p => p >= 80 ? '' : p >= 50 ? 'baixo' : 'critico';
+        const diaDoMes = new Date().getDate(), diasMes = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate();
+        const ritmo = alvoM ? Math.round(alvoM * diaDoMes / diasMes) : 0;
+        return `<div class="card"><h3>Meta do mês</h3><div class="h">Defina o alvo e acompanhe o ritmo${k ? '' : ' — escolha um mês no topo'}</div>
+          <div class="meta">
+            <div class="mt"><div class="lb">Matrículas <input type="number" min="0" value="${alvoM||''}" placeholder="meta" onchange="salvarMeta('matriculas', this.value)"></div>
+              <div class="vl">${mat}${alvoM?` <span style="font-size:15px;color:var(--faint)">de ${alvoM}</span>`:''}</div>
+              ${alvoM?`<div class="barra"><i class="${cls(pc(mat,alvoM))}" style="width:${pc(mat,alvoM)}%"></i></div>
+              <div class="obs">${mat >= alvoM ? 'meta batida 🎉' : `faltam ${alvoM-mat}${k===chave(new Date())?` · pro ritmo do mês deveria estar em ${ritmo}`:''}`}</div>`:'<div class="obs">defina a meta ao lado</div>'}</div>
+            <div class="mt"><div class="lb">Receita <input type="number" min="0" step="500" value="${alvoR||''}" placeholder="meta" onchange="salvarMeta('receita', this.value)"></div>
+              <div class="vl">${brl(rec)}${alvoR?` <span style="font-size:15px;color:var(--faint)">de ${brl(alvoR)}</span>`:''}</div>
+              ${alvoR?`<div class="barra"><i class="${cls(pc(rec,alvoR))}" style="width:${pc(rec,alvoR)}%"></i></div>
+              <div class="obs">${rec >= alvoR ? 'meta batida 🎉' : `faltam ${brl(alvoR-rec)}`}</div>`:'<div class="obs">defina a meta ao lado</div>'}</div>
+          </div></div>`; })()}
+
       ${funil}
       ${quem}
       ${temp}
