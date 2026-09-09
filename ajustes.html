@@ -115,7 +115,7 @@ function desenharConta(){
   document.getElementById('raiz').innerHTML = `
     <div class="bloco"><h3>Sua conta</h3>
       <div class="h">${eu.nome ? `Você está como <b>${esc(eu.nome)}</b> (${esc((PAPEIS[eu.papel]||{}).nome||eu.papel)}) · ${esc(eu.email)}` : 'Você entrou pelo link do painel, sem login pessoal.'}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn g" style="text-decoration:none" href="/login.html">Trocar de conta</a><button class="btn g" onclick="CaptaUser.sair();location.reload()">Esquecer neste navegador</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn g" style="text-decoration:none" href="/login.html">Trocar de conta</a><button class="btn g" onclick="CaptaUser.sair();try{localStorage.removeItem('capta_destino')}catch(e){};location.reload()">Esquecer neste navegador</button></div>
       <div class="dica">A senha é do próprio e-mail: mude em <b>login.html → esqueci minha senha</b>.</div></div>
     <div class="bloco"><h3>Negócio</h3><div class="h">Painel: <b>${esc(SLUG)}</b></div>
       <div class="dica">Para conectar ou trocar o WhatsApp da unidade, use o botão <b>Conectar WhatsApp</b> no topo do painel.</div></div>`;

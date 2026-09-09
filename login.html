@@ -167,6 +167,10 @@ async function route(){
   try{
     const r = await fetch('/api/capta-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ access_token: session.access_token }) });
     const d = await r.json();
+    if(d.role==='escolher'){ let lembrado=null; try{ lembrado=localStorage.getItem('capta_destino'); }catch(e){}
+      const ok = lembrado && d.destinos.some(x => x.url.split('&u=')[0] === lembrado.split('&u=')[0]);
+      if (ok) { location.replace(d.destinos.find(x => x.url.split('&u=')[0] === lembrado.split('&u=')[0]).url); return; }
+      escolherNegocio(d.destinos); return; }
     if(d.role==='admin' || d.role==='client'){ location.replace(d.url); return; }
     if(d.role==='new'){ show('onboarding-view'); return; }
     $('na-email').textContent = session.user.email || '';
@@ -222,6 +226,28 @@ function traduz(m){
     show('auth-view');
   }
 })();
+
+// Mais de um acesso (negócio próprio + equipe de outro): a pessoa escolhe
+function escolherNegocio(destinos){
+  const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(20,26,46,.5);display:grid;place-items:center;padding:20px;z-index:90;font-family:inherit';
+  box.innerHTML = `<div style="background:#fff;border-radius:20px;padding:26px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(20,26,46,.25)">
+    <h3 style="font-size:19px;font-weight:800;margin:0">Onde você quer entrar?</h3>
+    <p style="color:#697089;font-size:13.5px;margin:6px 0 16px;line-height:1.5">Seu e-mail tem acesso a mais de um lugar.</p>
+    ${destinos.map((d,i) => `<button data-i="${i}" style="width:100%;text-align:left;border:2px solid #E9ECF3;background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:inherit">
+      <b style="display:block;font-size:15.5px">${esc(d.nome)}</b>
+      <span style="color:#697089;font-size:13px">${esc(d.papel || (d.tipo === 'admin' ? 'Administração' : 'Acesso'))}</span></button>`).join('')}
+    <label style="display:flex;align-items:center;gap:8px;color:#697089;font-size:13px;margin-top:6px"><input type="checkbox" id="lembrar-neg"> lembrar minha escolha neste aparelho</label>
+  </div>`;
+  document.body.appendChild(box);
+  box.querySelectorAll('[data-i]').forEach(b => b.onclick = () => {
+    const d = destinos[+b.dataset.i];
+    if (document.getElementById('lembrar-neg').checked) { try { localStorage.setItem('capta_destino', d.url); } catch(e){} }
+    location.replace(d.url);
+  });
+}
+
 </script>
 </body>
 </html>
