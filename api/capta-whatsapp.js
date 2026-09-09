@@ -1253,7 +1253,8 @@ async function acaoCheckin(tenant, body, res) {
     reg = (await sb('capta_presencas', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
       tenant_id: tenant.id, data: dia, aluno_id: aluno_id || null, agendamento_id: agendamento_id || null, entrada_em: agora }) }))[0];
   } else if (saida || (ja.entrada_em && !ja.saida_em && saida !== false)) {
-    await sb(`capta_presencas?id=eq.${ja.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ saida_em: agora }) });
+    const extra = {}; if (body.nota != null) extra.feedback = Number(body.nota); if (body.comentario) extra.comentario = String(body.comentario).slice(0, 400);
+    await sb(`capta_presencas?id=eq.${ja.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ saida_em: agora, ...extra }) });
     reg = { ...ja, saida_em: agora };
   } else reg = ja;
   // aula experimental: entrar marca presença no agendamento
