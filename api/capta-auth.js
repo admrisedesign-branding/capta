@@ -105,32 +105,37 @@ module.exports = async function handler(req, res) {
   }
 
   // ---------- ROTEAMENTO ----------
+  // Junta tudo a que este e-mail tem acesso: admin, negócios próprios e equipes.
+  const destinos = [];
   try {
-    // comparação EXATA (eq), não ilike — ilike sem escapar curinga pode dar match indevido.
-    // email já vem normalizado em minúsculas; filtramos exatamente por ele.
     const admins = await sbRest(`capta_admins?email=eq.${esc}&select=email`);
-    if (admins && admins.length) return res.status(200).json({ role: 'admin', url: '/admin.html' });
+    if (admins && admins.length) destinos.push({ tipo: 'admin', nome: 'Administração da RISE', url: '/admin.html' });
   } catch (e) {}
 
   try {
-    const t = await tenantDoDono();
-    if (t && t.dashboard_token) {
-      return res.status(200).json({ role: 'client', url: `/dashboard.html?t=${encodeURIComponent(t.slug)}&k=${encodeURIComponent(t.dashboard_token)}` });
+    const meus = await sbRest(`capta_tenants?owner_email=eq.${esc}&select=id,nome,slug,dashboard_token,ativo`);
+    for (const t of meus || []) if (t.dashboard_token) destinos.push({
+      tipo: 'dono', nome: t.nome || t.slug, slug: t.slug, papel: 'Seu negócio',
+      url: `/dashboard.html?t=${encodeURIComponent(t.slug)}&k=${encodeURIComponent(t.dashboard_token)}&e=${esc}` });
+  } catch (e) {}
+
+  try {
+    const us = await sbRest(`capta_usuarios?email=eq.${esc}&ativo=is.true&select=id,nome,papel,tenant_id`);
+    for (const u of us || []) {
+      if (destinos.some(d => d.tenantId === u.tenant_id)) continue;
+      const t = await sbRest(`capta_tenants?id=eq.${u.tenant_id}&select=id,nome,slug,dashboard_token,ativo&limit=1`);
+      const tt = t && t[0];
+      if (!tt || !tt.dashboard_token) continue;
+      if (destinos.some(d => d.slug === tt.slug)) continue;
+      await fetch(`${SUPABASE_URL}/rest/v1/capta_usuarios?id=eq.${u.id}`, { method: 'PATCH', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ ultimo_acesso: new Date().toISOString() }) }).catch(() => {});
+      const papeis = { gestor: 'Gestor', dono: 'Gestor', atendente: 'Atendente', secretaria: 'Secretaria', leitura: 'Só leitura' };
+      destinos.push({ tipo: 'equipe', tenantId: tt.id, nome: tt.nome || tt.slug, slug: tt.slug, papel: papeis[u.papel] || u.papel,
+        url: `/dashboard.html?t=${encodeURIComponent(tt.slug)}&k=${encodeURIComponent(tt.dashboard_token)}&u=${encodeURIComponent(u.nome || email.split('@')[0])}&papel=${encodeURIComponent(u.papel || 'atendente')}&e=${esc}` });
     }
   } catch (e) {}
 
-  // ---------- EQUIPE: usuário convidado para um negócio (capta_usuarios) ----------
-  try {
-    const u = await sbRest(`capta_usuarios?email=eq.${esc}&ativo=is.true&select=id,nome,papel,tenant_id&limit=1`);
-    if (u && u[0]) {
-      const t = await sbRest(`capta_tenants?id=eq.${u[0].tenant_id}&select=slug,dashboard_token,ativo&limit=1`);
-      if (t && t[0] && t[0].dashboard_token) {
-        await fetch(`${SUPABASE_URL}/rest/v1/capta_usuarios?id=eq.${u[0].id}`, { method: 'PATCH', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ ultimo_acesso: new Date().toISOString() }) }).catch(() => {});
-        const nome = encodeURIComponent(u[0].nome || email.split('@')[0]);
-        return res.status(200).json({ role: 'client', url: `/dashboard.html?t=${encodeURIComponent(t[0].slug)}&k=${encodeURIComponent(t[0].dashboard_token)}&u=${nome}&papel=${encodeURIComponent(u[0].papel || 'atendente')}&e=${esc}` });
-      }
-    }
-  } catch (e) {}
+  if (destinos.length === 1) return res.status(200).json({ role: destinos[0].tipo === 'admin' ? 'admin' : 'client', url: destinos[0].url });
+  if (destinos.length > 1) return res.status(200).json({ role: 'escolher', destinos });
 
   return res.status(200).json({ role: 'new', email });
 };
