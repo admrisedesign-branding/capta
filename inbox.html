@@ -311,6 +311,7 @@ async function abrir(id) {
         <div class="painel-acoes">
           <div class="robo ${conversa.agente_ativo ? 'on' : 'off'}"><span class="ponto"></span>${conversa.agente_ativo ? 'Robô' : 'Você'}</div>
           <select onchange="atribuir('${conversa.id}', this.value)" title="Quem está atendendo"><option value="">— atendente —</option>${ATEND.map(a=>`<option ${conversa.atendente===a?'selected':''}>${a}</option>`).join('')}</select>
+          ${conversa.atendente && conversa.atendente !== FI.eu ? `<button style="border-color:var(--morno);color:var(--morno)" onclick="assumir('${conversa.id}','${FI.eu||''}')" title="${esc(conversa.atendente)} está nesta conversa">assumir</button>` : ''}
           ${conversa.resolvida_em ? `<button onclick="resolver('${conversa.id}', false)">Reabrir</button>` : `<button class="ok" onclick="resolver('${conversa.id}', true)">Resolver ✓</button>`}
           <button onclick="importarTxt({ lead_id: ${conversa.lead ? `'${conversa.lead.id}'` : 'null'}, telefone: '${esc(conversa.telefone)}', depois: () => { abrir('${conversa.id}'); carregarLista(); } })" title="Importar histórico exportado do WhatsApp (.txt)">Importar .txt</button>
         </div>
@@ -471,6 +472,10 @@ async function previaImport(texto, opts){
   };
 }
 
+async function assumir(id, quem){
+  try { await api('conversa_atualizar', { conversa_id: id, assumir: quem }); toast('Você assumiu esta conversa', { tipo:'ok' }); await abrir(id); carregarLista(); }
+  catch(e){ if (/está atendendo/.test(e.message) && confirm(e.message + '\n\nAssumir mesmo assim?')) { await api('conversa_atualizar', { conversa_id: id, atendente: quem }); await abrir(id); carregarLista(); } else toast(e.message, { tipo:'erro' }); }
+}
 async function enviar() {
   const txt = document.getElementById('txt'), btn = document.getElementById('btn');
   const texto = txt.value.trim();
@@ -478,7 +483,8 @@ async function enviar() {
 
   btn.disabled = true; btn.textContent = 'Enviando…';
   try {
-    await api('enviar', { conversa_id: atual, texto, autor: (window.CaptaUser&&CaptaUser.nome())||'atendente' });
+    try { await api('enviar', { conversa_id: atual, texto, autor: (window.CaptaUser&&CaptaUser.nome())||'atendente' }); }
+    catch(err){ if (/está atendendo/.test(err.message)) { if (!confirm(err.message)) { txt.value = texto; throw err; } await api('enviar', { conversa_id: atual, texto, autor: (window.CaptaUser&&CaptaUser.nome())||'atendente', forcar: true }); } else throw err; }
     txt.value = ''; txt.style.height = 'auto'; toast('Enviado', { tipo:'ok', ms: 1500 });
     await abrir(atual);
     carregarLista();

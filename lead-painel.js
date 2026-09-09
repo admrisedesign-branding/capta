@@ -143,7 +143,11 @@
   async function enviar() {
     const ta = document.getElementById('lp-txt'); const texto = (ta.value||'').trim(); if (!texto || !S.lead) return;
     const btn = document.getElementById('lp-btn'); btn.disabled = true; ta.value = ''; ta.style.height = 'auto';
-    try { await api('enviar', { autor: EU() || 'atendente', ...(S.info?.conversa ? { conversa_id: S.info.conversa.id, texto } : { telefone: S.lead.contato, texto }) }); S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); say('Enviado', { tipo:'ok', ms:1500 }); }
+    try {
+      const base = { autor: EU() || 'atendente', ...(S.info?.conversa ? { conversa_id: S.info.conversa.id, texto } : { telefone: S.lead.contato, texto }) };
+      try { await api('enviar', base); }
+      catch (err) { if (/está atendendo/.test(err.message) && confirm(err.message)) await api('enviar', { ...base, forcar: true }); else throw err; }
+      S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); say('Enviado', { tipo:'ok', ms:1500 }); }
     catch (e) { say(e.message, { tipo:'erro' }); btn.disabled = false; }
   }
   async function atribuir(quem) { if (!S.info?.conversa) return; try { await api('conversa_atualizar', { conversa_id: S.info.conversa.id, atendente: quem }); S.info.conversa.atendente = quem || null; say(quem ? `Conversa com ${esc(quem)}` : 'Sem atendente'); } catch (e) { say(e.message, { tipo:'erro' }); } }

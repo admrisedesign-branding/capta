@@ -54,6 +54,8 @@ h2{font-size:16px;font-weight:700}
 .nav.pendente{visibility:hidden}
 .quem{font-size:11.5px;color:var(--muted);padding:6px 8px;line-height:1.4}.quem b{color:var(--ink)}.quem a{color:var(--brand);font-weight:700;text-decoration:none;cursor:pointer}
 .layout.mini .quem{display:none!important}
+#barra-alerta{position:fixed;top:0;left:0;right:0;z-index:100;background:#B3261E;color:#fff;font-size:13px;font-weight:600;padding:9px 16px;text-align:center}#barra-alerta a{color:#fff;text-decoration:underline;cursor:pointer;margin-left:8px}
+body:has(#barra-alerta) .topbar{top:36px}
 .badge-n{margin-left:auto;background:var(--quente,#E03127);color:#fff;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 7px;min-width:20px;text-align:center}
 .layout.mini .badge-n{position:absolute;top:4px;right:6px;margin:0;padding:1px 5px;font-size:9.5px}
 .conv-box{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -2889,6 +2891,19 @@ function montarMenuGestao(){
   function badgeConversas(n){ const b = document.querySelector('.nav-item[data-page="/inbox.html"]'); if(!b) return; let x = b.querySelector('.badge-n'); if(!n){ if(x) x.remove(); return; } if(!x){ x = document.createElement('span'); x.className='badge-n'; b.appendChild(x); } x.textContent = n > 99 ? '99+' : n; }
   async function pollNaoLidas(){ try { const r = await fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'conversas',slug:SLUG,token:TOKEN})}); if(!r.ok) return; const j = await r.json(); badgeConversas((j.conversas||[]).reduce((s,c)=>s+(c.nao_lidas||0),0)); } catch(e){} }
   pollNaoLidas(); setInterval(pollNaoLidas, 60000);
+  // saúde: avisa se o WhatsApp caiu (barra no topo) e destaca o botão
+  async function checarSaude(){
+    try {
+      const r = await fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'saude',slug:SLUG,token:TOKEN})});
+      if(!r.ok) return; const j = await r.json(); const bz = document.getElementById('btn-zap');
+      let barra = document.getElementById('barra-alerta');
+      if (j.whatsapp && j.whatsapp.conectado) { bz && bz.classList.add('on'); if(bz) bz.querySelector('span').textContent = 'WhatsApp conectado'; if (barra) barra.remove(); return; }
+      if (bz) { bz.classList.remove('on'); bz.querySelector('span').textContent = 'Conectar WhatsApp'; }
+      if (!barra) { barra = document.createElement('div'); barra.id = 'barra-alerta'; document.body.prepend(barra); }
+      barra.innerHTML = `<b>WhatsApp desconectado.</b> As mensagens não estão chegando nem saindo pelo Capta. <a onclick="document.getElementById('btn-zap').click()">reconectar</a>`;
+    } catch(e){}
+  }
+  checarSaude(); setInterval(checarSaude, 120000);
   // Conectar WhatsApp vira botão no canto superior direito (abre a tela embutida)
   const bz=document.getElementById('btn-zap');
   if(bz){ bz.style.display='inline-flex'; bz.onclick=()=>{ document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('on')); document.getElementById('page-title').textContent='Conectar WhatsApp'; activeTab='embed'; view.innerHTML=`<iframe class="embed" src="/whatsapp.html${qs}&embed=1" title="Conectar WhatsApp"></iframe>`; window.scrollTo(0,0); };

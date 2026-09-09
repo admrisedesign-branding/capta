@@ -124,6 +124,7 @@ const ROT = { quente: ['Quer fechar','q'], morno: ['Considerando','m'], frio: ['
 const MOTIVOS = ['Orçamento','Horário não bate','Vai pensar','Distância','Criança não se adaptou','Só pesquisando'];
 const PAGTOS = ['Pix','cartão','boleto','recorrente'];
 const KITS = ['First','OneBot','TechBot','Autobot','App Developer','GameBot'];
+let SAUDE = null;
 let D = { aulas: [], leadsAula: [], turmas: [], leads: [], etapas: [], conversas: [], vagas: [] };
 
 async function api(acao, extra = {}) {
@@ -135,6 +136,7 @@ async function carregar(){
     const [ex, fu, ag, cv, evp] = await Promise.all([
       api('experimentais', { de: hoje, ate: hoje }), api('funil'), api('agenda', { dias: 14 }).catch(() => ({ horarios: [] })), api('conversas').catch(() => ({ conversas: [] })), api('evento_leads', { parados: true }).catch(() => ({ leads: [], eventos: [] }))
     ]);
+    api('saude').then(x => { SAUDE = x; desenhar(); }).catch(() => {});
     D = { aulas: ex.agendamentos || [], leadsAula: ex.leads || [], turmas: ex.turmas || [], leads: fu.leads || [], etapas: fu.etapas || [], conversas: cv.conversas || cv || [], vagas: (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0 && h.data > hoje), evParados: evp.leads || [], eventos: evp.eventos || [] };
     desenhar();
   } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
@@ -165,6 +167,7 @@ function desenhar(){
   document.getElementById('raiz').innerHTML = `
     <div class="barra"><h2>${new Date().getHours() < 12 ? 'Bom dia' : new Date().getHours() < 18 ? 'Boa tarde' : 'Boa noite'}</h2><span class="sub">${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}</span>
       <div style="margin-left:auto;display:flex;gap:8px"><button class="btn g" onclick="carregar()">Atualizar</button><button class="btn" onclick="irPara('/agendamentos.html')">+ Novo agendamento</button></div></div>
+    ${SAUDE && !SAUDE.whatsapp?.conectado ? `<div class="bloco" style="background:#FCF3F2;border-color:#F0C6C3;margin-bottom:14px"><b style="color:var(--quente)">WhatsApp desconectado</b> — mensagens não entram nem saem pelo Capta. Reconecte pelo botão no topo do painel.</div>` : ''}
     <div class="tally">
       <div onclick="document.getElementById('sec-aulas').scrollIntoView({behavior:'smooth'})"><b>${aulas.length}</b><small>aulas hoje</small></div>
       <div class="hot" onclick="document.getElementById('sec-aulas').scrollIntoView({behavior:'smooth'})"><b>${pend.length}</b><small>sem desfecho</small></div>
