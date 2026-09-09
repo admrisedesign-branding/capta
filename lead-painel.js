@@ -41,7 +41,7 @@
   #lp .salvo{font-size:11.5px;color:var(--verde,#16A34A);font-weight:600;margin-left:8px}
   #lp .lnk{font-weight:700;color:var(--brand);text-decoration:none;cursor:pointer}
   #lp .del{width:100%;margin-top:14px;background:none;border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:8px;font-size:12.5px;cursor:pointer;font-family:inherit}
-  @media(max-width:760px){#lp.aberto{width:100%}}
+  @media(max-width:760px){#lp.aberto{width:100%;max-width:100%}#lp .corpo{padding:12px 14px}#lp .escrever{padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}#lp .cab{padding:12px 14px}}
   `;
   const FONTES = ['anúncio','instagram','google busca','google business','evento','direto','indicação'];
   const PORTAS = ['site','whatsapp-bot','whatsapp-direto','evento','my robot'];

@@ -52,6 +52,27 @@ h2{font-size:16px;font-weight:700}
 .nav-item.on{background:var(--brand-soft);color:var(--brand)}
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
 .nav.pendente{visibility:hidden}
+
+/* celular */
+@media(max-width:760px){
+  .layout{display:block}
+  .side{position:fixed;left:0;top:0;bottom:0;width:82%;max-width:300px;z-index:70;transform:translateX(-100%);transition:.2s}
+  .side.open{transform:none}
+  .content{padding:12px 14px 78px;max-width:none}
+  .topbar{padding:0 14px;gap:8px}
+  .btn-zap span{display:none}
+  .embed{height:calc(100vh - 60px - 62px)}
+  /* barra inferior de navegação */
+  .tabbar{position:fixed;left:0;right:0;bottom:0;height:62px;background:var(--card);border-top:1px solid var(--line);display:flex;z-index:60;padding-bottom:env(safe-area-inset-bottom)}
+  .tabbar button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--muted);position:relative}
+  .tabbar button.on{color:var(--brand)}
+  .tabbar svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2}
+  .tabbar .pt{position:absolute;top:8px;right:calc(50% - 20px);background:var(--quente,#E03127);color:#fff;font-size:9.5px;font-weight:800;border-radius:99px;padding:1px 5px}
+}
+@media(min-width:761px){.tabbar{display:none}}
+.instalar{position:fixed;left:14px;right:14px;bottom:74px;background:var(--ink);color:#fff;border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:65;box-shadow:0 10px 30px rgba(20,26,46,.25);font-size:13px}
+.instalar b{display:block}.instalar button{margin-left:auto;background:var(--brand);color:#fff;border:0;border-radius:9px;padding:8px 14px;font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit}
+.instalar .x{background:none;color:rgba(255,255,255,.6);padding:6px;margin-left:0}
 .quem{font-size:11.5px;color:var(--muted);padding:6px 8px;line-height:1.4}.quem b{color:var(--ink)}.quem a{color:var(--brand);font-weight:700;text-decoration:none;cursor:pointer}
 .layout.mini .quem{display:none!important}
 #barra-alerta{position:fixed;top:0;left:0;right:0;z-index:100;background:#B3261E;color:#fff;font-size:13px;font-weight:600;padding:9px 16px;text-align:center}#barra-alerta a{color:#fff;text-decoration:underline;cursor:pointer;margin-left:8px}
@@ -385,6 +406,12 @@ window.CaptaUser = (function(){
   };
 })();
 </script>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Capta">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
 </head>
 <body>
 <div class="layout">
@@ -2883,6 +2910,7 @@ function montarMenuGestao(){
   // no plano Gestão a home é a lista de leads (o Painel Gestão é página própria)
   const home=nav.querySelector('.nav-item[data-page="/atendimento.html"]'); if(home){ home.classList.add('on'); setTimeout(()=>{ if(activeTab!=='embed') home.click(); }, 0); }
   window.__gestao=true;
+  montarTabbar(); prepararInstalacao(); pedirNotificacao();
   (function(){ const q=document.getElementById('quem'); if(!q) return;
     const pinta=()=>{ const n=CaptaUser.nome(); q.style.display='block'; q.innerHTML = n ? `Você: <b>${n}</b> · <a onclick="CaptaUser.sair();location.reload()">trocar</a>` : `<a onclick="(function(){const n=prompt('Quem está usando? (Rafael, Bento, RISE…)');if(n){CaptaUser.definir(n);location.reload();}})()">quem está usando?</a>`; };
     pinta(); })();
@@ -2912,6 +2940,76 @@ function montarMenuGestao(){
 }
 // menu certo desde o primeiro frame, se já conhecemos o plano deste negócio
 (function(){ try{ const pl=localStorage.getItem('capta_plano_'+SLUG); if(['gestao','business'].includes(pl)){ montarMenuGestao(); document.querySelector('.nav').classList.remove('pendente'); } }catch(e){} })();
+
+// ---------- celular: barra inferior com as 4 telas do dia ----------
+function montarTabbar(){
+  if (document.querySelector('.tabbar')) return;
+  const I = {
+    hoje:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    chat:'<svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
+    pipe:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/></svg>',
+    aula:'<svg viewBox="0 0 24 24"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>',
+    menu:'<svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>'
+  };
+  const itens = [['/atendimento.html','Hoje','hoje'],['/inbox.html','Conversas','chat'],['/funil.html','Pipeline','pipe'],['/aula-experimental.html','Aulas','aula']];
+  const bar = document.createElement('nav'); bar.className = 'tabbar';
+  bar.innerHTML = itens.map(([pg,t,ic]) => `<button data-pg="${pg}">${I[ic]}${t}</button>`).join('')
+    + `<button onclick="side.classList.add('open');sideScrim.classList.add('on')">${I.menu}Menu</button>`;
+  document.body.appendChild(bar);
+  bar.querySelectorAll('[data-pg]').forEach(b => b.onclick = () => {
+    const alvo = document.querySelector(`.nav-item[data-page="${b.dataset.pg}"]`); if (alvo) alvo.click();
+    bar.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  });
+  bar.querySelector('[data-pg="/atendimento.html"]').classList.add('on');
+}
+// badge de não lidas também na barra inferior
+const _badge = window.badgeConversas;
+window.badgeConversas = function(n){ if (_badge) _badge(n);
+  const b = document.querySelector('.tabbar [data-pg="/inbox.html"]'); if (!b) return;
+  let p = b.querySelector('.pt'); if (!n) { if (p) p.remove(); return; }
+  if (!p) { p = document.createElement('span'); p.className = 'pt'; b.appendChild(p); } p.textContent = n > 9 ? '9+' : n;
+};
+// ---------- instalar na tela inicial ----------
+let promptInstalar = null;
+function prepararInstalacao(){
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); promptInstalar = e; mostrarConvite(); });
+  const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !navigator.standalone;
+  if (iOS && !localStorage.getItem('capta_instalar_nao')) setTimeout(() => mostrarConvite(true), 4000);
+}
+function mostrarConvite(ios){
+  if (document.querySelector('.instalar') || localStorage.getItem('capta_instalar_nao') || matchMedia('(display-mode: standalone)').matches) return;
+  const d = document.createElement('div'); d.className = 'instalar';
+  d.innerHTML = ios
+    ? `<div><b>Instale o Capta no seu iPhone</b>toque em Compartilhar e depois "Adicionar à Tela de Início"</div><button class="x" onclick="this.parentElement.remove();localStorage.setItem('capta_instalar_nao','1')">✕</button>`
+    : `<div><b>Instalar o Capta</b>abre em tela cheia e avisa de mensagem nova</div><button onclick="instalarAgora()">Instalar</button><button class="x" onclick="this.parentElement.remove();localStorage.setItem('capta_instalar_nao','1')">✕</button>`;
+  document.body.appendChild(d);
+}
+async function instalarAgora(){ if (!promptInstalar) return; promptInstalar.prompt(); await promptInstalar.userChoice; promptInstalar = null; document.querySelector('.instalar')?.remove(); }
+// ---------- avisos ----------
+async function pedirNotificacao(){
+  if (!('Notification' in window) || Notification.permission !== 'default') return avisarDoDia();
+  setTimeout(async () => { try { await Notification.requestPermission(); avisarDoDia(); } catch(e){} }, 8000);
+}
+function avisar(titulo, texto, url, tag){
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  navigator.serviceWorker?.ready.then(r => r.active?.postMessage({ tipo:'aviso', titulo, texto, url, tag })).catch(() => {});
+}
+let ultNaoLidas = null;
+const _badge2 = window.badgeConversas;
+window.badgeConversas = function(n){ if (_badge2) _badge2(n);
+  if (ultNaoLidas !== null && n > ultNaoLidas && document.hidden) avisar('Nova mensagem', `${n} conversa${n>1?'s':''} esperando resposta`, '/dashboard.html', 'msg');
+  ultNaoLidas = n;
+};
+async function avisarDoDia(){
+  const hoje = new Date().toISOString().slice(0,10);
+  if (localStorage.getItem('capta_aviso_dia') === hoje) return;
+  try {
+    const r = await fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'experimentais',slug:SLUG,token:TOKEN,de:hoje,ate:hoje})});
+    if(!r.ok) return; const j = await r.json(); const n = (j.agendamentos||[]).filter(a => a.status !== 'cancelado').length;
+    if (n) { avisar('Aulas de hoje', `${n} aula${n>1?'s':''} experimental${n>1?'is':''} marcada${n>1?'s':''}`, '/dashboard.html', 'dia'); localStorage.setItem('capta_aviso_dia', hoje); }
+  } catch(e){}
+}
+
 async function load(){
   if(SLUG && TOKEN){
     try{

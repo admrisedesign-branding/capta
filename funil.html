@@ -112,6 +112,16 @@ body.embed .raias{min-height:calc(100vh - 120px)}
 .salvo{font-size:11.5px;color:var(--verde);font-weight:600;margin-left:8px}
 @media(max-width:760px){#painel.aberto{position:fixed;inset:0;top:0;width:100%;flex-basis:100%;height:100%;z-index:40}}
 
+
+@media(max-width:760px){
+  .raias{display:block;min-height:0}
+  .raia{width:100%;min-width:0;margin-bottom:12px;flex:none}
+  .raia-corpo{max-height:none}
+  .raia.fechada .raia-corpo{display:none}
+  .raia-cab{position:sticky;top:0;background:var(--card);z-index:2;cursor:pointer}
+  .filtros-bar{position:sticky;top:0;background:var(--bg);z-index:3;padding:8px 0}
+  .fb-busca{min-width:0;flex:1}
+}
 .filtros-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 body.embed .topbar{display:none}
 .fb-busca,.fb-sel{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 10px;font-size:12.5px;font-family:inherit;color:var(--ink)}
@@ -260,8 +270,9 @@ function desenhar() {
   const colunas = etapas.map(e => ({ e, itens: vis.filter(l => l.etapa_id === e.id) }));
   if (semEtapa.length) colunas.unshift({ e: { id: '', nome: 'Sem etapa', cor: '#9AA1B4' }, itens: semEtapa });
 
-  raiz.innerHTML = barraFiltros(leads.length, vis.length) + `<div class="raias">${colunas.map(c => `
-    <section class="raia" data-etapa="${c.e.id}">
+  const mob = window.matchMedia('(max-width:760px)').matches;
+  raiz.innerHTML = barraFiltros(leads.length, vis.length) + `<div class="raias">${colunas.map((c, ci) => `
+    <section class="raia ${mob && (ci > 0 || !c.itens.length) ? 'fechada' : ''}" data-etapa="${c.e.id}" ${mob ? 'onclick="if(event.target.closest(\'.raia-cab\'))this.classList.toggle(\'fechada\')"' : ''}>
       <div class="raia-cab">
         <span class="raia-cor" style="background:${esc(c.e.cor || '#2E5BFF')}"></span>
         <span class="raia-nome">${esc(c.e.nome)}</span>
