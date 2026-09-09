@@ -85,7 +85,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'recepcao', 'checkin', 'feedback'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -113,6 +113,9 @@ module.exports = async function handler(req, res) {
         case 'casar_conversas': return await acaoCasarConversas(tenant, body, res);
         case 'sem_data':      return await acaoSemData(tenant, body, res);
         case 'saude':         return await acaoSaude(tenant, body, res);
+        case 'recepcao':      return await acaoRecepcao(tenant, body, res);
+        case 'checkin':       return await acaoCheckin(tenant, body, res);
+        case 'feedback':      return await acaoFeedback(tenant, body, res);
       }
     }
 
@@ -1216,6 +1219,60 @@ async function acaoSaude(tenant, body, res) {
   const falhas = await sb(`capta_falhas?tenant_id=eq.${tenant.id}&criado_em=gte.${new Date(Date.now() - 864e5).toISOString()}&select=onde,mensagem,criado_em&order=criado_em.desc&limit=20`).catch(() => []);
   const kommo = !!process.env.KOMMO_TOKEN;
   return res.status(200).json({ whatsapp: whats, kommo, falhas: falhas || [] });
+}
+
+
+// ---------------------------------------------------------------------
+// RECEPÇÃO — tablet de check-in/out e monitor da sala
+// ---------------------------------------------------------------------
+async function acaoRecepcao(tenant, body, res) {
+  const dia = body.data || new Date().toISOString().slice(0, 10);
+  const dow = new Date(dia + 'T12:00:00').getDay();
+  const [turmas, alunos, ags, presencas] = await Promise.all([
+    sb(`capta_turmas?tenant_id=eq.${tenant.id}&ativa=is.true&dia_semana=eq.${dow}&select=id,nome,hora_inicio,hora_fim,limite_sala&order=hora_inicio`).catch(() => []),
+    sb(`capta_alunos?tenant_id=eq.${tenant.id}&status=eq.ativo&select=id,nome,nome_curto,kit,turma_id`).catch(() => []),
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&data=eq.${dia}&status=in.(agendado,confirmado,compareceu)&select=id,lead_id,turma_id,hora_inicio,hora_fim,crianca_nome,crianca_idade,status,compareceu_em,observacao`).catch(() => []),
+    sb(`capta_presencas?tenant_id=eq.${tenant.id}&data=eq.${dia}&select=id,aluno_id,agendamento_id,entrada_em,saida_em,feedback,paga_hoje,motivo`).catch(() => [])
+  ]);
+  const ids = [...new Set((ags || []).map(a => a.lead_id).filter(Boolean))];
+  const leads = ids.length ? await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${ids.join(',')})&select=id,nome,contato,temperatura,atendente`).catch(() => []) : [];
+  return res.status(200).json({ data: dia, turmas: turmas || [], alunos: alunos || [], agendamentos: ags || [], presencas: presencas || [], leads: leads || [] });
+}
+
+// check-in / check-out — aluno ativo (aluno_id) ou aula experimental (agendamento_id)
+async function acaoCheckin(tenant, body, res) {
+  const dia = body.data || new Date().toISOString().slice(0, 10);
+  const { aluno_id, agendamento_id, saida } = body;
+  if (!aluno_id && !agendamento_id) return res.status(400).json({ erro: 'Informe o aluno ou a aula.' });
+  const filtro = aluno_id ? `aluno_id=eq.${aluno_id}` : `agendamento_id=eq.${agendamento_id}`;
+  const ja = (await sb(`capta_presencas?tenant_id=eq.${tenant.id}&data=eq.${dia}&${filtro}&select=id,entrada_em,saida_em&limit=1`).catch(() => []))?.[0];
+  const agora = new Date().toISOString();
+  let reg;
+  if (!ja) {
+    reg = (await sb('capta_presencas', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+      tenant_id: tenant.id, data: dia, aluno_id: aluno_id || null, agendamento_id: agendamento_id || null, entrada_em: agora }) }))[0];
+  } else if (saida || (ja.entrada_em && !ja.saida_em && saida !== false)) {
+    await sb(`capta_presencas?id=eq.${ja.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ saida_em: agora }) });
+    reg = { ...ja, saida_em: agora };
+  } else reg = ja;
+  // aula experimental: entrar marca presença no agendamento
+  if (agendamento_id && !ja) await sb(`capta_agendamentos?id=eq.${agendamento_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'compareceu', compareceu_em: agora }) }).catch(() => null);
+  return res.status(200).json({ ok: true, presenca: reg });
+}
+
+// feedback do check-out da aula experimental (e desfecho automático quando fecha na hora)
+async function acaoFeedback(tenant, body, res) {
+  const { agendamento_id, nota, paga_hoje, motivo, comentario, pagamento, valor } = body;
+  if (!agendamento_id) return res.status(400).json({ erro: 'Informe a aula.' });
+  const dia = body.data || new Date().toISOString().slice(0, 10);
+  const p = (await sb(`capta_presencas?tenant_id=eq.${tenant.id}&data=eq.${dia}&agendamento_id=eq.${agendamento_id}&select=id&limit=1`).catch(() => []))?.[0];
+  const dados = { feedback: nota ?? null, paga_hoje: paga_hoje ?? null, motivo: motivo || null, comentario: comentario || null, saida_em: new Date().toISOString() };
+  if (p) await sb(`capta_presencas?id=eq.${p.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
+  else await sb('capta_presencas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ tenant_id: tenant.id, data: dia, agendamento_id, entrada_em: new Date().toISOString(), ...dados }) });
+  // fecha o ciclo: paga hoje = matrícula; não paga = motivo registrado, lead segue em remarketing
+  if (paga_hoje === true) return acaoDesfecho(tenant, { agendamento_id, desfecho: 'matriculou', pagamento: pagamento || null, valor: valor || null, atendente: body.atendente, observacao: `desfecho: matriculou · ${pagamento || 'na recepção'}` }, res);
+  if (paga_hoje === false && motivo) return acaoDesfecho(tenant, { agendamento_id, desfecho: 'nao', motivo, atendente: body.atendente, observacao: `desfecho: nao · ${motivo}` }, res);
+  return res.status(200).json({ ok: true });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
