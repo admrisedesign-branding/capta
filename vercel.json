@@ -3,6 +3,10 @@
     {
       "path": "/api/capta-whatsapp",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/capta-config?sync=diario",
+      "schedule": "0 11 * * *"
     }
   ]
 }

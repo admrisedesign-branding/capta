@@ -149,7 +149,7 @@ const rotulo = k => { const [a,m] = k.split('-'); return `${MESES[+m-1]}/${a}`; 
 // Ordem canônica das etapas (as do Kommo); qualquer outra vai depois, na ordem em que aparecer
 const ORDEM = ['Incoming leads','Novo Lead','Em Contato','Qualificado','Aula Agendada','Matrícula em Andamento','Aluno Ativo (matriculado)','Remarketing','Closed - lost'];
 
-let TODOS = [], TENANT = {};
+let TODOS = [], TENANT = {}, INVEST = [];
 
 async function carregar(){
   try{
@@ -157,6 +157,8 @@ async function carregar(){
     if(!r.ok) throw new Error('api '+r.status);
     const d = await r.json();
     TODOS = d.leads || []; TENANT = d.tenant || {};
+    fetch('/api/capta-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'investimento',slug:SLUG,token:TOKEN})})
+      .then(r=>r.json()).then(j=>{ INVEST = j.investimento || []; render(); }).catch(()=>{});
     document.title = `Painel Gestão — ${TENANT.nome || 'Capta'}`;
     montarMeses(); render();
   }catch(e){
@@ -199,7 +201,11 @@ function render(){
     <div class="kpi"><div class="l">Leads</div><div class="v">${leads}</div>${delta(leads, ant?ant.length:0)}</div>
     <div class="kpi"><div class="l">Aulas experimentais</div><div class="v">${aulas}</div>${delta(aulas, ant?ant.filter(agendou).length:0)}</div>
     <div class="kpi"><div class="l">Matrículas</div><div class="v">${mat}</div><span class="d">${leads?Math.round(mat/leads*100):0}% dos leads</span></div>
-    <div class="kpi"><div class="l">Receita (matrículas)</div><div class="v">${brl(rec)}</div><span class="d">${mat?'ticket '+brl(rec/mat):''}</span></div>`;
+    <div class="kpi"><div class="l">Receita (matrículas)</div><div class="v">${brl(rec)}</div><span class="d">${mat?'ticket '+brl(rec/mat):''}</span></div>
+    ${(() => { const g = INVEST.filter(i => !k || i.mes.slice(0,7) === k).reduce((s,i) => s + Number(i.valor||0), 0);
+      if (!g) return `<div class="kpi"><div class="l">Investimento</div><div class="v">—</div><span class="d">lance em Ajustes → Integrações</span></div>`;
+      return `<div class="kpi"><div class="l">Investimento</div><div class="v">${brl(g)}</div><span class="d">${leads?'custo por lead '+brl(g/leads):''}</span></div>
+        <div class="kpi"><div class="l">Custo por matrícula</div><div class="v">${mat?brl(g/mat):'—'}</div><span class="d">${mat&&rec?(rec/g>=1?'retorno '+(rec/g).toFixed(1)+'× o investido':'abaixo do investido'):''}</span></div>`; })()}`;
 
   // canais: fonte × porta
   const porFonte = conta(doMes, l => l.fonte || (l.origem && l.origem !== 'kommo' ? l.origem : null) || 'não informado');
@@ -255,6 +261,21 @@ function render(){
     <div class="grid">
       ${tabela(porFonte,'Por onde veio','Anúncio, Instagram, Google, evento, indicação…')}
       ${tabela(porPorta,'Como chegou','Site, WhatsApp pelo bot, WhatsApp direto, evento…')}
+      ${(() => { const g = INVEST.filter(i => !k || i.mes.slice(0,7) === k); if (!g.length) return '';
+        const porCanal = {}; g.forEach(i => porCanal[i.canal] = (porCanal[i.canal]||0) + Number(i.valor||0));
+        const NOME = { meta:'Meta Ads', google:'Google', evento:'Evento', material:'Material', outro:'Outro' };
+        const leadsDe = canal => doMes.filter(l => { const f = (l.fonte||l.origem||'').toLowerCase(); const p = (l.porta||'').toLowerCase();
+          if (canal === 'meta') return f.includes('anúncio') || f.includes('anuncio') || f.includes('instagram');
+          if (canal === 'google') return f.includes('google');
+          if (canal === 'evento') return f.includes('evento') || p === 'evento'; return false; }).length;
+        return `<div class="card"><h3>Investimento por canal</h3><div class="h">Quanto custou cada lead e cada matrícula</div>
+          <table><tr><th>Canal</th><th class="n">Gasto</th><th class="n">Leads</th><th class="n">Custo/lead</th><th class="n">Matr.</th><th class="n">Custo/matr.</th></tr>
+          ${Object.entries(porCanal).sort((a,b)=>b[1]-a[1]).map(([c,v]) => { const nl = leadsDe(c);
+            const nm = doMes.filter(l => { const f=(l.fonte||l.origem||'').toLowerCase(), p=(l.porta||'').toLowerCase();
+              const bate = c==='meta' ? (f.includes('anúncio')||f.includes('anuncio')||f.includes('instagram')) : c==='google' ? f.includes('google') : c==='evento' ? (f.includes('evento')||p==='evento') : false;
+              return bate && ganhou(l); }).length;
+            return `<tr><td>${esc(NOME[c]||c)}</td><td class="n">${brl(v)}</td><td class="n">${nl||'—'}</td><td class="n">${nl?brl(v/nl):'—'}</td><td class="n">${nm||'—'}</td><td class="n">${nm?brl(v/nm):'—'}</td></tr>`; }).join('')}
+          </table></div>`; })()}
       ${funil}
       ${quem}
       ${temp}
