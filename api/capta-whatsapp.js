@@ -721,16 +721,24 @@ async function acaoLead(tenant, body, res) {
   const id = (body.lead_id || '').trim();
   if (!id) return res.status(400).json({ erro: 'Informe lead_id.' });
   const [conv, ags, canais] = await Promise.all([
-    sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,telefone,agente_ativo,status,nao_lidas&order=ultima_mensagem_em.desc.nullslast&limit=1`).catch(() => []),
-    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,data,hora_inicio,hora_fim,status,crianca_nome,turma_id,remarcado_para&order=data.desc&limit=10`).catch(() => []),
+    sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,telefone,agente_ativo,status,nao_lidas,atendente,resolvida_em&order=ultima_mensagem_em.desc.nullslast&limit=1`).catch(() => []),
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,data,hora_inicio,hora_fim,status,crianca_nome,crianca_idade,turma_id,remarcado_para,observacao&order=data.desc&limit=10`).catch(() => []),
     sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&select=status&limit=1`).catch(() => [])
   ]);
   let mensagens = [];
   if (conv?.[0]) {
     mensagens = await sb(`capta_mensagens?conversa_id=eq.${conv[0].id}&tenant_id=eq.${tenant.id}&select=id,direcao,autor,tipo,texto,transcricao,criado_em&order=criado_em.asc&limit=100`).catch(() => []);
   }
+  // histórico completo: presença de cada aula, matrícula e aluno
+  const agIds = (ags || []).map(a => a.id);
+  const [presencas, matriculas, aluno] = await Promise.all([
+    agIds.length ? sb(`capta_presencas?tenant_id=eq.${tenant.id}&agendamento_id=in.(${agIds.join(',')})&select=agendamento_id,entrada_em,saida_em,feedback,paga_hoje,motivo,comentario`).catch(() => []) : [],
+    sb(`capta_matriculas?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,valor_bruto,fechada_em,fechada_por,status&order=fechada_em.desc`).catch(() => []),
+    sb(`capta_alunos?tenant_id=eq.${tenant.id}&lead_id=eq.${id}&select=id,nome,kit,turma_id,status&limit=1`).catch(() => [])
+  ]);
   return res.status(200).json({
     conversa: conv?.[0] || null, mensagens: mensagens || [], agendamentos: ags || [],
+    presencas: presencas || [], matriculas: matriculas || [], aluno: aluno?.[0] || null,
     canal: canais?.[0]?.status || null
   });
 }
@@ -1236,7 +1244,7 @@ async function acaoRecepcao(tenant, body, res) {
     sb(`capta_presencas?tenant_id=eq.${tenant.id}&data=eq.${dia}&select=id,aluno_id,agendamento_id,entrada_em,saida_em,feedback,paga_hoje,motivo`).catch(() => [])
   ]);
   const ids = [...new Set((ags || []).map(a => a.lead_id).filter(Boolean))];
-  const leads = ids.length ? await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${ids.join(',')})&select=id,nome,contato,temperatura,atendente`).catch(() => []) : [];
+  const leads = ids.length ? await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${ids.join(',')})&select=id,nome,contato,temperatura,atendente,crianca,idade,kommo_lead_id,notas`).catch(() => []) : [];
   return res.status(200).json({ data: dia, turmas: turmas || [], alunos: alunos || [], agendamentos: ags || [], presencas: presencas || [], leads: leads || [] });
 }
 
