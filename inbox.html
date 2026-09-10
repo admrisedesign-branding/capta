@@ -65,13 +65,41 @@ button{font-family:inherit;cursor:pointer}
 .robo.on .ponto{background:var(--verde)}
 .robo.off .ponto{background:var(--faint)}
 
-.fluxo{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:9px;background:var(--bg)}
-.msg{max-width:74%;padding:9px 13px;border-radius:14px;font-size:13.5px;line-height:1.55;word-wrap:break-word}
-.msg.entrada{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:5px}
-.msg.saida{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:5px}
-.msg-meta{font-size:10.5px;margin-top:4px;opacity:.62;display:flex;gap:6px;align-items:center}
-.msg.saida .msg-meta{justify-content:flex-end}
-.msg-autor{font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.fluxo{flex:1;overflow-y:auto;padding:16px 18px 8px;display:flex;flex-direction:column;gap:2px;
+  background:var(--bg);background-image:radial-gradient(rgba(105,112,137,.055) 1px, transparent 1px);background-size:22px 22px;scroll-behavior:smooth}
+.msg{max-width:min(76%,560px);padding:7px 11px 5px;border-radius:14px;font-size:14px;line-height:1.5;
+  word-wrap:break-word;white-space:pre-wrap;position:relative;box-shadow:0 1px 1px rgba(20,26,46,.05);margin-top:2px}
+.msg.entrada{align-self:flex-start;background:var(--card);border-top-left-radius:5px}
+.msg.saida{align-self:flex-end;background:#D9FDD3;border-top-right-radius:5px}
+/* grupos: só a primeira da sequência tem o "bico" */
+.msg.entrada.mesmo{border-top-left-radius:14px;margin-top:1px}
+.msg.saida.mesmo{border-top-right-radius:14px;margin-top:1px}
+.msg.fim{margin-bottom:8px}
+.msg-meta{font-size:11px;margin-top:2px;color:var(--faint);display:flex;gap:5px;align-items:center;justify-content:flex-end;float:right;
+  margin-left:10px;position:relative;top:4px}
+.msg.saida .msg-meta{color:#5c7a58}
+.msg-autor{font-weight:700;font-size:10.5px;color:var(--brand);margin-bottom:2px;display:block}
+.msg.saida .msg-autor{color:#1f7a4d}
+.tique{font-size:12px;letter-spacing:-2px}
+.tique.lida{color:#3B9DE8}
+.dia-sep{align-self:center;background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:99px;
+  padding:4px 14px;font-size:11.5px;font-weight:700;color:var(--muted);margin:14px 0 8px;box-shadow:0 1px 2px rgba(20,26,46,.05);
+  position:sticky;top:6px;z-index:2}
+.resp{border-left:3px solid var(--brand);background:rgba(46,91,255,.07);border-radius:7px;padding:5px 9px;
+  margin-bottom:5px;font-size:12.5px;color:var(--muted);cursor:pointer;max-height:52px;overflow:hidden}
+.resp b{display:block;font-size:11.5px;color:var(--brand)}
+.msg.saida .resp{border-left-color:#1f7a4d;background:rgba(31,122,77,.09)}.msg.saida .resp b{color:#1f7a4d}
+.msg-acao{position:absolute;top:2px;right:6px;opacity:0;background:none;border:0;color:var(--faint);font-size:14px;cursor:pointer;padding:2px}
+.msg:hover .msg-acao{opacity:.7}.msg-acao:hover{opacity:1!important}
+.msg.destaque{animation:pisca-msg 1.4s ease-out}
+@keyframes pisca-msg{0%,100%{background-color:inherit}30%{background-color:#FFF3C4}}
+.desce{position:absolute;right:22px;bottom:96px;width:38px;height:38px;border-radius:50%;background:var(--card);
+  border:1px solid var(--line);box-shadow:0 3px 12px rgba(20,26,46,.14);display:none;place-items:center;cursor:pointer;z-index:4;font-size:15px;color:var(--muted)}
+.desce.on{display:grid}.desce b{position:absolute;top:-6px;right:-4px;background:var(--brand);color:#fff;font-size:10px;border-radius:99px;padding:1px 5px}
+.respondendo{display:flex;align-items:center;gap:10px;padding:8px 18px;background:var(--line-2);border-top:1px solid var(--line);font-size:12.5px}
+.respondendo .txt{flex:1;min-width:0;border-left:3px solid var(--brand);padding-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.respondendo .txt b{display:block;color:var(--brand);font-size:11.5px}
+.respondendo button{border:0;background:none;color:var(--faint);font-size:16px;cursor:pointer}
 
 /* Mídia */
 .msg audio{display:block;width:250px;max-width:100%;margin:2px 0}
@@ -315,7 +343,7 @@ async function abrir(id) {
       </div>
 
       <div class="fluxo" id="fluxo">
-        ${mensagens.length ? mensagens.map(corpoMsg).join('')
+        ${mensagens.length ? montarFluxo(mensagens)
           : '<div class="vazio">Sem mensagens nesta conversa.</div>'}
       </div>
 
@@ -325,6 +353,8 @@ async function abrir(id) {
       ${conversa.lead ? `<div class="lado-lead"><b>${esc(conversa.lead.nome||'')}</b>${conversa.lead.temperatura?' · '+esc(conversa.lead.temperatura):''}${conversa.lead.crianca?' · '+esc(conversa.lead.crianca)+(conversa.lead.idade?', '+conversa.lead.idade+' anos':''):''}${conversa.lead.notas?' · '+esc(conversa.lead.notas.slice(0,80)):''}
         <span style="margin-left:auto;display:flex;gap:6px"><button class="bt" onclick="irLead('${conversa.lead.id}','agendar')">marcar aula</button><button class="bt" onclick="irLead('${conversa.lead.id}','dados')">dados</button>${conversa.lead.kommo_lead_id?`<a class="bt" style="text-decoration:none" href="https://roboticanorte.kommo.com/leads/detail/${conversa.lead.kommo_lead_id}" target="_blank" rel="noopener">Kommo ↗</a>`:''}</span></div>` : ''}
       <div id="rapidas"></div>
+      <div class="respondendo" id="respondendo" style="display:none"></div>
+      <div class="desce" id="desce" onclick="document.getElementById('fluxo').scrollTop = document.getElementById('fluxo').scrollHeight" title="Ir para o fim">↓</div>
       <div class="escrever">
         <button class="ico" title="Respostas prontas (ou digite /)" onclick="abrirRapidas()">⚡</button>
         <button class="ico" title="Anexar imagem, áudio ou arquivo" onclick="document.getElementById('anexo').click()">📎</button>
@@ -335,6 +365,8 @@ async function abrir(id) {
 
     const fluxo = document.getElementById('fluxo');
     fluxo.scrollTop = fluxo.scrollHeight;
+    fluxo.onscroll = () => { const noFim = fluxo.scrollHeight - fluxo.scrollTop - fluxo.clientHeight < 80;
+      document.getElementById('desce').classList.toggle('on', !noFim); };
     carregarMidias();
 
     const txt = document.getElementById('txt');
@@ -370,14 +402,44 @@ function corpoMsg(m) {
     }
   }
 
-  return `<div class="msg ${m.direcao}">
-    ${miolo}
-    <div class="msg-meta">
-      ${m.autor !== 'lead' ? `<span class="msg-autor">${m.autor === 'agente' ? 'robô' : 'você'}</span>` : ''}
-      <span>${hora(m.criado_em)}</span>
-    </div>
+  const resp = m.responde_a ? (() => { const o = (CONV_MSGS||[]).find(x => x.id === m.responde_a || x.provedor_msg_id === m.responde_a);
+      return o ? `<div class="resp" onclick="irParaMsg('${o.id}')"><b>${o.direcao === 'saida' ? (o.autor === 'agente' ? 'Robô' : 'Você') : 'Cliente'}</b>${esc((o.texto || '[' + (o.tipo||'mídia') + ']').slice(0, 90))}</div>` : ''; })() : '';
+  const tique = m.direcao === 'saida' ? `<span class="tique ${m.entrega === 'lida' ? 'lida' : ''}">${m.entrega === 'enviando' ? '🕓' : m.entrega === 'lida' || m.entrega === 'entregue' ? '✓✓' : '✓'}</span>` : '';
+  return `<div class="msg ${m.direcao} ${m.mesmo ? 'mesmo' : ''} ${m.fim ? 'fim' : ''}" id="msg-${m.id}">
+    ${!m.mesmo && m.direcao === 'saida' && m.autor && m.autor !== 'lead' ? `<span class="msg-autor">${m.autor === 'agente' ? 'Robô' : esc(m.autor === 'atendente' ? 'Você' : m.autor)}</span>` : ''}
+    ${resp}${miolo}
+    <div class="msg-meta"><span>${hora(m.criado_em)}</span>${tique}</div>
+    <button class="msg-acao" title="Responder" onclick="responderMsg('${m.id}')">↩</button>
   </div>`;
 }
+// agrupa por dia e por autor, do jeito que o WhatsApp faz
+function montarFluxo(msgs){
+  CONV_MSGS = msgs;
+  const hojeStr = new Date().toDateString(), onteStr = new Date(Date.now() - 864e5).toDateString();
+  const rotuloDia = d => { const x = new Date(d).toDateString();
+    return x === hojeStr ? 'Hoje' : x === onteStr ? 'Ontem' : new Date(d).toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year: new Date(d).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }); };
+  let html = '', diaAnterior = null;
+  msgs.forEach((m, i) => {
+    const dia = new Date(m.criado_em).toDateString();
+    if (dia !== diaAnterior) { html += `<div class="dia-sep">${rotuloDia(m.criado_em)}</div>`; diaAnterior = dia; }
+    const ant = msgs[i-1], prox = msgs[i+1];
+    const mesmoAnt = ant && ant.direcao === m.direcao && ant.autor === m.autor && new Date(m.criado_em) - new Date(ant.criado_em) < 120000 && new Date(ant.criado_em).toDateString() === dia;
+    const mesmoProx = prox && prox.direcao === m.direcao && prox.autor === m.autor && new Date(prox.criado_em) - new Date(m.criado_em) < 120000;
+    html += corpoMsg({ ...m, mesmo: !!mesmoAnt, fim: !mesmoProx });
+  });
+  return html;
+}
+let CONV_MSGS = [], RESPONDENDO = null;
+function responderMsg(id){
+  const m = (CONV_MSGS||[]).find(x => x.id === id); if (!m) return;
+  RESPONDENDO = m;
+  const box = document.getElementById('respondendo');
+  if (box) { box.style.display = 'flex';
+    box.innerHTML = `<div class="txt"><b>${m.direcao === 'saida' ? 'Você' : 'Cliente'}</b>${esc((m.texto || '[' + (m.tipo||'mídia') + ']').slice(0, 120))}</div><button onclick="cancelarResposta()" title="Cancelar">×</button>`; }
+  const t = document.getElementById('txt'); if (t) t.focus();
+}
+function cancelarResposta(){ RESPONDENDO = null; const b = document.getElementById('respondendo'); if (b) { b.style.display = 'none'; b.innerHTML = ''; } }
+function irParaMsg(id){ const el = document.getElementById('msg-' + id); if (!el) return; el.scrollIntoView({ behavior:'smooth', block:'center' }); el.classList.add('destaque'); setTimeout(() => el.classList.remove('destaque'), 1500); }
 
 // As URLs são assinadas e valem 5 minutos, então só são pedidas na hora
 // de exibir — nunca ficam guardadas na página.
@@ -480,7 +542,7 @@ async function enviar() {
 
   btn.disabled = true; btn.textContent = 'Enviando…';
   try {
-    try { await api('enviar', { conversa_id: atual, texto, autor: (window.CaptaUser&&CaptaUser.nome())||'atendente' }); }
+    try { await api('enviar', { conversa_id: atual, texto, autor: (window.CaptaUser&&CaptaUser.nome())||'atendente', responde_a: RESPONDENDO ? RESPONDENDO.id : undefined }); cancelarResposta(); }
     catch(err){ if (/está atendendo/.test(err.message)) { if (!confirm(err.message)) { txt.value = texto; throw err; } await api('enviar', { conversa_id: atual, texto, autor: (window.CaptaUser&&CaptaUser.nome())||'atendente', forcar: true }); } else throw err; }
     txt.value = ''; txt.style.height = 'auto'; toast('Enviado', { tipo:'ok', ms: 1500 });
     await abrir(atual);
