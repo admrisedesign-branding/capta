@@ -170,7 +170,7 @@ async function desenharIntegra(){
         ${meta.ultimo_erro ? `<div class="dica" style="background:rgba(224,49,39,.08);color:var(--quente)">${esc(meta.ultimo_erro)}</div>` : ''}`
       : `<div class="campo"><label>Token de acesso (System User, com ads_read)</label><input id="mt-token" type="password" placeholder="Cole aqui o token gerado no Meta Business"></div>
          <div id="mt-contas"></div>
-         <div style="margin-top:12px"><button class="btn" onclick="conectarMeta()">Conectar</button></div>
+         <div style="margin-top:12px"><button class="btn" id="bt-conectar" onclick="conectarMeta()">Conectar</button></div>
          <div class="dica"><b>Como gerar:</b> business.facebook.com → Configurações do negócio → Usuários → <b>Usuários do sistema</b> → Adicionar ("Capta") → Adicionar ativos → a conta de anúncios com permissão de ver desempenho → <b>Gerar token</b> marcando <b>ads_read</b>. O token fica guardado aqui e nunca aparece de volta na tela.</div>`}
     </div>
     <div class="bloco"><h3>Investimento por mês</h3><div class="h">O que a Meta traz aparece sozinho. Evento, brinde e impulsionamento avulso você lança aqui.</div>
@@ -187,20 +187,31 @@ async function desenharIntegra(){
 }
 async function conectarMeta(){
   const token = document.getElementById('mt-token').value.trim(); if (!token) return toast('Cole o token.', { tipo:'erro' });
+  const bc = document.getElementById('bt-conectar'); if (bc) { bc.disabled = true; bc.textContent = 'Consultando a Meta…'; }
   try { const d = await cfg('integracao_salvar', { token_meta: token });
     if (d.escolher) {
+      TOKEN_META = token;                       // guardado só nesta tela, até confirmar
       document.getElementById('mt-contas').innerHTML = `<div class="campo"><label>Qual conta de anúncios?</label><select id="mt-conta">${d.escolher.map(c => `<option value="${c.id}" data-n="${esc(c.nome)}">${esc(c.nome)} (${c.id})</option>`).join('')}</select></div>
-        <div style="margin-top:10px"><button class="btn" onclick="confirmarMeta()">Confirmar conta</button></div>`;
-      return toast('Escolha a conta de anúncios');
+        <div style="margin-top:10px"><button class="btn" id="bt-confirmar">Confirmar conta</button></div>`;
+      document.getElementById('bt-confirmar').onclick = confirmarMeta;
+      const bc = document.getElementById('bt-conectar'); if (bc) bc.style.display = 'none';
+      return toast('Escolha a conta de anúncios e confirme');
     }
     INTEG = d.integracoes; toast('Meta Ads conectada · gasto importado', { tipo:'ok' }); desenharIntegra(); }
-  catch(e){ toast(e.message, { tipo:'erro' }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); const b2 = document.getElementById('bt-conectar'); if (b2) { b2.disabled = false; b2.textContent = 'Conectar'; } }
 }
+let TOKEN_META = '';
 async function confirmarMeta(){
-  const sel = document.getElementById('mt-conta'); const token = document.getElementById('mt-token').value.trim();
+  const sel = document.getElementById('mt-conta');
+  const campo = document.getElementById('mt-token');
+  const token = TOKEN_META || (campo ? campo.value.trim() : '');
+  if (!sel || !token) return toast('Cole o token e clique em Conectar primeiro.', { tipo:'erro' });
+  const bt = document.getElementById('bt-confirmar'); if (bt) { bt.disabled = true; bt.textContent = 'Importando…'; }
   try { const d = await cfg('integracao_salvar', { token_meta: token, conta_id: sel.value, conta_nome: sel.selectedOptions[0].dataset.n });
-    toast(d.sync && d.sync.campanhas ? `Conectado · ${d.sync.campanhas} campanhas importadas` : 'Meta Ads conectada', { tipo:'ok' }); desenharIntegra(); }
-  catch(e){ toast(e.message, { tipo:'erro' }); }
+    TOKEN_META = '';
+    toast(d.sync && d.sync.campanhas ? `Conectado · ${d.sync.campanhas} campanhas importadas` : (d.sync && d.sync.erro ? d.sync.erro : 'Meta Ads conectada'), { tipo: d.sync && d.sync.erro ? 'erro' : 'ok' });
+    desenharIntegra(); }
+  catch(e){ toast(e.message, { tipo:'erro' }); if (bt) { bt.disabled = false; bt.textContent = 'Confirmar conta'; } }
 }
 async function sincronizar(){ try { const d = await cfg('meta_sync', { meses: 3 }); toast(d.erro ? d.erro : `${d.campanhas} campanhas atualizadas`, d.erro ? { tipo:'erro' } : { tipo:'ok' }); desenharIntegra(); } catch(e){ toast(e.message, { tipo:'erro' }); } }
 async function desconectarMeta(){ if (!confirm('Desconectar a Meta Ads? O histórico de gastos continua.')) return;
