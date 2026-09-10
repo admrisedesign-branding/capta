@@ -67,16 +67,18 @@ button{font-family:inherit;cursor:pointer}
 
 .fluxo{flex:1;overflow-y:auto;padding:16px 18px 8px;display:flex;flex-direction:column;gap:2px;
   background:var(--bg);background-image:radial-gradient(rgba(105,112,137,.055) 1px, transparent 1px);background-size:22px 22px;scroll-behavior:smooth}
-.msg{max-width:min(76%,560px);padding:7px 11px 5px;border-radius:14px;font-size:14px;line-height:1.5;
-  word-wrap:break-word;white-space:pre-wrap;position:relative;box-shadow:0 1px 1px rgba(20,26,46,.05);margin-top:2px}
+.msg{max-width:min(76%,560px);width:fit-content;padding:6px 10px 6px 11px;border-radius:14px;font-size:14px;line-height:1.45;
+  overflow-wrap:anywhere;position:relative;box-shadow:0 1px 1px rgba(20,26,46,.05);margin-top:2px}
+.msg-txt{white-space:pre-wrap}
+.msg .midia,.msg img,.msg audio,.msg video{display:block}
 .msg.entrada{align-self:flex-start;background:var(--card);border-top-left-radius:5px}
 .msg.saida{align-self:flex-end;background:#D9FDD3;border-top-right-radius:5px}
 /* grupos: só a primeira da sequência tem o "bico" */
 .msg.entrada.mesmo{border-top-left-radius:14px;margin-top:1px}
 .msg.saida.mesmo{border-top-right-radius:14px;margin-top:1px}
 .msg.fim{margin-bottom:8px}
-.msg-meta{font-size:11px;margin-top:2px;color:var(--faint);display:flex;gap:5px;align-items:center;justify-content:flex-end;float:right;
-  margin-left:10px;position:relative;top:4px}
+.msg-meta{font-size:11px;color:var(--faint);display:inline-flex;gap:4px;align-items:center;vertical-align:bottom;
+  margin-left:8px;position:relative;top:3px;white-space:nowrap}
 .msg.saida .msg-meta{color:#5c7a58}
 .msg-autor{font-weight:700;font-size:10.5px;color:var(--brand);margin-bottom:2px;display:block}
 .msg.saida .msg-autor{color:#1f7a4d}
@@ -139,6 +141,11 @@ button{font-family:inherit;cursor:pointer}
   .voltar-chat{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--muted);margin-right:8px}
 }
 @media(min-width:761px){.voltar-chat{display:none}}
+.bt-transcrever{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:4px 9px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
+.bt-transcrever:hover{color:var(--brand);border-color:var(--brand)}
+.transcricao{margin-top:7px;padding-top:7px;border-top:1px solid rgba(105,112,137,.2);font-size:13px;line-height:1.5;color:var(--muted);white-space:pre-wrap}
+.msg.saida .transcricao{border-top-color:rgba(31,122,77,.25);color:#3f5c3c}
+.pendente{margin-top:6px;font-size:11.5px;color:var(--faint)}
 /* inbox v2 */
 
 .conv{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--line-2);background:transparent;cursor:pointer;font-family:inherit}
@@ -365,6 +372,7 @@ async function abrir(id) {
 
     const fluxo = document.getElementById('fluxo');
     fluxo.scrollTop = fluxo.scrollHeight;
+    setTimeout(transcreverPendentes, 400);
     fluxo.onscroll = () => { const noFim = fluxo.scrollHeight - fluxo.scrollTop - fluxo.clientHeight < 80;
       document.getElementById('desce').classList.toggle('on', !noFim); };
     carregarMidias();
@@ -397,8 +405,10 @@ function corpoMsg(m) {
   if (m.tipo === 'audio') {
     if (m.transcricao) {
       miolo += `<div class="transcricao">${esc(m.transcricao)}</div>`;
-    } else if (m.transcricao_status === 'pendente') {
-      miolo += `<div class="pendente">Transcrição ainda não disponível</div>`;
+    } else if (m.transcricao_status === 'processando') {
+      miolo += `<div class="pendente" id="tr-${m.id}">transcrevendo…</div>`;
+    } else {
+      miolo += `<div class="pendente" id="tr-${m.id}"><button class="bt-transcrever" onclick="transcrever('${m.id}')">📝 ler o que diz</button></div>`;
     }
   }
 
@@ -406,9 +416,8 @@ function corpoMsg(m) {
       return o ? `<div class="resp" onclick="irParaMsg('${o.id}')"><b>${o.direcao === 'saida' ? (o.autor === 'agente' ? 'Robô' : 'Você') : 'Cliente'}</b>${esc((o.texto || '[' + (o.tipo||'mídia') + ']').slice(0, 90))}</div>` : ''; })() : '';
   const tique = m.direcao === 'saida' ? `<span class="tique ${m.entrega === 'lida' ? 'lida' : ''}">${m.entrega === 'enviando' ? '🕓' : m.entrega === 'lida' || m.entrega === 'entregue' ? '✓✓' : '✓'}</span>` : '';
   return `<div class="msg ${m.direcao} ${m.mesmo ? 'mesmo' : ''} ${m.fim ? 'fim' : ''}" id="msg-${m.id}">
-    ${!m.mesmo && m.direcao === 'saida' && m.autor && m.autor !== 'lead' ? `<span class="msg-autor">${m.autor === 'agente' ? 'Robô' : esc(m.autor === 'atendente' ? 'Você' : m.autor)}</span>` : ''}
-    ${resp}${miolo}
-    <div class="msg-meta"><span>${hora(m.criado_em)}</span>${tique}</div>
+    ${!m.mesmo && m.direcao === 'saida' && m.autor && m.autor !== 'lead' ? `<span class="msg-autor">${m.autor === 'agente' ? 'Robô' : esc(m.autor === 'atendente' || m.autor === 'humano' ? 'Você' : m.autor)}</span>` : ''}
+    ${resp}<span class="msg-txt">${miolo}</span><span class="msg-meta">${hora(m.criado_em)}${tique}</span>
     <button class="msg-acao" title="Responder" onclick="responderMsg('${m.id}')">↩</button>
   </div>`;
 }
@@ -535,6 +544,23 @@ async function assumir(id, quem){
   try { await api('conversa_atualizar', { conversa_id: id, assumir: quem }); toast('Você assumiu esta conversa', { tipo:'ok' }); await abrir(id); carregarLista(); }
   catch(e){ if (/está atendendo/.test(e.message) && confirm(e.message + '\n\nAssumir mesmo assim?')) { await api('conversa_atualizar', { conversa_id: id, atendente: quem }); await abrir(id); carregarLista(); } else toast(e.message, { tipo:'erro' }); }
 }
+
+// ---- transcrever áudio (a IA lê e escreve o que foi dito) ----
+async function transcrever(id){
+  const alvo = document.getElementById('tr-' + id); if (alvo) alvo.textContent = 'transcrevendo…';
+  try {
+    const d = await api('transcrever', { mensagem_id: id });
+    if (d.erro) { if (alvo) alvo.innerHTML = `<span title="${esc(d.erro)}">não deu pra transcrever</span>`; return toast(d.erro, { tipo:'erro' }); }
+    if (alvo) { alvo.className = 'transcricao'; alvo.textContent = d.transcricao; }
+    const m = (CONV_MSGS||[]).find(x => x.id === id); if (m) m.transcricao = d.transcricao;
+  } catch(e){ if (alvo) alvo.textContent = 'não deu pra transcrever'; toast(e.message, { tipo:'erro' }); }
+}
+// transcreve sozinho os áudios que o cliente mandou e ainda não têm texto
+async function transcreverPendentes(){
+  const pend = (CONV_MSGS||[]).filter(m => m.tipo === 'audio' && !m.transcricao && m.direcao === 'entrada').slice(0, 3);
+  for (const m of pend) { await transcrever(m.id); }
+}
+
 async function enviar() {
   const txt = document.getElementById('txt'), btn = document.getElementById('btn');
   const texto = txt.value.trim();

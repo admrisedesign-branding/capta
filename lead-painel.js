@@ -28,7 +28,9 @@
   #lp .msgs{display:flex;flex-direction:column;gap:6px;flex:1}
   #lp .msg{max-width:88%;padding:8px 10px;border-radius:12px;font-size:13px;line-height:1.45;background:var(--line-2,#F1F3F8);align-self:flex-start;white-space:pre-wrap}
   #lp .msg.saida{background:var(--brand-soft,rgba(46,91,255,.1));align-self:flex-end}#lp .msg small{display:block;color:var(--faint);font-size:10.5px;margin-top:3px}
-  #lp .msg img{max-width:100%;border-radius:8px;display:block;margin-top:4px}#lp .msg audio{width:100%;margin-top:4px}
+  #lp .msg img{max-width:100%;border-radius:8px;display:block;margin-top:4px}
+  #lp .transcr{margin-top:6px;padding-top:6px;border-top:1px solid rgba(105,112,137,.2);font-size:12.5px;line-height:1.45;color:var(--muted);white-space:pre-wrap}
+  #lp .bt-tr{margin-top:6px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}#lp .msg audio{width:100%;margin-top:4px}
   #lp .aviso{margin:8px 0;background:rgba(224,147,15,.14);border:1px solid rgba(224,147,15,.28);border-radius:11px;padding:8px 12px;font-size:12.5px;color:#8A5A04;line-height:1.5}
   #lp .aviso-p{border:1px dashed var(--line);border-radius:12px;padding:14px;color:var(--faint);font-size:12.5px;line-height:1.6;text-align:center}
   #lp .escrever{display:flex;gap:6px;padding:10px 18px;border-top:1px solid var(--line);align-items:flex-end;position:relative}
@@ -126,7 +128,7 @@
       <span style="margin-left:auto;display:flex;gap:6px">${l.contato ? `<a class="lnk" style="font-size:12px" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">abrir no WhatsApp ↗</a>` : ''}</span></div>`;
     let corpo;
     if (!i) corpo = `<div class="aviso-p">Carregando…</div>`;
-    else if (i.mensagens && i.mensagens.length) corpo = `<div class="msgs" id="lp-msgs">${i.mensagens.map(m => `<div class="msg ${m.direcao==='saida'?'saida':''}">${m.tipo==='imagem'&&m.midia_url ? `<div data-midia="${m.id}" data-tipo="imagem">🖼️ imagem</div>` : m.tipo==='audio'&&m.midia_url ? `<div data-midia="${m.id}" data-tipo="audio">🎤 áudio</div>` : ''}${esc(m.texto || m.transcricao || (m.midia_url ? '' : '['+(m.tipo||'mídia')+']'))}<small>${esc(m.autor||'')} · ${hora(m.criado_em)}</small></div>`).join('')}</div>`;
+    else if (i.mensagens && i.mensagens.length) corpo = `<div class="msgs" id="lp-msgs">${i.mensagens.map(m => `<div class="msg ${m.direcao==='saida'?'saida':''}">${m.tipo==='imagem'&&m.midia_url ? `<div data-midia="${m.id}" data-tipo="imagem">🖼️ imagem</div>` : m.tipo==='audio'&&m.midia_url ? `<div data-midia="${m.id}" data-tipo="audio">🎤 áudio</div>${m.transcricao ? `<div class="transcr">${esc(m.transcricao)}</div>` : `<button class="bt-tr" onclick="LeadPainel.transcrever('${m.id}')">📝 ler o que diz</button>`}` : ''}${esc(m.texto || m.transcricao || (m.midia_url ? '' : '['+(m.tipo||'mídia')+']'))}<small>${esc(m.autor||'')} · ${hora(m.criado_em)}</small></div>`).join('')}</div>`;
     else corpo = `<div class="aviso-p">${conectado ? 'Ainda não há conversa com este lead pelo Capta. Escreva abaixo pra começar.' : 'A conversa aparece aqui quando o WhatsApp da unidade estiver conectado.'}${l.kommo_lead_id ? `<br><a class="lnk" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Ver a conversa no Kommo ↗</a>` : ''}</div>`;
     setTimeout(carregarMidias, 50);
     return `${acoes}<div class="corpo">${chipsEtapa(l, et)}<div class="sec">Conversa</div>${corpo}</div>
@@ -279,5 +281,11 @@
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
 
-  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, mudarEtapa, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
+  async function transcrever(id){
+    try { const d = await api('transcrever', { mensagem_id: id });
+      if (d.erro) return say(d.erro, { tipo:'erro' });
+      S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
+    catch (e) { say(e.message, { tipo:'erro' }); }
+  }
+  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, mudarEtapa, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
 })();
