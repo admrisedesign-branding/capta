@@ -76,7 +76,7 @@ module.exports = async function handler(req, res) {
     const tenant = tenants && tenants[0];
     if (!tenant) return res.status(403).json({ erro: 'Acesso negado.' });
     // o tablet e o monitor usam um token próprio, que só abre as ações da recepção
-    const RECEPCAO = ['recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora'];
+    const RECEPCAO = ['recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     const ehRecepcao = tenant.recepcao_token && token === tenant.recepcao_token;
     if (ehRecepcao) { if (!RECEPCAO.includes(acao)) return res.status(403).json({ erro: 'Este dispositivo só pode fazer check-in.' }); }
     else if (token !== tenant.dashboard_token) return res.status(403).json({ erro: 'Acesso negado.' });
@@ -90,7 +90,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -124,6 +124,7 @@ module.exports = async function handler(req, res) {
         case 'visita_avulsa': return await acaoVisitaAvulsa(tenant, body, res);
         case 'resumo_config': return await acaoResumoConfig(tenant, body, res);
         case 'resumo_agora':  { const r = await enviarResumo(tenant.id, true); return res.status(200).json(r); }
+        case 'ficha_aluno':   return await acaoFichaAluno(tenant, body, res);
       }
     }
 
@@ -1397,6 +1398,37 @@ async function enviarResumo(tenantId, forcar) {
   const texto = await montarResumo(tenantId);
   await prov.enviarTexto(canal, t.resumo_para, texto);
   return { ok: true, enviado_para: t.resumo_para };
+}
+
+
+// ---------------------------------------------------------------------
+// FICHA DO ALUNO — frequência, kit, satisfação e a origem dele
+// ---------------------------------------------------------------------
+async function acaoFichaAluno(tenant, body, res) {
+  const id = body.aluno_id; if (!id) return res.status(400).json({ erro: 'Informe o aluno.' });
+  const [al] = await sb(`capta_alunos?id=eq.${id}&tenant_id=eq.${tenant.id}&select=*&limit=1`);
+  if (!al) return res.status(404).json({ erro: 'Aluno não encontrado.' });
+  const [turmas, presencas, lead, matriculas] = await Promise.all([
+    sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim`).catch(() => []),
+    sb(`capta_presencas?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&select=data,entrada_em,saida_em,feedback,comentario&order=data.desc&limit=180`).catch(() => []),
+    al.lead_id ? sb(`capta_leads?id=eq.${al.lead_id}&select=id,nome,contato,fonte,porta,origem,criado_em,kommo_lead_id,evento_id,temperatura`).catch(() => []) : [],
+    al.lead_id ? sb(`capta_matriculas?tenant_id=eq.${tenant.id}&lead_id=eq.${al.lead_id}&select=valor_bruto,fechada_em,fechada_por,status&order=fechada_em.desc`).catch(() => []) : []
+  ]);
+  // aulas previstas desde a matrícula (uma por semana, no dia da turma)
+  const turma = (turmas || []).find(t => t.id === al.turma_id);
+  const inicio = (matriculas?.[0]?.fechada_em) || String(al.criado_em || '').slice(0, 10);
+  let previstas = 0;
+  if (turma && inicio) {
+    const d = new Date(inicio + 'T12:00:00'), hoje = new Date();
+    while (d <= hoje) { if (d.getDay() === turma.dia_semana) previstas++; d.setDate(d.getDate() + 1); }
+  }
+  const presentes = (presencas || []).filter(p => p.entrada_em).length;
+  const notas = (presencas || []).filter(p => p.feedback).map(p => ({ data: p.data, nota: p.feedback, comentario: p.comentario }));
+  return res.status(200).json({
+    aluno: al, turma: turma || null, presencas: presencas || [], previstas, presentes,
+    frequencia: previstas ? Math.round(presentes / previstas * 100) : null,
+    notas, lead: lead?.[0] || null, matriculas: matriculas || []
+  });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
