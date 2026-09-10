@@ -6,20 +6,8 @@
 <title>Painel Gestão — Capta</title>
 <link rel="icon" href="/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/capta.css">
 <style>
-:root{
-  --brand:#2E5BFF; --brand-deep:#1E44D6; --brand-2:#5B8DEF;
-  --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
-  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
-  --ink:#141A2E; --muted:#697089; --faint:#9AA1B4;
-  --quente:#E03127; --quente-bg:rgba(224,49,39,.12);
-  --morno:#C47A08;  --morno-bg:rgba(224,147,15,.14);
-  --frio:#3E6FD6;   --frio-bg:rgba(91,141,239,.15);
-  --verde:#16A34A;  --verde-bg:rgba(22,163,74,.12);
-  --gray-bg:rgba(105,112,137,.12);
-  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
-}
-*{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
 button,select{font-family:inherit;cursor:pointer}
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
@@ -113,12 +101,7 @@ tr:last-child td{border-bottom:0}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
-#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:90;pointer-events:none}
-.toast{pointer-events:auto;background:var(--ink,#141A2E);color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px rgba(20,26,46,.25);display:flex;align-items:center;gap:12px;animation:tin .18s ease-out;max-width:560px}
-.toast.erro{background:#B3261E}.toast.ok{background:#1F7A4D}
-.toast button{border:0;background:rgba(255,255,255,.14);color:#fff;font-weight:700;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
-.toast button:hover{background:rgba(255,255,255,.24)}
-@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+to{opacity:1;transform:none}}
 </style>
 <script>
 // aviso discreto no rodapé, com ação opcional (ex.: desfazer)

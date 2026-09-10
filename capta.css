@@ -1,0 +1,129 @@
+/* capta.css — a base visual do Capta: cores, tipografia e os componentes que
+   se repetem em todas as telas (botões, cartões, tabelas, janelas, avisos).
+   Cada tela carrega este arquivo primeiro e só acrescenta o que é dela. */
+
+:root{
+  --brand:#2E5BFF; --brand-deep:#1E44D6; --brand-2:#5B8DEF;
+  --brand-soft:rgba(46,91,255,.10); --brand-softer:rgba(46,91,255,.06);
+  --bg:#F4F6FB; --card:#FFFFFF; --line:#E9ECF3; --line-2:#F1F3F8;
+  --ink:#141A2E; --muted:#697089; --faint:#9AA1B4;
+  --quente:#E03127; --quente-bg:rgba(224,49,39,.12);
+  --morno:#C47A08;  --morno-bg:rgba(224,147,15,.14);
+  --frio:#3E6FD6;   --frio-bg:rgba(91,141,239,.15);
+  --verde:#16A34A;  --verde-bg:rgba(22,163,74,.12);
+  --exp:#E8734A;    --exp-bg:#FDEFE7;
+  --gray-bg:rgba(105,112,137,.12);
+  --r:16px; --shadow:0 1px 2px rgba(20,26,46,.04),0 6px 20px rgba(20,26,46,.05);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;font-size:14px}
+button,input,select,textarea{font-family:inherit}
+button{cursor:pointer;border:0}
+a{color:var(--brand)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:6px}
+
+/* barra do topo (nas telas abertas fora do painel) */
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;
+  background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px;font-weight:700}
+.voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;
+  padding:7px 13px;border-radius:10px;text-decoration:none}
+.voltar:hover{border-color:var(--brand);color:var(--brand)}
+.ferr{margin-left:auto;display:flex;gap:8px;align-items:center}
+.wrap{padding:20px 26px 48px}
+
+/* barra de navegação/ações das telas */
+.barra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.barra h2{font-size:19px;font-weight:800;letter-spacing:-.01em}
+.nav{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 12px;font-weight:700;color:var(--muted)}
+.periodo{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 14px;font-weight:700;font-size:13.5px;text-transform:capitalize}
+.abas{display:flex;gap:4px;background:var(--line-2);padding:3px;border-radius:10px}
+.abas button{border:0;background:transparent;font-weight:700;font-size:12.5px;color:var(--muted);padding:6px 12px;border-radius:8px}
+.abas button.on{background:var(--card);color:var(--brand);box-shadow:var(--shadow)}
+
+/* botões */
+.btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:9px}
+.btn:hover{background:var(--brand-deep)}
+.btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+.btn.g:hover{border-color:var(--brand);color:var(--brand)}
+.btn.v{background:var(--verde)}.btn.x{background:var(--quente-bg);color:var(--quente)}
+.btn.sm{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default}
+
+/* cartões e blocos */
+.card,.bloco{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px}
+.card.full{grid-column:1/-1}
+.card h3,.bloco h3{font-size:13.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;
+  margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.card .h,.bloco .h{font-size:12.5px;color:var(--faint);margin-bottom:12px;line-height:1.5}
+.bloco h3 .n{background:var(--line-2);color:var(--ink);border-radius:99px;padding:1px 8px;font-size:11.5px}
+.bloco h3 .link,.card h3 .link{margin-left:auto;font-size:12px;font-weight:700;color:var(--brand);
+  text-transform:none;letter-spacing:0;cursor:pointer}
+
+/* contadores */
+.tally{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+  padding:12px 18px;display:flex;gap:26px;margin-bottom:14px;flex-wrap:wrap}
+.tally b{font-size:22px;font-weight:800;margin-right:6px}
+.tally small{color:var(--muted);font-weight:600;font-size:12.5px}
+.tally .hot b{color:var(--morno)}.tally .bad b{color:var(--quente)}.tally .ok b{color:var(--verde)}
+
+/* tabelas */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:700;
+  text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+
+/* etiquetas de temperatura */
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--line-2);color:var(--muted)}
+.t-Quente,.tag.quente{background:var(--quente-bg);color:var(--quente)}
+.t-Morno,.tag.morno{background:var(--morno-bg);color:var(--morno)}
+.t-Frio,.tag.frio{background:var(--frio-bg);color:var(--frio)}
+
+/* janelas */
+.fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
+.janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:460px;
+  box-shadow:0 20px 50px rgba(20,26,46,.2);max-height:92vh;overflow-y:auto}
+.janela h3{font-size:16px;font-weight:700}
+.janela p{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.5}
+.campo{margin-top:12px}
+.campo label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.campo input,.campo select,.campo textarea{width:100%;border:1px solid var(--line);border-radius:10px;
+  padding:9px 11px;font-size:13px;color:var(--ink);background:var(--card)}
+.campo textarea{min-height:70px;resize:vertical}
+.campo input:focus,.campo select:focus,.campo textarea:focus{outline:0;border-color:var(--brand)}
+.l2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fim{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:5px 10px;
+  font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+
+/* estados vazios e dicas */
+.vazio,.aviso{border:1px dashed var(--line);border-radius:var(--r);padding:30px;text-align:center;
+  color:var(--faint);font-size:13.5px;line-height:1.7}
+.dica{font-size:12.5px;color:var(--muted);background:var(--line-2);border-radius:10px;padding:10px 12px;
+  line-height:1.55;margin-top:10px}
+.nota{font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.5}
+
+/* avisos flutuantes (toast) */
+#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;
+  gap:8px;z-index:90;pointer-events:none}
+.toast{pointer-events:auto;background:var(--ink);color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;
+  box-shadow:0 10px 30px rgba(20,26,46,.25);display:flex;align-items:center;gap:12px;animation:toast-in .18s ease-out;max-width:560px}
+.toast.erro{background:#B3261E}.toast.ok{background:#1F7A4D}
+.toast button{border:0;background:rgba(255,255,255,.14);color:#fff;font-weight:700;font-size:12px;
+  padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
+.toast button:hover{background:rgba(255,255,255,.24)}
+@keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* dentro do painel: a tela some com a própria barra */
+body.embed .voltar,body.embed .topbar h1{display:none}
+body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;
+  padding:10px 18px 0;position:static;justify-content:flex-end}
+body.embed .wrap{padding-top:16px}
+
+@media print{.topbar,.barra,.nota{display:none}body{background:#fff}.card,.bloco,.tally{box-shadow:none;break-inside:avoid}}
