@@ -55,7 +55,7 @@ td{padding:10px;border-bottom:1px solid var(--line-2);vertical-align:middle}tr:l
 </head>
 <body>
 <div class="topbar"><a class="voltar" id="voltar" href="/dashboard.html">← Painel</a><h1>Ajustes</h1></div>
-<div class="wrap"><div class="barra"><div class="abas"><button class="on" id="ab-equipe" onclick="aba('equipe')">Equipe e permissões</button><button id="ab-recepcao" onclick="aba('recepcao')">Recepção</button><button id="ab-conta" onclick="aba('conta')">Conta</button></div>
+<div class="wrap"><div class="barra"><div class="abas"><button class="on" id="ab-equipe" onclick="aba('equipe')">Equipe e permissões</button><button id="ab-recepcao" onclick="aba('recepcao')">Recepção</button><button id="ab-integra" onclick="aba('integra')">Integrações e investimento</button><button id="ab-conta" onclick="aba('conta')">Conta</button></div>
   <button class="btn" style="margin-left:auto" id="btn-novo" onclick="editar(null)">+ Nova pessoa</button></div>
   <div id="raiz"><div class="aviso">Carregando…</div></div></div>
 <div id="modal"></div>
@@ -77,12 +77,13 @@ async function carregar(){
     EU = EQ.find(u => u.email === ((window.CaptaUser && CaptaUser.email && CaptaUser.email()) || '')) || null;
     desenhar(); } catch(e){ document.getElementById('raiz').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
 }
-function aba(a){ ABA = a; ['equipe','recepcao','conta'].forEach(x => document.getElementById('ab-'+x).classList.toggle('on', x===a)); document.getElementById('btn-novo').style.display = a==='equipe' ? '' : 'none'; desenhar(); }
+function aba(a){ ABA = a; ['equipe','recepcao','integra','conta'].forEach(x => document.getElementById('ab-'+x).classList.toggle('on', x===a)); document.getElementById('btn-novo').style.display = a==='equipe' ? '' : 'none'; desenhar(); }
 const telasDe = u => (u.telas && u.telas.length ? u.telas : (PAPEIS[u.papel] || {}).telas || []);
 
 function desenhar(){
   if (ABA === 'conta') return desenharConta();
   if (ABA === 'recepcao') return desenharRecepcao();
+  if (ABA === 'integra') return desenharIntegra();
   const gestor = !EU || EU.papel === 'gestor';
   document.getElementById('raiz').innerHTML = `
     <div class="bloco"><h3>Quem tem acesso</h3><div class="h">Cada pessoa entra com o próprio e-mail e senha em capta.riseagencia.com/login.html. O que ela pode ver e fazer vem do perfil — e dá pra ajustar tela a tela.</div>
@@ -100,15 +101,25 @@ function desenhar(){
       <div class="dica"><b>Exemplo do dia a dia:</b> quem cuida da matrícula e do quadro de alunos (matriculados, cancelados, trancados) entra como <b>Secretaria</b> — vê Alunos, Agenda e Aula experimental, e não abre as conversas nem o Painel.</div>
     </div>`;
 }
-function desenharRecepcao(){
-  const base = location.origin, qs = `?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+let TOKEN_REC = null;
+async function desenharRecepcao(){
+  if (TOKEN_REC === null) { document.getElementById('raiz').innerHTML = '<div class="aviso">Carregando…</div>';
+    try { const d = await cfg('recepcao_token'); TOKEN_REC = d.token || ''; } catch(e){ TOKEN_REC = ''; } }
+  const base = location.origin, qs = `?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN_REC || TOKEN)}`;
   const link = (url, titulo, texto) => `<div class="bloco"><h3>${titulo}</h3><div class="h">${texto}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input readonly value="${url}" style="flex:1;min-width:260px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:12.5px;color:var(--muted)" onclick="this.select()">
     <button class="btn g" onclick="navigator.clipboard.writeText('${url}');toast('Link copiado')">copiar</button><a class="btn" style="text-decoration:none" href="${url}" target="_blank" rel="noopener">abrir</a></div></div>`;
   document.getElementById('raiz').innerHTML =
     link(base + '/checkin.html' + qs, 'Tablet de check-in', 'Deixe aberto no tablet da entrada. A pessoa toca no próprio nome ao chegar e ao sair; na saída da aula experimental, o tablet pergunta como foi, se vai matricular na hora e, se não, o motivo.') +
     link(base + '/monitor.html' + qs, 'Monitor da sala', 'Tela cheia na TV: turmas do dia, quem já chegou e os visitantes da aula experimental. Atualiza sozinho.') +
+    `<div class="bloco"><h3>Segurança destes links</h3><div class="h">Eles usam uma chave separada, que só permite check-in e check-out — não abre leads, conversas nem o painel. Se um tablet sumir, gere uma chave nova: os links antigos param de funcionar na hora.</div>
+      <button class="btn g" onclick="novaChaveRecepcao()">Gerar nova chave</button></div>` +
     `<div class="bloco"><h3>Como deixar em tela cheia</h3><div class="h">No tablet: abra o link no Chrome, toque em ⋮ → <b>Adicionar à tela inicial</b>. Na TV/monitor: abra no navegador e aperte <b>F11</b>. Os dois links não pedem senha — quem tiver o link entra, então use só nos aparelhos da escola.</div></div>`;
+}
+async function novaChaveRecepcao(){
+  if (!confirm('Gerar uma chave nova? Os links atuais do tablet e do monitor deixam de funcionar.')) return;
+  try { const d = await cfg('recepcao_token', { renovar: true }); TOKEN_REC = d.token; desenharRecepcao(); toast('Chave nova gerada — atualize os aparelhos', { tipo:'ok' }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
 }
 function desenharConta(){
   const eu = EU || {};
@@ -120,6 +131,87 @@ function desenharConta(){
     <div class="bloco"><h3>Negócio</h3><div class="h">Painel: <b>${esc(SLUG)}</b></div>
       <div class="dica">Para conectar ou trocar o WhatsApp da unidade, use o botão <b>Conectar WhatsApp</b> no topo do painel.</div></div>`;
 }
+
+// ---------------- Integrações e investimento ----------------
+const CANAIS = [['meta','Meta Ads (Instagram/Facebook)'],['google','Google'],['evento','Evento'],['material','Material e brindes'],['outro','Outro']];
+let INV = [], INTEG = [];
+async function cfg(acao, extra = {}) {
+  const r = await fetch('/api/capta-config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug:SLUG, token:TOKEN, ...extra }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`); return d;
+}
+async function desenharIntegra(){
+  document.getElementById('raiz').innerHTML = `<div class="aviso">Carregando…</div>`;
+  try { const d = await cfg('investimento'); INV = d.investimento || []; INTEG = d.integracoes || []; } catch(e){ document.getElementById('raiz').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; return; }
+  const meta = INTEG.find(i => i.servico === 'meta_ads');
+  const brl = v => (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
+  const mesNome = m => new Date(m + 'T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  const meses = [...new Set(INV.map(i => i.mes))].sort().reverse();
+  document.getElementById('raiz').innerHTML = `
+    <div class="bloco"><h3>Meta Ads</h3><div class="h">Puxa sozinho quanto cada campanha gastou, todo dia de manhã. Assim o Painel mostra custo por lead e por matrícula sem ninguém digitar.</div>
+      ${meta && meta.conectado ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="papel" style="background:var(--verde-bg);color:var(--verde)">conectado</span>
+        <b>${esc(meta.conta_nome || meta.conta_id)}</b>
+        <span style="color:var(--faint);font-size:12.5px">${meta.ultimo_sync ? 'atualizado ' + new Date(meta.ultimo_sync).toLocaleString('pt-BR') : 'ainda não sincronizou'}</span>
+        <span style="margin-left:auto;display:flex;gap:8px"><button class="btn g sm" onclick="sincronizar()">Atualizar agora</button><button class="btn g sm" onclick="desconectarMeta()">Desconectar</button></span></div>
+        ${meta.ultimo_erro ? `<div class="dica" style="background:rgba(224,49,39,.08);color:var(--quente)">${esc(meta.ultimo_erro)}</div>` : ''}`
+      : `<div class="campo"><label>Token de acesso (System User, com ads_read)</label><input id="mt-token" type="password" placeholder="Cole aqui o token gerado no Meta Business"></div>
+         <div id="mt-contas"></div>
+         <div style="margin-top:12px"><button class="btn" onclick="conectarMeta()">Conectar</button></div>
+         <div class="dica"><b>Como gerar:</b> business.facebook.com → Configurações do negócio → Usuários → <b>Usuários do sistema</b> → Adicionar ("Capta") → Adicionar ativos → a conta de anúncios com permissão de ver desempenho → <b>Gerar token</b> marcando <b>ads_read</b>. O token fica guardado aqui e nunca aparece de volta na tela.</div>`}
+    </div>
+    <div class="bloco"><h3>Investimento por mês</h3><div class="h">O que a Meta traz aparece sozinho. Evento, brinde e impulsionamento avulso você lança aqui.</div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn" onclick="editarGasto(null)">+ Lançar gasto</button></div>
+      ${meses.length ? meses.map(m => { const linhas = INV.filter(i => i.mes === m); const tot = linhas.reduce((s,i) => s + Number(i.valor||0), 0);
+        return `<div style="margin-bottom:16px"><div style="font-size:12.5px;font-weight:800;color:var(--muted);text-transform:capitalize;margin-bottom:6px">${mesNome(m)} · ${brl(tot)}</div>
+        <table><tr><th>Campanha</th><th>Canal</th><th class="n" style="text-align:right">Valor</th><th></th></tr>
+        ${linhas.map(i => `<tr><td><b>${esc(i.campanha)}</b>${i.observacao?`<br><span style="color:var(--faint);font-size:11.5px">${esc(i.observacao)}</span>`:''}</td>
+          <td><span class="papel ${i.canal==='meta'?'':'secretaria'}">${esc((CANAIS.find(c=>c[0]===i.canal)||[])[1] || i.canal)}</span></td>
+          <td style="text-align:right;font-weight:700">${brl(i.valor)}</td>
+          <td style="text-align:right">${i.canal === 'meta' ? '<span style="color:var(--faint);font-size:11.5px">automático</span>' : `<button class="btn g sm" onclick="editarGasto('${i.id}')">editar</button>`}</td></tr>`).join('')}</table></div>`; }).join('')
+        : '<div class="aviso">Nada lançado ainda.</div>'}
+    </div>`;
+}
+async function conectarMeta(){
+  const token = document.getElementById('mt-token').value.trim(); if (!token) return toast('Cole o token.', { tipo:'erro' });
+  try { const d = await cfg('integracao_salvar', { token_meta: token });
+    if (d.escolher) {
+      document.getElementById('mt-contas').innerHTML = `<div class="campo"><label>Qual conta de anúncios?</label><select id="mt-conta">${d.escolher.map(c => `<option value="${c.id}" data-n="${esc(c.nome)}">${esc(c.nome)} (${c.id})</option>`).join('')}</select></div>
+        <div style="margin-top:10px"><button class="btn" onclick="confirmarMeta()">Confirmar conta</button></div>`;
+      return toast('Escolha a conta de anúncios');
+    }
+    INTEG = d.integracoes; toast('Meta Ads conectada · gasto importado', { tipo:'ok' }); desenharIntegra(); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function confirmarMeta(){
+  const sel = document.getElementById('mt-conta'); const token = document.getElementById('mt-token').value.trim();
+  try { const d = await cfg('integracao_salvar', { token_meta: token, conta_id: sel.value, conta_nome: sel.selectedOptions[0].dataset.n });
+    toast(d.sync && d.sync.campanhas ? `Conectado · ${d.sync.campanhas} campanhas importadas` : 'Meta Ads conectada', { tipo:'ok' }); desenharIntegra(); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function sincronizar(){ try { const d = await cfg('meta_sync', { meses: 3 }); toast(d.erro ? d.erro : `${d.campanhas} campanhas atualizadas`, d.erro ? { tipo:'erro' } : { tipo:'ok' }); desenharIntegra(); } catch(e){ toast(e.message, { tipo:'erro' }); } }
+async function desconectarMeta(){ if (!confirm('Desconectar a Meta Ads? O histórico de gastos continua.')) return;
+  try { await cfg('integracao_salvar', { desconectar: true }); toast('Desconectado'); desenharIntegra(); } catch(e){ toast(e.message, { tipo:'erro' }); } }
+function editarGasto(id){
+  const i = id ? INV.find(x => x.id === id) : { mes: new Date().toISOString().slice(0,7) + '-01', canal: 'evento' };
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela">
+    <h3>${id ? 'Editar gasto' : 'Lançar gasto'}</h3><p>Evento, brinde, impulsionamento avulso — o que não vem da Meta.</p>
+    <div class="campo"><label>Mês</label><input id="g-mes" type="month" value="${(i.mes||'').slice(0,7)}"></div>
+    <div class="campo"><label>Campanha / descrição</label><input id="g-nome" value="${esc(i.campanha||'')}" placeholder="Ex.: Evento Shopping Plaza"></div>
+    <div class="l2"><div class="campo"><label>Canal</label><select id="g-canal">${CANAIS.filter(c=>c[0]!=='meta').map(c => `<option value="${c[0]}" ${i.canal===c[0]?'selected':''}>${c[1]}</option>`).join('')}</select></div>
+      <div class="campo"><label>Valor (R$)</label><input id="g-valor" type="number" step="10" min="0" value="${i.valor||''}"></div></div>
+    <div class="campo"><label>Observação</label><input id="g-obs" value="${esc(i.observacao||'')}"></div>
+    <div class="fim">${id?`<button class="btn g" style="margin-right:auto" onclick="apagarGasto('${id}')">Excluir</button>`:''}<button class="btn g" onclick="fechar()">Cancelar</button><button class="btn" onclick="salvarGasto('${id||''}')">Salvar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fechar(); };
+}
+async function salvarGasto(id){
+  const g = x => document.getElementById(x).value;
+  try { const d = await cfg('investimento_salvar', { item: { id: id||undefined, mes: g('g-mes') + '-01', campanha: g('g-nome'), canal: g('g-canal'), valor: g('g-valor'), observacao: g('g-obs') } });
+    INV = d.investimento; fechar(); desenharIntegra(); toast('Gasto salvo', { tipo:'ok' }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function apagarGasto(id){ if (!confirm('Excluir este lançamento?')) return;
+  try { const d = await cfg('investimento_salvar', { apagar: id }); INV = d.investimento; fechar(); desenharIntegra(); toast('Excluído'); } catch(e){ toast(e.message, { tipo:'erro' }); } }
+
 function editar(id){
   const u = id ? EQ.find(x => x.id === id) : { papel:'atendente', ativo:true };
   const telas = telasDe(u);
