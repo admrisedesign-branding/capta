@@ -306,10 +306,11 @@ async function acaoEnviar(tenant, canal, body, res) {
       conversa_id: conversa.id,
       tenant_id: tenant.id,
       direcao: 'saida',
-      autor: 'humano',
+      autor: body.autor && body.autor !== 'bot' ? body.autor : 'humano',
       autor_id: body.usuario_id || null,
       tipo: 'texto',
       texto,
+      responde_a: body.responde_a || null,
       provedor_msg_id: envio.provedor_msg_id,
       entrega: 'enviada'
     })
@@ -358,7 +359,7 @@ async function acaoMensagens(tenant, body, res) {
   const msgs = await sb(
     `capta_mensagens?conversa_id=eq.${id}&tenant_id=eq.${tenant.id}` +
     `&select=id,direcao,autor,tipo,texto,midia_url,midia_mime,entrega,criado_em,` +
-    `transcricao,transcricao_status` +
+    `transcricao,transcricao_status,responde_a,provedor_msg_id` +
     `&order=criado_em.asc&limit=200`
   );
 
