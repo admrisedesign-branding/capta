@@ -3,10 +3,9 @@
 //   ?acao=espelho  (padrão)  → espelho Kommo → Capta. Webhook do Kommo aponta pra cá:
 //                              https://capta.riseagencia.com/api/capta-kommo   (lead adicionado/alterado/etapa alterada)
 //                              backfill: ...?acao=espelho&lead_id=123456
-//   ?acao=migrar&secret=<MIG_SECRET ou CRON_SECRET>[&dry=1][&so=tabela] → migração one-off rise-leads → capta-dev (remover depois)
 //
 // Variáveis: KOMMO_TOKEN · SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · CRON_SECRET
-//            (migração) MIG_SRC_URL · MIG_SRC_KEY · MIG_DST_URL · MIG_DST_KEY
+//            KOMMO_ACCOUNT_ID (opcional: só aceita webhook da sua conta)
 
 // ───────────── ESPELHO ─────────────
 
@@ -233,6 +232,17 @@ function idsDoWebhook(body) {
 
 async function espelho(req, res) {
   try {
+    // GET manual (backfill) exige o segredo; POST é o webhook do Kommo, que traz account_id
+    if (req.method === 'GET' && req.query?.lead_id) {
+      const esperado = (process.env.MIG_SECRET || process.env.CRON_SECRET || '').trim();
+      const recebido = String(req.query.secret || '').trim();
+      if (!esperado || recebido !== esperado) return res.status(401).json({ erro: 'Informe o segredo para o backfill manual.' });
+    } else if (req.method === 'POST') {
+      const conta = process.env.KOMMO_ACCOUNT_ID;
+      const obj = typeof req.body === 'string' ? Object.fromEntries(new URLSearchParams(req.body)) : (req.body || {});
+      const daConta = obj['account[id]'] || obj.account_id || (obj.account && obj.account.id);
+      if (conta && daConta && String(daConta) !== String(conta)) return res.status(200).json({ ok: true, ignorado: 'outra conta' });
+    }
     const ids = req.method === 'GET' && req.query?.lead_id
       ? [Number(req.query.lead_id)]
       : idsDoWebhook(req.body);
@@ -250,89 +260,6 @@ async function espelho(req, res) {
   }
 }
 
-// ───────────── MIGRAÇÃO (one-off) ─────────────
-
-const SRC = { url: process.env.MIG_SRC_URL, key: process.env.MIG_SRC_KEY };
-const DST = { url: process.env.MIG_DST_URL, key: process.env.MIG_DST_KEY };
-
-// ordem respeita as chaves estrangeiras
-const TABELAS = [
-  'capta_tenants', 'capta_planos', 'capta_admins', 'capta_usuarios', 'capta_etapas',
-  'capta_formularios', 'capta_perguntas', 'capta_leads', 'capta_turmas', 'capta_agenda_bloqueios',
-  'capta_canais', 'capta_conversas', 'capta_mensagens', 'capta_midias',
-  'capta_agendamentos', 'capta_matriculas', 'capta_investimento', 'capta_conhecimento',
-  'capta_agente_config', 'capta_relatorios', 'capta_diagnosticos', 'leads',
-];
-
-// tabelas sem PK "id" (upsert por outra chave ou insert simples)
-const CHAVE = { capta_planos: 'codigo', capta_agente_config: 'tenant_id', capta_diagnosticos: 'tenant_id', capta_admins: null };
-// colunas que existem na origem mas NÃO no destino (descartar)
-const DESCARTAR = { capta_admins: ['criado_em'] };
-
-const h = (p, extra = {}) => ({ apikey: p.key, Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json', ...extra });
-
-async function contar(p, t) {
-  const r = await fetch(`${p.url}/rest/v1/${t}?select=*`, { headers: h(p, { Prefer: 'count=exact', Range: '0-0' }) });
-  const cr = r.headers.get('content-range') || '';
-  return r.ok ? Number(cr.split('/')[1] ?? -1) : `erro ${r.status}`;
-}
-
-async function lerTudo(t) {
-  const out = [];
-  const passo = 500;
-  for (let off = 0; ; off += passo) {
-    const r = await fetch(`${SRC.url}/rest/v1/${t}?select=*&offset=${off}&limit=${passo}`, { headers: h(SRC) });
-    if (!r.ok) throw new Error(`ler ${t}: ${r.status} ${await r.text()}`);
-    const rows = await r.json();
-    out.push(...rows);
-    if (rows.length < passo) break;
-  }
-  return out;
-}
-
-async function gravar(t, rows) {
-  if (!rows.length) return { gravadas: 0 };
-  const desc = DESCARTAR[t] || [];
-  const limpo = rows.map(r => { const o = { ...r }; for (const c of desc) delete o[c]; return o; });
-  const chave = t in CHAVE ? CHAVE[t] : 'id';
-  const tentar = async (prefer, q = '') => fetch(`${DST.url}/rest/v1/${t}${q}`, {
-    method: 'POST', headers: h(DST, { Prefer: prefer }), body: JSON.stringify(limpo),
-  });
-  let r = chave
-    ? await tentar('resolution=merge-duplicates,return=minimal', `?on_conflict=${chave}`)
-    : await tentar('return=minimal');
-  if (!r.ok && chave) r = await tentar('return=minimal'); // sem PK utilizável → insert simples
-  if (!r.ok) throw new Error(`gravar ${t}: ${r.status} ${await r.text()}`);
-  return { gravadas: limpo.length };
-}
-
-async function migrar(req, res) {
-  const q = req.query || {};
-  const esperado = (process.env.MIG_SECRET || process.env.CRON_SECRET || '').trim(); // MIG_SECRET: senha simples só pra migração
-  const recebido = String(q.secret || '').trim();
-  let dec = recebido; try { dec = decodeURIComponent(recebido); } catch {}
-  const bate = esperado && (recebido === esperado || dec === esperado);
-  if (!bate) return res.status(401).json({ erro: 'secret', recebido_len: recebido.length, esperado_len: esperado.length, ambiente: process.env.VERCEL_ENV || null });
-  if (!SRC.url || !SRC.key || !DST.url || !DST.key) return res.status(500).json({ erro: 'faltam MIG_SRC_* / MIG_DST_*' });
-
-  const lista = q.so ? [q.so] : TABELAS;
-  const rel = [];
-  for (const t of lista) {
-    const item = { tabela: t, origem: await contar(SRC, t), destino_antes: await contar(DST, t) };
-    try {
-      if (!q.dry) {
-        const rows = await lerTudo(t);
-        Object.assign(item, await gravar(t, rows));
-        item.destino_depois = await contar(DST, t);
-      }
-    } catch (e) { item.erro = e.message.slice(0, 300); }
-    rel.push(item);
-  }
-  res.status(200).json({ ok: true, dry: !!q.dry, rel });
-}
-
 module.exports = async function handler(req, res) {
-  const acao = (req.query && req.query.acao) || 'espelho';
-  if (acao === 'migrar') return migrar(req, res);
   return espelho(req, res);
 };

@@ -71,10 +71,15 @@ module.exports = async function handler(req, res) {
   try {
     // ---- valida o negócio e o plano ----
     const tenants = await sb(
-      `capta_tenants?slug=eq.${encodeURIComponent(slug)}&dashboard_token=eq.${encodeURIComponent(token)}&select=id,slug,plano&limit=1`
+      `capta_tenants?slug=eq.${encodeURIComponent(slug)}&select=id,slug,plano,dashboard_token,recepcao_token&limit=1`
     );
     const tenant = tenants && tenants[0];
     if (!tenant) return res.status(403).json({ erro: 'Acesso negado.' });
+    // o tablet e o monitor usam um token próprio, que só abre as ações da recepção
+    const RECEPCAO = ['recepcao', 'checkin', 'feedback', 'visita_avulsa'];
+    const ehRecepcao = tenant.recepcao_token && token === tenant.recepcao_token;
+    if (ehRecepcao) { if (!RECEPCAO.includes(acao)) return res.status(403).json({ erro: 'Este dispositivo só pode fazer check-in.' }); }
+    else if (token !== tenant.dashboard_token) return res.status(403).json({ erro: 'Acesso negado.' });
 
     // Funil, agenda e presença não dependem de WhatsApp: valem em qualquer
     // plano, com ou sem canal conectado.

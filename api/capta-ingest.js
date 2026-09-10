@@ -53,6 +53,11 @@ module.exports = async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   const { slug, token, nome, contato, origem, respostas, extra } = body || {};
+  // freio de abuso: campos longos e payload gigante são recusados antes de tocar no banco
+  const tam = JSON.stringify(body || {}).length;
+  if (tam > 20000) return res.status(413).json({ error: 'Envio muito grande.' });
+  if (String(nome || '').length > 120 || String(contato || '').length > 30 || String(origem || '').length > 60)
+    return res.status(400).json({ error: 'Campos acima do tamanho permitido.' });
 
   if (!slug || !token) return res.status(400).json({ error: 'slug e token são obrigatórios.' });
   if (!nome || !String(nome).trim()) return res.status(400).json({ error: 'nome é obrigatório.' });
