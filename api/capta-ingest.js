@@ -104,15 +104,25 @@ module.exports = async function handler(req, res) {
       };
     });
 
-    // 4) campos livres viram anotação do lead
+    // 4) campos conhecidos entram em colunas próprias; o resto vira anotação
+    const CONHECIDOS = ['fonte','porta','atendente','crianca','idade','evento_id','kommo_lead_id','notas','temperatura','curso'];
+    const campos = {};
     let notas = '';
     if (extra && typeof extra === 'object') {
-      notas = Object.keys(extra)
+      for (const k of CONHECIDOS) {
+        const v = extra[k];
+        if (v === null || v === undefined || v === '') continue;
+        if (k === 'idade') campos.idade = Number(v) || null;
+        else if (k === 'kommo_lead_id') campos.kommo_lead_id = Number(v) || null;
+        else if (k === 'notas') notas = String(v).slice(0, 1000);
+        else campos[k] = String(v).slice(0, 160);
+      }
+      const sobra = Object.keys(extra).filter(k => !CONHECIDOS.includes(k))
         .slice(0, 12)
         .filter(k => extra[k] !== null && extra[k] !== undefined && extra[k] !== '')
-        .map(k => `${k}: ${String(extra[k]).slice(0, 120)}`)
-        .join(' · ')
-        .slice(0, 1000);
+        .map(k => `${k.replace(/_/g, ' ')}: ${String(extra[k]).slice(0, 120)}`)
+        .join(' · ');
+      notas = [notas, sobra].filter(Boolean).join(' · ').slice(0, 1000);
     }
 
     const lead = {
@@ -124,6 +134,12 @@ module.exports = async function handler(req, res) {
     };
     if (formId) lead.formulario_id = formId;
     if (notas) lead.notas = notas;
+    Object.assign(lead, campos);
+    // lead de evento já entra na primeira etapa do funil, pronto pro atendimento
+    try {
+      const et = await sb(`capta_etapas?tenant_id=eq.${t.id}&nome=ilike.novo%20lead&select=id&limit=1`);
+      if (et && et[0]) { lead.etapa_id = et[0].id; lead.etapa_em = new Date().toISOString(); }
+    } catch (e) {}
 
     const created = await sb('capta_leads', {
       method: 'POST',
