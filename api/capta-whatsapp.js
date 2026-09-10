@@ -76,7 +76,7 @@ module.exports = async function handler(req, res) {
     const tenant = tenants && tenants[0];
     if (!tenant) return res.status(403).json({ erro: 'Acesso negado.' });
     // o tablet e o monitor usam um token próprio, que só abre as ações da recepção
-    const RECEPCAO = ['recepcao', 'checkin', 'feedback', 'visita_avulsa'];
+    const RECEPCAO = ['recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora'];
     const ehRecepcao = tenant.recepcao_token && token === tenant.recepcao_token;
     if (ehRecepcao) { if (!RECEPCAO.includes(acao)) return res.status(403).json({ erro: 'Este dispositivo só pode fazer check-in.' }); }
     else if (token !== tenant.dashboard_token) return res.status(403).json({ erro: 'Acesso negado.' });
@@ -90,7 +90,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'recepcao', 'checkin', 'feedback', 'visita_avulsa'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -122,6 +122,8 @@ module.exports = async function handler(req, res) {
         case 'checkin':       return await acaoCheckin(tenant, body, res);
         case 'feedback':      return await acaoFeedback(tenant, body, res);
         case 'visita_avulsa': return await acaoVisitaAvulsa(tenant, body, res);
+        case 'resumo_config': return await acaoResumoConfig(tenant, body, res);
+        case 'resumo_agora':  { const r = await enviarResumo(tenant.id, true); return res.status(200).json(r); }
       }
     }
 
@@ -405,6 +407,12 @@ async function acaoMidia(tenant, body, res) {
 // a perseguição que segura o comparecimento.
 // ---------------------------------------------------------------------
 async function rodarCron(res) {
+  // resumo da manhã para quem ativou
+  try {
+    const donos = await sb(`capta_tenants?resumo_para=not.is.null&resumo_ativo=is.true&select=id`).catch(() => []);
+    for (const d of donos || []) await enviarResumo(d.id).catch(() => null);
+  } catch (e) { console.error('[resumo]', e.message); }
+
   const resumo = { enviados: 0, falhas: 0, negocios: 0, sessoes: 0 };
 
   try {
@@ -1321,6 +1329,74 @@ async function acaoVisitaAvulsa(tenant, body, res) {
   if (leadId) { const e = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Aula%20agendada&select=id&limit=1`).catch(() => []))?.[0];
     if (e) { await moverLead(tenant.id, leadId, e.id, null).catch(() => null); await empurrarKommo(tenant.id, leadId, e.id, null).catch(() => null); } }
   return res.status(200).json({ ok: true, agendamento_id: agId, lead_id: leadId });
+}
+
+
+// ---------------------------------------------------------------------
+// RESUMO DA MANHÃ — o dono abre o WhatsApp e já sabe como está o dia
+// ---------------------------------------------------------------------
+async function acaoResumoConfig(tenant, body, res) {
+  if (body.salvar) {
+    const c = body.salvar;
+    const dados = { resumo_para: (c.telefone || '').replace(/\D/g, '') || null, resumo_ativo: c.ativo !== false, resumo_hora: c.hora || '08:00' };
+    await sb(`capta_tenants?id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
+  }
+  const [t] = await sb(`capta_tenants?id=eq.${tenant.id}&select=resumo_para,resumo_ativo,resumo_hora&limit=1`);
+  return res.status(200).json({ config: t || {} });
+}
+
+function plural(n, um, muitos) { return `${n} ${n === 1 ? um : muitos}`; }
+async function montarResumo(tenantId) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const ontem = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+  const mes = hoje.slice(0, 7);
+  const [tenant] = await sb(`capta_tenants?id=eq.${tenantId}&select=nome&limit=1`);
+  const [ags, leads, etapas, alunos, conversas] = await Promise.all([
+    sb(`capta_agendamentos?tenant_id=eq.${tenantId}&data=eq.${hoje}&status=in.(agendado,confirmado,compareceu)&select=id,hora_inicio,crianca_nome,status,lead_id&order=hora_inicio`).catch(() => []),
+    sb(`capta_leads?tenant_id=eq.${tenantId}&select=id,nome,temperatura,etapa_id,etapa_em,criado_em,kommo_criado_em,ganho_em,valor,data_aula&limit=2000`).catch(() => []),
+    sb(`capta_etapas?tenant_id=eq.${tenantId}&select=id,nome`).catch(() => []),
+    sb(`capta_alunos?tenant_id=eq.${tenantId}&status=eq.ativo&select=id`).catch(() => []),
+    sb(`capta_conversas?tenant_id=eq.${tenantId}&nao_lidas=gt.0&select=id`).catch(() => [])
+  ]);
+  const nomeEt = id => (etapas.find(e => e.id === id) || {}).nome || '';
+  const dt = l => l.kommo_criado_em || l.criado_em || '';
+  const novos = (leads || []).filter(l => dt(l).slice(0, 10) === ontem).length;
+  const doMes = (leads || []).filter(l => dt(l).slice(0, 7) === mes);
+  const mats = doMes.filter(l => l.ganho_em || /venda ganha|aluno ativo|matriculado/i.test(nomeEt(l.etapa_id)));
+  const receita = mats.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+  const parados = (leads || []).filter(l => /novo lead|em contato|qualificado/i.test(nomeEt(l.etapa_id)) && l.etapa_em && (Date.now() - new Date(l.etapa_em)) / 864e5 >= 3).length;
+  const quentesSemAula = (leads || []).filter(l => (l.temperatura || '').toLowerCase() === 'quente' && !l.data_aula && !/aula agendada|matr|aluno|venda ganha|perdid/i.test(nomeEt(l.etapa_id))).length;
+
+  const L = [];
+  L.push(`☀️ *Bom dia!* Resumo da ${tenant?.nome || 'unidade'} — ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`);
+  L.push('');
+  if (ags?.length) {
+    L.push(`🤖 *Aulas experimentais hoje: ${ags.length}*`);
+    for (const a of ags.slice(0, 8)) L.push(`   ${String(a.hora_inicio).slice(0,5)} · ${a.crianca_nome || 'visitante'}${a.status === 'confirmado' ? ' ✅ confirmou' : a.status === 'compareceu' ? ' · já chegou' : ''}`);
+    if (ags.length > 8) L.push(`   e mais ${ags.length - 8}`);
+  } else L.push('🤖 *Nenhuma aula experimental hoje*');
+  L.push('');
+  L.push(`📈 *No mês:* ${plural(mats.length, 'matrícula', 'matrículas')}${receita ? ` · R$ ${receita.toLocaleString('pt-BR')}` : ''} · ${plural(doMes.length, 'lead novo', 'leads novos')}`);
+  L.push(`👥 ${plural((alunos || []).length, 'aluno ativo', 'alunos ativos')}`);
+  L.push('');
+  const pend = [];
+  if (conversas?.length) pend.push(`💬 ${plural(conversas.length, 'conversa esperando resposta', 'conversas esperando resposta')}`);
+  if (quentesSemAula) pend.push(`🔥 ${plural(quentesSemAula, 'lead quente sem aula marcada', 'leads quentes sem aula marcada')}`);
+  if (parados) pend.push(`⏳ ${plural(parados, 'lead parado há 3+ dias', 'leads parados há 3+ dias')}`);
+  if (novos) pend.push(`✨ ${plural(novos, 'lead chegou ontem', 'leads chegaram ontem')}`);
+  if (pend.length) { L.push('*Para hoje:*'); pend.forEach(x => L.push(`   ${x}`)); }
+  else L.push('Tudo em dia por aqui 👏');
+  return L.join('\n');
+}
+async function enviarResumo(tenantId, forcar) {
+  const [t] = await sb(`capta_tenants?id=eq.${tenantId}&select=resumo_para,resumo_ativo&limit=1`);
+  if (!t?.resumo_para) return { erro: 'Sem número configurado para o resumo.' };
+  if (!forcar && t.resumo_ativo === false) return { pulado: 'desligado' };
+  const [canal] = await sb(`capta_canais?tenant_id=eq.${tenantId}&tipo=eq.whatsapp&status=eq.conectado&select=*&limit=1`).catch(() => []);
+  if (!canal) return { erro: 'WhatsApp não está conectado.' };
+  const texto = await montarResumo(tenantId);
+  await prov.enviarTexto(canal, t.resumo_para, texto);
+  return { ok: true, enviado_para: t.resumo_para };
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
