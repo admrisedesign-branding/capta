@@ -114,7 +114,7 @@ body.embed .raias{min-height:calc(100vh - 120px)}
 
 
 @media(max-width:760px){
-  .raias{display:block;min-height:0}
+  .raias{display:block;min-height:0;overflow:visible}
   .raia{width:100%;min-width:0;margin-bottom:12px;flex:none}
   .raia-corpo{max-height:none}
   .raia.fechada .raia-corpo{display:none}
@@ -178,6 +178,7 @@ window.CaptaUser = (function(){
   };
 })();
 </script>
+<link rel="stylesheet" href="/mobile.css">
 </head>
 <body>
 <div class="topbar">

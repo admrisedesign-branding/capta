@@ -1,0 +1,53 @@
+/* mobile.css — ajustes de celular para todas as telas do Capta.
+   Carregado por último, depois do CSS de cada página. */
+@media (max-width: 760px) {
+  html, body { max-width: 100%; overflow-x: hidden; }
+
+  /* respiro geral e espaço pra barra inferior */
+  .wrap, .content { padding-left: 14px !important; padding-right: 14px !important; }
+  body.embed .wrap { padding-bottom: 90px !important; }
+
+  /* grids viram uma coluna e param de empurrar a largura */
+  .grade, .corpo, .cards, .meta, .papeis, .vagas3, .escolha, .l2, .linha2, .kpis, .semana, .mes, .grade-alunos {
+    grid-template-columns: 1fr !important;
+  }
+  .grade > *, .corpo > *, .cards > *, .card, .bloco, .lado, .kpi { min-width: 0 !important; }
+
+  /* cabeçalhos de bloco: o link vai pra linha de baixo em vez de estourar */
+  .bloco h3, .card h3 { flex-wrap: wrap; row-gap: 4px; }
+  .bloco h3 .link, .card h3 .link { margin-left: 0; }
+
+  /* barras de filtro e ação: quebram e ocupam a largura */
+  .barra, .filtros-bar, .ferr, .acoes-f, .painel-acoes { flex-wrap: wrap; gap: 8px; }
+  .barra .periodo { order: -1; width: 100%; }
+  .fb-busca, .busca input, input[type="search"] { min-width: 0 !important; width: 100% !important; }
+  .abas { width: 100%; overflow-x: auto; }
+
+  /* contadores compactos */
+  .tally { gap: 12px 18px; padding: 12px 14px; }
+  .tally b { font-size: 19px; }
+  .tally small { font-size: 11.5px; }
+  .kpi .v { font-size: 22px; }
+
+  /* listas com botão à direita: nome corta, botão não */
+  .li { gap: 8px; }
+  .li .t { min-width: 0; }
+  .li .t b, .li .t small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .li .acs { flex-shrink: 0; }
+  .btn.sm { padding: 6px 10px; font-size: 11.5px; }
+
+  /* tabelas: rolam sozinhas em vez de estourar a tela */
+  table { display: block; overflow-x: auto; white-space: nowrap; }
+  table td, table th { white-space: nowrap; }
+
+  /* kanban e grades largas rolam na horizontal */
+  .scrollx, .raia-area, .raias { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* gavetas e janelas em tela cheia */
+  .janela { max-width: 100% !important; border-radius: 18px; padding: 18px; }
+  .fundo { padding: 12px; }
+
+  /* alvos de toque maiores */
+  button, .chip, .nav-item { min-height: 38px; }
+  .acts.quatro button { padding: 16px 10px; font-size: 15px; }
+}

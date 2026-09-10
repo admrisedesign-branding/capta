@@ -113,6 +113,16 @@ button{font-family:inherit;cursor:pointer}
   font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:9px}
 @media(max-width:840px){.voltar-lista{display:block}}
 
+
+@media(max-width:760px){
+  .wrap{display:block}
+  .lista{width:100%;border-right:0}
+  .painel{display:none}
+  body.chat-aberto .lista{display:none}
+  body.chat-aberto .painel{display:flex;height:calc(100vh - 130px)}
+  .voltar-chat{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--muted);margin-right:8px}
+}
+@media(min-width:761px){.voltar-chat{display:none}}
 /* inbox v2 */
 
 .conv{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--line-2);background:transparent;cursor:pointer;font-family:inherit}
@@ -192,6 +202,7 @@ window.CaptaUser = (function(){
 })();
 </script>
 <style>@media(max-width:760px){body.embed .wrap{padding-bottom:80px}.grade,.corpo{grid-template-columns:1fr!important}.tally{gap:14px;padding:10px 12px}.tally b{font-size:19px}}</style>
+<link rel="stylesheet" href="/mobile.css">
 </head>
 <body>
 <div class="topbar">
@@ -292,6 +303,7 @@ async function carregarLista() {
 }
 
 async function abrir(id) {
+  document.body.classList.add('chat-aberto');
   atual = id;
   document.body.classList.add('aberta');
   elConvs.querySelectorAll('.conv').forEach(b => b.setAttribute('aria-current', b.dataset.id === id));
@@ -309,7 +321,8 @@ async function abrir(id) {
             <div class="painel-fone">${fone(conversa.telefone)}</div>
           </div>
         </div>
-        <div class="painel-acoes">
+        <button class="voltar-chat" onclick="document.body.classList.remove('chat-aberto')">← conversas</button>
+    <div class="painel-acoes">
           <div class="robo ${conversa.agente_ativo ? 'on' : 'off'}"><span class="ponto"></span>${conversa.agente_ativo ? 'Robô' : 'Você'}</div>
           <select onchange="atribuir('${conversa.id}', this.value)" title="Quem está atendendo"><option value="">— atendente —</option>${ATEND.map(a=>`<option ${conversa.atendente===a?'selected':''}>${a}</option>`).join('')}</select>
           ${conversa.atendente && conversa.atendente !== FI.eu ? `<button style="border-color:var(--morno);color:var(--morno)" onclick="assumir('${conversa.id}','${FI.eu||''}')" title="${esc(conversa.atendente)} está nesta conversa">assumir</button>` : ''}
