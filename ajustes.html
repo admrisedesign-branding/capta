@@ -210,10 +210,11 @@ async function confirmarMeta(){
   try { const d = await cfg('integracao_salvar', { token_meta: token, conta_id: sel.value, conta_nome: sel.selectedOptions[0].dataset.n });
     TOKEN_META = '';
     toast(d.sync && d.sync.campanhas ? `Conectado · ${d.sync.campanhas} campanhas importadas` : (d.sync && d.sync.erro ? d.sync.erro : 'Meta Ads conectada'), { tipo: d.sync && d.sync.erro ? 'erro' : 'ok' });
-    desenharIntegra(); }
+    setTimeout(desenharIntegra, 600); }
   catch(e){ toast(e.message, { tipo:'erro' }); if (bt) { bt.disabled = false; bt.textContent = 'Confirmar conta'; } }
 }
-async function sincronizar(){ try { const d = await cfg('meta_sync', { meses: 3 }); toast(d.erro ? d.erro : `${d.campanhas} campanhas atualizadas`, d.erro ? { tipo:'erro' } : { tipo:'ok' }); desenharIntegra(); } catch(e){ toast(e.message, { tipo:'erro' }); } }
+async function sincronizar(){ const b = event && event.target; if (b) { b.disabled = true; b.textContent = 'Atualizando…'; }
+  try { const d = await cfg('meta_sync', { meses: 3 }); toast(d.erro ? d.erro : `${d.campanhas} campanhas atualizadas`, d.erro ? { tipo:'erro' } : { tipo:'ok' }); desenharIntegra(); } catch(e){ toast(e.message, { tipo:'erro' }); if (b) { b.disabled = false; b.textContent = 'Atualizar agora'; } } }
 async function desconectarMeta(){ if (!confirm('Desconectar a Meta Ads? O histórico de gastos continua.')) return;
   try { await cfg('integracao_salvar', { desconectar: true }); toast('Desconectado'); desenharIntegra(); } catch(e){ toast(e.message, { tipo:'erro' }); } }
 function editarGasto(id){
