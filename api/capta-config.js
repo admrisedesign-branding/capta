@@ -20,7 +20,10 @@ async function sb(caminho, opts = {}) {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
   });
   if (!r.ok) throw new Error(`Supabase ${r.status}: ${(await r.text()).slice(0, 200)}`);
-  return r.status === 204 ? null : r.json();
+  if (r.status === 204) return null;
+  const txt = await r.text();
+  if (!txt) return null;                       // resposta vazia (Prefer: return=minimal)
+  try { return JSON.parse(txt); } catch { return null; }
 }
 const mesDe = d => String(d || new Date().toISOString().slice(0, 10)).slice(0, 7) + '-01';
 
@@ -66,7 +69,7 @@ async function sincronizarMeta(tenant, meses = 3) {
       else await sb('capta_investimento', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
     }
     await sb(`capta_integracoes?id=eq.${conf.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ultimo_sync: new Date().toISOString(), ultimo_erro: null }) });
-    return { ok: true, campanhas: linhas.length };
+    return { ok: true, campanhas: linhas.length, ultimo_sync: new Date().toISOString() };
   } catch (e) {
     await sb(`capta_integracoes?id=eq.${conf.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ultimo_erro: e.message.slice(0, 300) }) }).catch(() => null);
     return { erro: e.message };
