@@ -90,7 +90,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -118,6 +118,7 @@ module.exports = async function handler(req, res) {
         case 'casar_conversas': return await acaoCasarConversas(tenant, body, res);
         case 'sem_data':      return await acaoSemData(tenant, body, res);
         case 'saude':         return await acaoSaude(tenant, body, res);
+        case 'transcrever':   return await acaoTranscrever(tenant, body, res);
         case 'recepcao':      return await acaoRecepcao(tenant, body, res);
         case 'checkin':       return await acaoCheckin(tenant, body, res);
         case 'feedback':      return await acaoFeedback(tenant, body, res);
@@ -742,7 +743,7 @@ async function acaoLead(tenant, body, res) {
   ]);
   let mensagens = [];
   if (conv?.[0]) {
-    mensagens = await sb(`capta_mensagens?conversa_id=eq.${conv[0].id}&tenant_id=eq.${tenant.id}&select=id,direcao,autor,tipo,texto,transcricao,criado_em&order=criado_em.asc&limit=100`).catch(() => []);
+    mensagens = await sb(`capta_mensagens?conversa_id=eq.${conv[0].id}&tenant_id=eq.${tenant.id}&select=id,direcao,autor,tipo,texto,transcricao,transcricao_status,midia_url,criado_em&order=criado_em.asc&limit=100`).catch(() => []);
   }
   // histórico completo: presença de cada aula, matrícula e aluno
   const agIds = (ags || []).map(a => a.id);
@@ -1430,6 +1431,57 @@ async function acaoFichaAluno(tenant, body, res) {
     frequencia: previstas ? Math.round(presentes / previstas * 100) : null,
     notas, lead: lead?.[0] || null, matriculas: matriculas || []
   });
+}
+
+
+// ---------------------------------------------------------------------
+// TRANSCRIÇÃO DE ÁUDIO — o áudio do WhatsApp vira texto no chat
+// Usa a API da Anthropic (ANTHROPIC_API_KEY). Sem a chave, fica pendente.
+// ---------------------------------------------------------------------
+async function acaoTranscrever(tenant, body, res) {
+  const chave = process.env.ANTHROPIC_API_KEY;
+  const id = body.mensagem_id;
+  if (!id) return res.status(400).json({ erro: 'Informe a mensagem.' });
+  const [m] = await sb(`capta_mensagens?id=eq.${id}&tenant_id=eq.${tenant.id}&select=id,tipo,midia_url,midia_mime,transcricao,transcricao_status&limit=1`);
+  if (!m) return res.status(404).json({ erro: 'Mensagem não encontrada.' });
+  if (m.transcricao) return res.status(200).json({ transcricao: m.transcricao, ja: true });
+  if (!chave) return res.status(200).json({ erro: 'Transcrição ainda não está ativa nesta conta.' });
+  if (!m.midia_url) return res.status(400).json({ erro: 'Áudio não está guardado.' });
+
+  await sb(`capta_mensagens?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ transcricao_status: 'processando' }) }).catch(() => null);
+  try {
+    // 1) baixa o áudio do nosso próprio storage
+    const assin = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/capta-midia/${m.midia_url}`, {
+      method: 'POST', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 300 }) }).then(r => r.json());
+    const url = `${SUPABASE_URL}/storage/v1${assin.signedURL || assin.signedUrl}`;
+    const bin = Buffer.from(await (await fetch(url)).arrayBuffer());
+    if (bin.length > 20 * 1024 * 1024) throw new Error('Áudio grande demais para transcrever.');
+
+    // 2) manda para a Anthropic transcrever e resumir em uma linha
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': chave, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 1200,
+        system: 'Você transcreve áudios de WhatsApp de pais interessados numa escola de robótica infantil em Manaus. Devolva SOMENTE a transcrição fiel, em português, sem comentários. Se houver silêncio ou ruído, escreva [inaudível].',
+        messages: [{ role: 'user', content: [
+          { type: 'document', source: { type: 'base64', media_type: m.midia_mime || 'audio/ogg', data: bin.toString('base64') } },
+          { type: 'text', text: 'Transcreva este áudio.' }
+        ] }]
+      })
+    });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error.message || 'A IA recusou o áudio.');
+    const texto = (j.content || []).filter(x => x.type === 'text').map(x => x.text).join('\n').trim();
+    if (!texto) throw new Error('Não consegui entender o áudio.');
+    await sb(`capta_mensagens?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ transcricao: texto.slice(0, 4000), transcricao_status: 'pronta' }) });
+    return res.status(200).json({ transcricao: texto });
+  } catch (e) {
+    await sb(`capta_mensagens?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ transcricao_status: 'erro' }) }).catch(() => null);
+    await registrarFalha(tenant.id, 'transcricao', e.message).catch(() => null);
+    return res.status(200).json({ erro: e.message });
+  }
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
