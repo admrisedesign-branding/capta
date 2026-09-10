@@ -135,6 +135,26 @@ module.exports = async function handler(req, res) {
     if (formId) lead.formulario_id = formId;
     if (notas) lead.notas = notas;
     Object.assign(lead, campos);
+    // veio de evento: acha o evento cadastrado pelo nome (sem precisar de id fixo)
+    if (!lead.evento_id && extra && extra.evento_nome) {
+      try {
+        const alvo = String(extra.evento_nome).trim().toLowerCase();
+        const evs = await sb(`capta_eventos?tenant_id=eq.${t.id}&select=id,nome,data_inicio&order=data_inicio.desc&limit=50`);
+        const limpa = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+        const a1 = limpa(alvo);
+        const achou = (evs || []).find(e => limpa(e.nome) === a1)
+          || (evs || []).find(e => limpa(e.nome).includes(a1) || a1.includes(limpa(e.nome)));
+        if (achou) lead.evento_id = achou.id;
+        else {
+          // evento novo: cadastra sozinho, pra não perder o rastreio
+          const criado = await sb('capta_eventos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+            tenant_id: t.id, nome: String(extra.evento_nome).slice(0, 120), local: extra.evento_local || null,
+            cidade: 'Manaus', data_inicio: (extra.evento_data || new Date().toISOString().slice(0, 10)).slice(0, 10),
+            tipo: 'evento', ativo: true, observacao: 'criado pelo app de captação' }) });
+          if (criado && criado[0]) lead.evento_id = criado[0].id;
+        }
+      } catch (e) {}
+    }
     // lead de evento já entra na primeira etapa do funil, pronto pro atendimento
     try {
       const et = await sb(`capta_etapas?tenant_id=eq.${t.id}&nome=ilike.novo%20lead&select=id&limit=1`);
