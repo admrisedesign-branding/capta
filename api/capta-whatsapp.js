@@ -1781,9 +1781,9 @@ async function acaoRetomada(tenant, body, res) {
 
   const [etapas, leads, ags, convs, feitas] = await Promise.all([
     sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome,tipo,ordem&order=ordem.asc`),
-    sb(`capta_leads?tenant_id=eq.${tenant.id}&select=id,nome,contato,temperatura,crianca,idade,etapa_id,etapa_em,criado_em,fonte,porta,atendente,notas,campanha&limit=1500`),
+    sb(`capta_leads?tenant_id=eq.${tenant.id}&select=id,nome,contato,temperatura,crianca,idade,etapa_id,etapa_em,criado_em,fonte,porta,atendente,notas,campanha,kommo_lead_id&limit=1500`),
     sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&select=lead_id,data,status&order=data.desc&limit=800`).catch(() => []),
-    sb(`capta_conversas?tenant_id=eq.${tenant.id}&select=lead_id,ultima_mensagem_em,nao_lidas,resolvida_em&limit=500`).catch(() => []),
+    sb(`capta_conversas?tenant_id=eq.${tenant.id}&select=id,lead_id,ultima_mensagem_em,nao_lidas,resolvida_em&limit=500`).catch(() => []),
     sb(`capta_retomadas?tenant_id=eq.${tenant.id}&select=lead_id,acao,adiar_ate,criado_em&order=criado_em.desc&limit=1000`).catch(() => [])
   ]);
 
@@ -1831,7 +1831,9 @@ async function acaoRetomada(tenant, body, res) {
     if (!motivo) continue;
     fila.push({
       lead_id: l.id, nome: l.nome, contato: l.contato, crianca: l.crianca, idade: l.idade,
-      temperatura: l.temperatura, etapa: et.nome, atendente: l.atendente, notas: l.notas,
+      temperatura: l.temperatura, etapa: et.nome, etapa_id: l.etapa_id, atendente: l.atendente, notas: l.notas,
+      kommo_lead_id: l.kommo_lead_id || null, conversa_id: c?.id || null,
+      fonte: l.fonte, porta: l.porta, criado_em: l.criado_em,
       motivo, porque, parado_ha: paradoHa, urgencia
     });
   }
