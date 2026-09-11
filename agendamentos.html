@@ -213,6 +213,8 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .cel.vazia{opacity:.5}
 .assentos-horas{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
 .assentos-horas .hora-livre{margin-top:0}
+.cel.cont{background:linear-gradient(180deg,rgba(46,91,255,.035),transparent);border-top-style:dashed}
+.cel .segue{font-size:11px;color:var(--faint);font-weight:600}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -422,41 +424,48 @@ function expBloco(list, h){
 // cada criança é um "assento": azul = matriculado, laranja = experimental, roxo = reposição.
 function vSemanaGrade(){
   const seg = segunda(SEL), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
-  // blocos = turmas + horas abertas sem turma (a escola aceita experimental em qualquer hora aberta)
-  const deTurma = (D.turmas||[]).filter(t => t.ativa !== false).map(t => `${hh(t.hora_inicio)}|${hh(t.hora_fim)}`);
-  const deAberto = (VAGAS||[]).filter(v => dias.includes(v.data)).map(v => `${hh(v.hora_inicio)}|${hh(v.hora_fim)}`);
-  const blocos = [...new Set([...deTurma, ...deAberto])].sort();
+  // uma linha por HORA (8h, 9h, 10h…). A turma de 2h ocupa as duas linhas dela.
+  const horas = [...new Set([
+    ...(VAGAS||[]).filter(v => dias.includes(v.data)).map(v => hN(v.hora_inicio)),
+    ...(D.turmas||[]).filter(t => t.ativa !== false).flatMap(t => {
+      const out = []; for (let x = hN(t.hora_inicio); x < hN(t.hora_fim); x++) out.push(x); return out; }),
+    ...EXP.filter(a => dias.includes(a.data) && viva(a)).map(a => hN(a.hora_inicio)),
+  ])].sort((a,b) => a-b);
+
   let h = `<div class="scrollx"><div class="grade"><div></div>${dias.map(d => `<div class="gh" style="${d===hoje?'color:var(--brand)':''}">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}</div>`).join('')}`;
-  for (const b of blocos) {
-    const [hi, hf] = b.split('|');
-    h += `<div class="gb">${hi} – ${hf}</div>`;
+  for (const hora of horas) {
+    const hs = String(hora).padStart(2,'0') + ':00';
+    h += `<div class="gb">${hs}</div>`;
     for (const d of dias) {
-      const t = (D.turmas||[]).find(x => x.dia_semana === dow(d) && hh(x.hora_inicio) === hi && x.ativa !== false);
-      const exps = EXP.filter(a => a.data === d && viva(a) && hh(a.hora_inicio) >= hi && hh(a.hora_inicio) < hf);
+      const t = (D.turmas||[]).find(x => x.dia_semana === dow(d) && x.ativa !== false
+        && hN(x.hora_inicio) <= hora && hora < hN(x.hora_fim));
+      const exps = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) === hora);
       const expV = TIPO === 'alunos' ? exps.filter(ehRep) : TIPO === 'experimental' ? exps.filter(ehExp) : exps;
-      // a escola está aberta nesta hora?
-      const aberta = (VAGAS||[]).find(v => v.data === d && hh(v.hora_inicio) === hi);
+      const aberta = (VAGAS||[]).find(v => v.data === d && hN(v.hora_inicio) === hora);
+
       if (!t && !expV.length) {
         h += aberta
-          ? `<div class="cel livre" onclick="novoAgendamento('${d}','${aberta.turma_id||''}',${hN(hi)})" title="a escola está aberta: dá para marcar aula experimental">
+          ? `<div class="cel livre" onclick="novoAgendamento('${d}','${aberta.turma_id||''}',${hora})" title="a escola abre nesta hora — dá para marcar aula experimental">
                <span class="lv">livre</span><span class="lv2">${aberta.vagas} vaga${aberta.vagas>1?'s':''}</span></div>`
           : `<div class="cel vazia">fechado</div>`;
         continue;
       }
-      const als = t ? alunosDa(t).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome)) : [];
-      const sala = t ? (t.limite_sala || 18) : 18;
-      const v = aberta ? { n: aberta.vagas, cap: aberta.capacidade } : (t ? vagasHora(d, hN(t.hora_inicio)) : null);
+      const primeira = t ? hN(t.hora_inicio) === hora : true;     // só a 1ª hora da turma lista os alunos
+      const als = (t && primeira) ? alunosDa(t).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome)) : [];
+      const v = aberta ? { n: aberta.vagas, cap: aberta.capacidade } : null;
       const cls = !v ? '' : v.n <= 0 ? 'cheio' : v.n <= 2 ? 'alerta' : '';
-      h += `<div class="cel ${expV.length?'temexp':''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hN(hi)})">
-        <div class="t"><span><b>${als.length + expV.length}</b>/${sala} na sala</span>
-          ${v ? `<span class="cap ${cls}" title="kits First livres para aula experimental nesta hora">${v.n} livre${v.n===1?'':'s'}</span>` : ''}</div>
+      const naSala = (t ? alunosDa(t).length : 0) + expV.length;
+      h += `<div class="cel ${expV.length?'temexp':''} ${t && !primeira ? 'cont' : ''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hora})">
+        <div class="t">
+          <span>${t ? (primeira ? `<b>${naSala}</b>/${t.limite_sala||18} na sala` : `<span class="segue">${hh(t.hora_inicio)}–${hh(t.hora_fim)} · continua</span>`) : ''}</span>
+          ${v ? `<span class="cap ${cls}" title="kits First livres nesta hora">${v.n} livre${v.n===1?'':'s'}</span>` : ''}</div>
         ${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('')}
         ${als.length && expV.length ? '<div class="sep"></div>' : ''}
         ${expV.map(a => { const l = leadDe(a); const alu = (D.alunos||[]).find(x => x.id === a.aluno_id) || {};
           return ehRep(a)
-            ? `<div class="al rep" onclick="abrirAluno('${a.aluno_id}')" title="reposição"><span class="k"></span><span class="n">${esc(a.crianca_nome||alu.nome||'')}</span><span class="hr">rep ${hh(a.hora_inicio)}</span></div>`
-            : `<div class="al exp" onclick="irDia('${d}')" title="aula experimental · ${esc(l.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||l.nome||'visita')}</span><span class="hr">${hh(a.hora_inicio)}</span></div>`; }).join('')}
-        ${v && v.n > 0 && TIPO !== 'alunos' ? `<div class="al mais" onclick="novoAgendamento('${d}','${t?t.id:(aberta?aberta.turma_id||'':'')}',${hN(hi)})">+ ${v.n} livre${v.n>1?'s':''}</div>` : ''}
+            ? `<div class="al rep" onclick="abrirAluno('${a.aluno_id}')" title="reposição"><span class="k"></span><span class="n">${esc(a.crianca_nome||alu.nome||'')}</span></div>`
+            : `<div class="al exp" onclick="irDia('${d}')" title="aula experimental · ${esc(l.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||l.nome||'visita')}</span></div>`; }).join('')}
+        ${v && v.n > 0 && TIPO !== 'alunos' ? `<div class="al mais" onclick="novoAgendamento('${d}','${t?t.id:(aberta?aberta.turma_id||'':'')}',${hora})">+ ${v.n} livre${v.n>1?'s':''}</div>` : ''}
       </div>`;
     }
   }
@@ -465,7 +474,7 @@ function vSemanaGrade(){
     <span><span style="width:9px;height:9px;border-radius:50%;background:var(--exp);display:inline-block"></span>aula experimental (1h)</span>
     <span><span style="width:9px;height:9px;border-radius:50%;background:#7C5CDB;display:inline-block"></span>reposição</span>
     <span><i style="width:11px;height:11px;border:1px dashed var(--line);border-radius:3px;display:inline-block"></i>livre — a escola abre e há kit</span>
-    <span>fechado = a unidade não abre nesse horário</span></div>`;
+    <span>fechado = a unidade não abre nessa hora</span></div>`;
   return h;
 }
 
