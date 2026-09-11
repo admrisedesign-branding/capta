@@ -127,6 +127,28 @@ body.embed .topbar{display:none}
 .janela-fim{display:flex;gap:9px;justify-content:flex-end;margin-top:20px}
 .btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:9px}
 .btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+
+/* modo organizar */
+.org-topo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--brand);border-radius:12px;padding:10px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
+.org-topo b{font-size:13.5px}
+.org-topo span{font-size:12.5px;color:var(--muted);margin-right:auto}
+.org-aviso{background:var(--morno-bg);color:var(--morno);border-radius:10px;padding:8px 12px;font-size:12px;line-height:1.5;margin-bottom:12px;font-weight:600}
+.sg-faixa{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px;cursor:default}
+.sg-faixa.meta{border-top-color:var(--morno)}
+.sg-top{display:flex;align-items:center;gap:7px}
+.sg-top input{width:15px;height:15px;accent-color:var(--brand);cursor:pointer}
+.sg-para{font-size:12.5px;font-weight:800;color:var(--brand)}
+.sg-faixa.meta .sg-para{color:var(--morno)}
+.sg-conf{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:1px 7px;border-radius:99px;background:var(--line-2);color:var(--muted);margin-left:auto}
+.sg-conf.alta{background:var(--verde-bg);color:var(--verde)}
+.sg-conf.baixa{background:var(--morno-bg);color:var(--morno)}
+.sg-motivo{font-size:12px;color:var(--muted);line-height:1.45;margin-top:5px}
+.sg-cri{font-size:11.5px;color:var(--faint);margin-top:3px}
+.sg-acs{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.sg-acs button{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
+.sg-acs button:hover{border-color:var(--brand);color:var(--brand)}
+.sg-acs .sg-ind{background:var(--morno);border-color:var(--morno);color:#fff}
+.sg-acs .sg-ind:hover{color:#fff;opacity:.9}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -259,19 +281,33 @@ function barraFiltros(total, vis) {
     <select class="fb-sel" onchange="F.temp=this.value;desenhar()"><option value="" ${!F.temp?'selected':''}>Temperatura: todas</option><option value="quente" ${F.temp==='quente'?'selected':''}>Quer fechar</option><option value="morno" ${F.temp==='morno'?'selected':''}>Considerando</option><option value="frio" ${F.temp==='frio'?'selected':''}>Só conhecendo</option></select>
     <select class="fb-sel" onchange="F.ordem=this.value;desenhar()"><option value="recente" ${F.ordem==='recente'?'selected':''}>Mais recente primeiro</option><option value="temperatura" ${F.ordem==='temperatura'?'selected':''}>Quentes primeiro</option><option value="parado" ${F.ordem==='parado'?'selected':''}>Mais parado primeiro</option></select>
     <label class="fb-chk"><input type="checkbox" ${F.esconderFrios?'checked':''} onchange="F.esconderFrios=this.checked;desenhar()"> esconder frios parados há 30+ dias</label>
-    <span class="fb-n">${vis} de ${total}</span></div>`;
+    <span class="fb-n">${vis} de ${total}</span>
+    ${ORG.ligado
+      ? `<button class="btn g" onclick="sairOrganizar()">sair de organizar</button>`
+      : `<button class="btn g" onclick="organizar()" title="A IA lê as conversas e sugere em que etapa cada lead deveria estar">✨ Organizar</button>`}
+    </div>`;
 }
 function desenhar() {
   const raiz = document.getElementById('raiz');
   raiz.className = 'raia-area';
 
-  const vis = filtrar(leads);
+  let vis = filtrar(leads);
+  if (ORG.ligado && ORG.sug.length) vis = vis.filter(l => sugDe(l.id));
   const semEtapa = vis.filter(l => !l.etapa_id);
   const colunas = etapas.map(e => ({ e, itens: vis.filter(l => l.etapa_id === e.id) }));
   if (semEtapa.length) colunas.unshift({ e: { id: '', nome: 'Sem etapa', cor: '#9AA1B4' }, itens: semEtapa });
 
   const mob = window.matchMedia('(max-width:760px)').matches;
-  raiz.innerHTML = barraFiltros(leads.length, vis.length) + `<div class="raias">${colunas.map((c, ci) => `
+  const barraOrg = ORG.ligado ? `<div class="org-topo">
+      <b>Organizando o funil</b>
+      <span>${ORG.rodando ? 'lendo conversas…' : `${ORG.sug.length} sugestão${ORG.sug.length===1?'':'ões'} · só os leads com sugestão aparecem`}</span>
+      <button class="btn g" onclick="organizar()" ${ORG.rodando?'disabled':''}>ler mais 8</button>
+      ${ORG.sug.filter(x=>!x.avisa_meta).length ? `<button class="btn g" onclick="marcarTodasSug(true)">marcar todas</button><button class="btn g" onclick="marcarTodasSug(false)">limpar</button>` : ''}
+      <button class="btn" onclick="aplicarSug()" ${ORG.marcados.size?'':'disabled'}>Aprovar ${ORG.marcados.size || ''}</button>
+      <button class="btn g" onclick="sairOrganizar()">sair</button>
+    </div>
+    <div class="org-aviso">Mover para <b>Qualificado</b> ou <b>Aula agendada</b> envia um evento de conversão para a Meta. Esses dois saem um de cada vez, pelo botão laranja do card.</div>` : '';
+  raiz.innerHTML = barraFiltros(leads.length, vis.length) + barraOrg + `<div class="raias">${colunas.map((c, ci) => `
     <section class="raia ${mob && (ci > 0 || !c.itens.length) ? 'fechada' : ''}" data-etapa="${c.e.id}" ${mob ? 'onclick="if(event.target.closest(\'.raia-cab\'))this.classList.toggle(\'fechada\')"' : ''}>
       <div class="raia-cab">
         <span class="raia-cor" style="background:${esc(c.e.cor || '#2E5BFF')}"></span>
@@ -286,6 +322,79 @@ function desenhar() {
   ligar();
 }
 
+
+// ---------------------------------------------------------------------
+// ORGANIZAR: a IA lê as conversas e sugere a etapa de cada lead.
+// As sugestões aparecem no próprio card, na coluna onde o lead está hoje.
+// Qualificado e Aula agendada disparam evento de conversão na Meta (webhook
+// do Kommo), por isso saem um de cada vez, com confirmação.
+// ---------------------------------------------------------------------
+let ORG = { ligado: false, rodando: false, sug: [], marcados: new Set() };
+const sugDe = id => ORG.sug.find(s => s.lead_id === id);
+
+async function organizar(){
+  if (!ORG.ligado) { ORG.ligado = true; desenhar(); }
+  if (ORG.rodando) return;
+  ORG.rodando = true; desenhar();
+  try {
+    const d = await api('triagem', { limite: 8 });
+    if (d.erro) { toast(d.erro, { tipo:'erro' }); }
+    else {
+      const novos = (d.sugestoes || []).filter(n => !ORG.sug.some(x => x.lead_id === n.lead_id));
+      ORG.sug = [...ORG.sug, ...novos];
+      if (!novos.length) toast('Nada novo para sugerir.');
+      else toast(`${novos.length} sugestão${novos.length>1?'ões':''} — confira nos cards`, { tipo:'ok' });
+    }
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+  ORG.rodando = false; desenhar();
+}
+function sairOrganizar(){ ORG = { ligado: false, rodando: false, sug: [], marcados: new Set() }; desenhar(); }
+function marcarSug(id, on){ on ? ORG.marcados.add(id) : ORG.marcados.delete(id); desenhar(); }
+function ignorarSug(id){ ORG.sug = ORG.sug.filter(s => s.lead_id !== id); ORG.marcados.delete(id); desenhar(); }
+function marcarTodasSug(on){ ORG.marcados = new Set(on ? ORG.sug.filter(s => !s.avisa_meta).map(s => s.lead_id) : []); desenhar(); }
+
+async function aplicarSug(){
+  const itens = ORG.sug.filter(s => ORG.marcados.has(s.lead_id) && !s.avisa_meta);
+  if (!itens.length) return;
+  try {
+    const d = await api('triagem_aplicar', { itens });
+    toast(`${d.movidos} lead${d.movidos===1?'':'s'} movido${d.movidos===1?'':'s'} · Kommo atualizado`, { tipo:'ok' });
+    ORG.sug = ORG.sug.filter(s => !ORG.marcados.has(s.lead_id)); ORG.marcados = new Set();
+    await carregar();
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function aplicarUmaSug(id){
+  const s = sugDe(id); if (!s) return;
+  if (!confirm(`Mover ${s.nome || 'este lead'} para "${s.etapa_nova}"?\n\nIsso envia um evento de conversão para a Meta. Só confirme se estiver certo.`)) return;
+  try {
+    const d = await api('triagem_aplicar', { itens: [{ ...s, confirmado_individual: true }] });
+    if (d.movidos) { toast(`${esc(s.nome||'Lead')} → ${esc(s.etapa_nova)}`, { tipo:'ok' }); ORG.sug = ORG.sug.filter(x => x.lead_id !== id); await carregar(); }
+    else toast(d.falhas?.[0]?.erro || 'Não deu certo', { tipo:'erro' });
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+function verConversaSug(id){
+  const s = sugDe(id); if (!s) return;
+  abrirLead(s.lead_id);     // a gaveta do lead já abre na conversa
+}
+// faixa de sugestão dentro do card
+function faixaSug(l){
+  const s = sugDe(l.id); if (!s || !ORG.ligado) return '';
+  return `<div class="sg-faixa ${s.avisa_meta?'meta':''}" onclick="event.stopPropagation()">
+    <div class="sg-top">
+      ${s.avisa_meta ? '' : `<input type="checkbox" ${ORG.marcados.has(l.id)?'checked':''} onchange="marcarSug('${l.id}', this.checked)">`}
+      <span class="sg-para">→ ${esc(s.etapa_nova)}</span>
+      <span class="sg-conf ${s.confianca}">${s.confianca === 'alta' ? 'alta' : s.confianca === 'baixa' ? 'baixa' : 'média'}</span>
+    </div>
+    <div class="sg-motivo">${esc(s.motivo)}</div>
+    ${s.crianca ? `<div class="sg-cri">criança: <b>${esc(s.crianca)}</b>${s.idade?`, ${s.idade} anos`:''}</div>` : ''}
+    <div class="sg-acs">
+      ${s.avisa_meta ? `<button class="sg-ind" onclick="aplicarUmaSug('${l.id}')">mover (avisa a Meta)</button>` : ''}
+      <button onclick="verConversaSug('${l.id}')">ver conversa</button>
+      <button onclick="ignorarSug('${l.id}')">ignorar</button>
+    </div>
+  </div>`;
+}
+
 function cartao(l) {
   const pd = parado(l.etapa_em || l.criado_em);
   return `<article class="lead" draggable="true" data-lead="${l.id}" onclick="abrirLead('${l.id}')">
@@ -297,6 +406,7 @@ function cartao(l) {
       <span class="parado ${pd.cls}">${pd.txt}</span>
       ${l.kommo_lead_id ? `<a class="kommo-lnk" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Abrir no Kommo">Kommo ↗</a>` : ''}
     </div>
+    ${faixaSug(l)}
   </article>`;
 }
 
