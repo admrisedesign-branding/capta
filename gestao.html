@@ -400,6 +400,10 @@ function render(){
     <div class="nota">"Por onde veio" e "Como chegou" vêm dos campos preenchidos no Kommo; "não informado" são leads sem esses campos. Matrícula = lead ganho no Kommo. Aulas = leads com aula marcada ou além dessa etapa.</div>`;
 }
 carregar();
+
+// outra tela do painel mudou algo (aula, matrícula, remarcação): recarrega
+addEventListener('storage', e => { if (e.key === 'capta_mudou' && typeof carregar === 'function') carregar(); });
+addEventListener('message', e => { if (e.data && e.data.capta === 'mudou' && typeof carregar === 'function') carregar(); });
 </script>
 </body>
 </html>

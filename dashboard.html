@@ -4134,6 +4134,14 @@ function demoForms(){
   ir('nav-agenda',    '/agenda.html');
   ir('nav-whatsapp',  '/whatsapp.html');
 })();
+
+// uma tela avisou que mudou algo: repassa para as outras abas do painel
+window.addEventListener('message', e => {
+  if (e.data && e.data.capta === 'mudou') {
+    try { localStorage.setItem('capta_mudou', JSON.stringify({ ...e.data, em: Date.now() })); } catch(x){}
+    const f = document.querySelector('#tela iframe'); if (f && f.contentWindow) f.contentWindow.postMessage(e.data, '*');
+  }
+});
 </script>
 </body>
 </html>

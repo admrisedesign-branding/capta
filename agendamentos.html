@@ -368,6 +368,16 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .al-linha:hover .bt-rem{opacity:1}
 .bt-rem:hover{border-color:#7C5CDB;color:#5B3FBF}
 .dcell .lin.rm{color:#5B3FBF}.dcell .lin.rm b{color:#5B3FBF}
+
+/* feedback de ação em andamento */
+body.trabalhando{cursor:progress}
+.ocupado{opacity:.65;pointer-events:none;position:relative}
+.mini-pt{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;
+  border-radius:50%;animation:gira .7s linear infinite;margin-right:7px;vertical-align:-2px}
+.toast .mini-pt{border-color:rgba(255,255,255,.3);border-top-color:#fff}
+button .mini-pt{border-color:rgba(0,0,0,.15);border-top-color:currentColor}
+@keyframes gira{to{transform:rotate(360deg)}}
+.acts button:disabled,.hcol-mais.ocupado{cursor:default}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -468,6 +478,7 @@ async function carregar(){
     const de = addDias(segunda(SEL), -35), ate = addDias(segunda(SEL), 42);
     const [al, ex] = await Promise.all([api('alunos', {}, 60000), api('experimentais', { de, ate }, 20000)]);
     D = { ...al, agendamentos: ex.agendamentos || [] }; EXP = ex.agendamentos || []; LEADS = ex.leads || []; carregadoDe = de; carregadoAte = ate; desenhar();
+    if (AULA_ABERTA) pintarAula();
     // vagas vêm depois: a grade já aparece, os números de vaga entram em seguida
     api('agenda', { dias: 45 }, 45000).then(ag => { VAGAS = ag.horarios || []; desenhar(); }).catch(() => {});
   } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
@@ -611,9 +622,15 @@ function mini(a){
     <span>${esc(l.nome || 'sem responsável')}</span>
     ${D_ ? `<i class="mx-res">${D_.t === 'matriculou' ? 'matriculou' : D_.t === 'nao' ? 'não fechou' : D_.t === 'andamento' ? 'em andamento' : 'faltou'}</i>` : ''}</div>`;
 }
+let AULA_ABERTA = null;
 function abrirAula(id){
   const a = EXP.find(x => x.id === id); if (!a) return;
-  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela" style="max-width:560px;padding:18px">
+  AULA_ABERTA = id; pintarAula();
+}
+function pintarAula(){
+  const a = EXP.find(x => x.id === AULA_ABERTA);
+  if (!a) { AULA_ABERTA = null; document.getElementById('modal').innerHTML = ''; return; }
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela" style="max-width:580px;padding:18px">
     ${cartao(a)}<div class="fim"><button class="btn g" onclick="fecharModal()">Fechar</button></div></div></div>`;
   document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
 }
@@ -687,21 +704,22 @@ function desenharRemarcar(){
   </div></div>`;
   document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
 }
-async function confirmarRemarcar(){
+async function confirmarRemarcar(){ return acao('confirmarRemarcar', async () => { const aviso = toast('<span class="mini-pt"></span>remarcando aula…', { ms: 60000 });
   const motivo = (document.getElementById('rm-m')||{}).value || null;
   try {
     await api('remarcar_aluno', { aluno_id: REMEX.aluno.id, data_original: REMEX.data_original,
       data_nova: REMEX.data, turma_nova: REMEX.turma, motivo,
       atendente: (window.CaptaUser&&CaptaUser.nome())||undefined });
-    fecharModal(); toast(`Aula remarcada para ${fmt(REMEX.data,{day:'2-digit',month:'2-digit'})}`, { tipo:'ok' });
-    await carregar();
+    fecharModal(); mudou({ o:'remarcacao' }); toast(`Aula remarcada para ${fmt(REMEX.data,{day:'2-digit',month:'2-digit'})}`, { tipo:'ok' });
+    aviso.remove(); await carregar(); if (AULA_ABERTA) pintarAula();
   } catch(e){ toast(e.message, { tipo:'erro' }); }
-}
-async function desfazerRemarcacao(id){
-  try { await api('desfazer_remarcacao', { id }); toast('Remarcação desfeita'); await carregar(); }
-  catch(e){ toast(e.message, { tipo:'erro' }); }
-}
 
+ }, 'remarcando aula…'); }
+async function desfazerRemarcacao(id){ return acao('desfazerRemarcacao', async () => { const aviso = toast('<span class="mini-pt"></span>desfazendo…', { ms: 60000 });
+  try { await api('desfazer_remarcacao', { id }); toast('Remarcação desfeita'); aviso.remove(); await carregar(); if (AULA_ABERTA) pintarAula(); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+
+ }, 'desfazendo…'); }
 function vSemanaGrade(){
   const seg = segunda(SEL), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
   const horas = [...new Set([
@@ -835,7 +853,7 @@ function quemNoDia(d, tipo){
   document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
 }
 
-function desenhar(){
+function desenhar(){ setTimeout(() => { if (AULA_ABERTA) pintarAula(); }, 0);
   let periodo, dias, corpo;
   // contadores do filtro, no período visível
   const diasVis = (() => { if (MODO === 'dia') return [SEL];
@@ -875,9 +893,9 @@ function dropExp(ev, data, hora){
     <div class="fim"><button class="btn g" onclick="fecharModal()">Cancelar</button><button class="btn" onclick="fecharModal();remarcar('${id}','${turma.id}','${data}')">Sim, remarcar</button></div></div></div>`;
   document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
 }
-function fecharModal(){ document.getElementById('modal').innerHTML = ''; }
-async function remarcar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'remarcado pela agenda' }); toast('Aula remarcada · Kommo atualizado', { tipo:'ok' }); await carregar(); } catch(e){ toast(e.message, { tipo:'erro' }); } }
-
+function fecharModal(){ AULA_ABERTA = null; document.getElementById('modal').innerHTML = ''; }
+async function remarcar(id, turmaId, data){ return acao('remarcar', async () => { const aviso = toast('<span class="mini-pt"></span>remarcando…', { ms: 60000 }); try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'remarcado pela agenda' }); toast('Aula remarcada · Kommo atualizado', { tipo:'ok' }); aviso.remove(); await carregar(); if (AULA_ABERTA) pintarAula(); } catch(e){ toast(e.message, { tipo:'erro' }); } 
+ }, 'remarcando…'); }
 // ---- novo agendamento: busca o lead, criança, escolhe a vaga ----
 let NA = { leads: null, lead: null, vagas: null, vaga: null, q: '' };
 async function novoAgendamento(data, turmaId, hora){
@@ -905,12 +923,12 @@ function desenharNA(){
     <div class="fim"><button class="btn g" onclick="fecharModal()">Cancelar</button><button class="btn" onclick="confirmarNA()" ${NA.lead && NA.vaga ? '' : 'disabled'}>Agendar</button></div></div></div>`;
   document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
 }
-async function confirmarNA(){
+async function confirmarNA(){ return acao('confirmarNA', async () => { const aviso = toast('<span class="mini-pt"></span>agendando…', { ms: 60000 });
   const crianca = document.getElementById('na-cri').value.trim(), idade = document.getElementById('na-id').value;
   if (!crianca) return toast('Informe o nome da criança.', { tipo:'erro' });
-  try { await api('agendar', { turma_id: NA.vaga.turma_id || null, data: NA.vaga.data, hora_inicio: NA.vaga.hora_inicio, crianca_nome: crianca, crianca_idade: idade || null, lead_id: NA.lead.id }); fecharModal(); toast(`<b>${esc(crianca)}</b> agendada · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' }); await carregar(); }
-  catch(e){ toast(e.message, { tipo:'erro' }); }
-}
+  try { await api('agendar', { turma_id: NA.vaga.turma_id || null, data: NA.vaga.data, hora_inicio: NA.vaga.hora_inicio, crianca_nome: crianca, crianca_idade: idade || null, lead_id: NA.lead.id }); fecharModal(); toast(`<b>${esc(crianca)}</b> agendada · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' }); aviso.remove(); await carregar(); if (AULA_ABERTA) pintarAula(); }
+  catch(e){ aviso.remove(); toast(e.message, { tipo:'erro' }); }
+ }, 'agendando…'); }
 
 LeadPainel.init({ slug: SLUG, token: TOKEN, getLead: id => LEADS.find(x => x.id === id), getEtapas: () => [], onAgendou: () => carregar() });
 
@@ -990,23 +1008,83 @@ function menuReagendar(a){
   return `<div class="menu"><p>Reagendar ${esc(a.crianca_nome||'')} — ofereça duas opções</p><div class="vagas3">${vg('Manhã',pick('manha'))}${vg('Tarde',pick('tarde'))}${vg('Sábado',pick('sab'))}</div><div class="acts save"><button onclick="fecharMenu()">cancelar</button></div></div>`;
 }
 async function carregarVagas(){ try { VAGAS3 = (await api('agenda', { dias: 30 })).horarios || []; } catch(e){ VAGAS3 = []; } desenhar(); }
-function abrirMenu(id, tipo){ ABERTO = { id, tipo }; ESC = {}; desenhar(); }
-function fecharMenu(){ ABERTO = null; desenhar(); }
+function abrirMenu(id, tipo){ ABERTO = { id, tipo }; ESC = {}; desenhar(); if (AULA_ABERTA) pintarAula(); }
+function fecharMenu(){ ABERTO = null; desenhar(); if (AULA_ABERTA) pintarAula(); }
+
+// ---------------------------------------------------------------------
+// Toda ação que fala com o servidor passa por aqui: trava o botão, mostra
+// que está trabalhando e impede clique repetido. Sem isso a recepção clica
+// três vezes achando que não funcionou.
+// ---------------------------------------------------------------------
+
+// Avisa as outras telas do painel que algo mudou (aula, matrícula, remarcação).
+// Sem isso o Atendimento e o Pipeline ficam mostrando o estado velho.
+function mudou(o){
+  try { localStorage.setItem('capta_mudou', JSON.stringify({ ...o, em: Date.now() })); } catch(e){}
+  if (window.parent !== window) window.parent.postMessage({ capta: 'mudou', ...o }, '*');
+}
+
+let OCUPADO = false;
+async function acao(chave, fn, textoOcupado){
+  if (OCUPADO) return;
+  OCUPADO = true;
+  const alvo = (typeof event !== 'undefined' && event && event.target && event.target.closest) ? event.target.closest('button,.al,.hcol-mais,.minix') : null;
+  let antes = null;
+  if (alvo) { antes = alvo.innerHTML; alvo.classList.add('ocupado'); alvo.setAttribute('disabled','');
+    if (textoOcupado) alvo.innerHTML = `<span class="mini-pt"></span>${textoOcupado}`; }
+  document.body.classList.add('trabalhando');
+  try { return await fn(); }
+  finally {
+    OCUPADO = false; document.body.classList.remove('trabalhando');
+    if (alvo && document.body.contains(alvo)) { alvo.classList.remove('ocupado'); alvo.removeAttribute('disabled'); if (antes !== null) alvo.innerHTML = antes; }
+  }
+}
+
 async function registrar(id, tipo, extra){
-  try { await api('desfecho', { atendente: (window.CaptaUser&&CaptaUser.nome())||undefined, agendamento_id: id, desfecho: tipo, observacao: `desfecho: ${tipo}${extra.motivo?' · '+extra.motivo:''}${extra.observacao?' · '+extra.observacao:''}`, ...extra }); ABERTO = null; await carregar();
-    const nome = (D.agendamentos.find(x=>x.id===id)||{}).crianca_nome || 'Aula';
-    toast(`<b>${esc(nome)}</b> · ${({matriculou:'matriculou',nao:'não fechou',andamento:'em andamento',faltou:'faltou'})[tipo]} · Kommo atualizado`, tipo==='matriculou'?{tipo:'ok'}:{ acao:'desfazer', onAcao:() => desfazer(id) }); }
-  catch(e){ toast(e.message,{tipo:'erro'}); }
+  return acao('desfecho', async () => {
+    const nome = (EXP.find(x=>x.id===id)||{}).crianca_nome || 'Aula';
+    const aviso = toast(`<span class="mini-pt"></span>gravando ${({matriculou:'matrícula',nao:'resultado',andamento:'resultado',faltou:'falta'})[tipo]}…`, { ms: 60000 });
+    try {
+      await api('desfecho', { atendente: (window.CaptaUser&&CaptaUser.nome())||undefined, agendamento_id: id, desfecho: tipo, observacao: `desfecho: ${tipo}${extra.motivo?' · '+extra.motivo:''}${extra.observacao?' · '+extra.observacao:''}`, ...extra });
+      ABERTO = null;
+      // efeito na hora, sem esperar o servidor responder de novo
+      const loc = EXP.find(x => x.id === id);
+      if (loc) { loc.observacao = `desfecho: ${tipo}${extra.motivo?' · '+extra.motivo:''}${extra.observacao?' · '+extra.observacao:''}`;
+        if (tipo === 'faltou') loc.status = 'faltou'; }
+      desenhar(); if (AULA_ABERTA) pintarAula();
+      aviso.remove();
+      mudou({ o:'desfecho' }); toast(`<b>${esc(nome)}</b> · ${({matriculou:'matriculou',nao:'não fechou',andamento:'em andamento',faltou:'faltou'})[tipo]} · Kommo atualizado`,
+        tipo==='matriculou'?{tipo:'ok'}:{ acao:'desfazer', onAcao:() => desfazer(id) });
+      await carregar();
+    } catch(e){ aviso.remove(); toast(e.message,{tipo:'erro'}); }
+  }, 'gravando…');
 }
 async function confirmarMatricula(id){
   const g = x => document.getElementById(x).value;
   if (!ESC.pagamento) return toast('Escolha a forma de pagamento.',{tipo:'erro'});
-  try { await api('desfecho', { agendamento_id: id, desfecho: 'matriculou', valor: g('m-valor'), curso: g('m-curso'), pagamento: ESC.pagamento, turma_id: g('m-turma'), aluno_nome: g('m-aluno'), observacao: `desfecho: matriculou · ${ESC.pagamento}${g('m-valor')?' · R$ '+g('m-valor'):''}` }); ABERTO = null; await carregar(); }
-  catch(e){ toast(e.message,{tipo:'erro'}); }
+  return acao('matricula', async () => {
+  const aviso = toast('<span class="mini-pt"></span>criando matrícula e aluno…', { ms: 60000 });
+  try { await api('desfecho', { agendamento_id: id, desfecho: 'matriculou', valor: g('m-valor'), curso: g('m-curso'), pagamento: ESC.pagamento, turma_id: g('m-turma'), aluno_nome: g('m-aluno'), observacao: `desfecho: matriculou · ${ESC.pagamento}${g('m-valor')?' · R$ '+g('m-valor'):''}` }); ABERTO = null; aviso.remove(); desenhar(); if (AULA_ABERTA) pintarAula(); await carregar(); }
+  catch(e){ aviso.remove(); toast(e.message,{tipo:'erro'}); }
+  }, 'gravando…');
 }
-async function cancelar(id){ if (!confirm('Cancelar esta aula?')) return; try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pela recepção' }); toast('Aula cancelada · lead voltou de etapa · Kommo atualizado'); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
-async function reagendar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'reagendado pela recepção' }); ABERTO = null; VAGAS3 = null; toast('Aula remarcada · Kommo atualizado', { tipo:'ok' }); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
-async function desfazer(id){ try { await api('desfazer', { agendamento_id: id }); toast('Desfeito · aula voltou a agendada'); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+async function cancelar(id){ return acao('cancelar', async () => { const aviso = toast('<span class="mini-pt"></span>cancelando…', { ms: 60000 }); if (!confirm('Cancelar esta aula?')) return; try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pela recepção' }); mudou({ o:'aula' }); toast('Aula cancelada · lead voltou de etapa · Kommo atualizado'); aviso.remove(); await carregar(); if (AULA_ABERTA) pintarAula(); } catch(e){ aviso.remove(); toast(e.message,{tipo:'erro'}); } 
+ }, 'cancelando…'); }
+async function reagendar(id, turmaId, data){ return acao('reagendar', async () => { const aviso = toast('<span class="mini-pt"></span>reagendando…', { ms: 60000 }); try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'reagendado pela recepção' }); ABERTO = null; VAGAS3 = null; toast('Aula remarcada · Kommo atualizado', { tipo:'ok' }); aviso.remove(); await carregar(); if (AULA_ABERTA) pintarAula(); } catch(e){ aviso.remove(); toast(e.message,{tipo:'erro'}); } 
+ }, 'reagendando…'); }
+async function desfazer(id){
+  return acao('desfazer', async () => {
+    const aviso = toast('<span class="mini-pt"></span>desfazendo…', { ms: 60000 });
+    try {
+      await api('desfazer', { agendamento_id: id });
+      const loc = EXP.find(x => x.id === id);
+      if (loc) { loc.observacao = String(loc.observacao || '').replace(/desfecho:[^·]*(·[^·]*)*/i, '').trim() || null; loc.status = 'agendado'; }
+      ABERTO = null; desenhar(); if (AULA_ABERTA) pintarAula();
+      aviso.remove(); mudou({ o:'desfecho' }); toast('Desfeito · a aula voltou a agendada', { tipo:'ok' });
+      await carregar();
+    } catch(e){ aviso.remove(); toast(e.message,{tipo:'erro'}); }
+  }, 'desfazendo…');
+}
 
 
 // ---------------- filtro de tipo ----------------
@@ -1099,9 +1177,10 @@ function blocoVagasRep(){
       <b>${fmt(v.data,{day:'2-digit',month:'2-digit'})}</b><span>${DIAS3[dow(v.data)]} · ${hh(v.hora_inicio)}</span><i>${v.vagas} livre${v.vagas>1?'s':''}</i></div>`).join('')}</div>`;
 }
 async function confirmarReposicao(turmaId, data){
-  try { await api('repor', { aluno_id: REP.aluno.id, turma_id: turmaId, data, repoe_data: REP.escolhido || null, atendente: (window.CaptaUser&&CaptaUser.nome())||undefined });
-    fecharModal(); toast(`Reposição marcada para ${fmt(data,{day:'2-digit',month:'2-digit'})}`, { tipo:'ok' }); await carregar(); }
-  catch(e){ toast(e.message, { tipo:'erro' }); }
+  return acao('repor', async () => { const aviso = toast('<span class="mini-pt"></span>marcando reposição…', { ms: 60000 });
+    try { await api('repor', { aluno_id: REP.aluno.id, turma_id: turmaId, data, repoe_data: REP.escolhido || null, atendente: (window.CaptaUser&&CaptaUser.nome())||undefined });
+      fecharModal(); aviso.remove(); mudou({ o:'reposicao' }); toast(`Reposição marcada para ${fmt(data,{day:'2-digit',month:'2-digit'})}`, { tipo:'ok' }); await carregar(); }
+    catch(e){ aviso.remove(); toast(e.message, { tipo:'erro' }); } }, 'marcando…');
 }
 
 if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();

@@ -332,6 +332,10 @@ async function salvar(id){
   try { await api('aluno', d); fechar(); await carregar(); toast(`<b>${esc(d.nome)}</b> ${id ? 'atualizado' : 'cadastrado'}${d.status!=='ativo'?' · '+d.status:''}`, { tipo:'ok' }); } catch(e){ toast(e.message,{tipo:'erro'}); }
 }
 if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
+
+// outra tela do painel mudou algo (aula, matrícula, remarcação): recarrega
+addEventListener('storage', e => { if (e.key === 'capta_mudou' && typeof carregar === 'function') carregar(); });
+addEventListener('message', e => { if (e.data && e.data.capta === 'mudou' && typeof carregar === 'function') carregar(); });
 </script>
 </body>
 </html>

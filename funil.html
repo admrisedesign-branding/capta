@@ -527,6 +527,10 @@ if (!SLUG || !TOKEN) {
 } else {
   carregar();
 }
+
+// outra tela do painel mudou algo (aula, matrícula, remarcação): recarrega
+addEventListener('storage', e => { if (e.key === 'capta_mudou' && typeof carregar === 'function') carregar(); });
+addEventListener('message', e => { if (e.data && e.data.capta === 'mudou' && typeof carregar === 'function') carregar(); });
 </script>
 </body>
 </html>
