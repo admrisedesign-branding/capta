@@ -29,6 +29,8 @@
   #lp .msg{max-width:88%;padding:8px 10px;border-radius:12px;font-size:13px;line-height:1.45;background:var(--line-2,#F1F3F8);align-self:flex-start;white-space:pre-wrap}
   #lp .msg.saida{background:var(--brand-soft,rgba(46,91,255,.1));align-self:flex-end}#lp .msg small{display:block;color:var(--faint);font-size:10.5px;margin-top:3px}
   #lp .msg img{max-width:100%;border-radius:8px;display:block;margin-top:4px}
+  #lp .t-pessoa{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;display:inline-flex;align-items:center;gap:4px}
+  #lp .t-pessoa:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
   #lp .transcr{margin-top:6px;padding-top:6px;border-top:1px solid rgba(105,112,137,.2);font-size:12.5px;line-height:1.45;color:var(--muted);white-space:pre-wrap}
   #lp .bt-tr{margin-top:6px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}#lp .msg audio{width:100%;margin-top:4px}
   #lp .aviso{margin:8px 0;background:rgba(224,147,15,.14);border:1px solid rgba(224,147,15,.28);border-radius:11px;padding:8px 12px;font-size:12.5px;color:#8A5A04;line-height:1.5}
@@ -61,6 +63,15 @@
   const EU = () => (window.CaptaUser && CaptaUser.nome()) || '';
   const DIAS_N = ['dom','seg','ter','qua','qui','sex','sáb'];
   function hojeLocal(){ const d = new Date(Date.now() - 4*3600*1000); return d.toISOString().slice(0,10); }
+  function corPessoa(nome){
+    const n = String(nome||'').trim().toLowerCase(); if (!n) return null;
+    const paleta = [['#2E5BFF','rgba(46,91,255,.12)'],['#16A34A','rgba(22,163,74,.12)'],['#E8734A','rgba(232,115,74,.14)'],
+                    ['#7C5CDB','rgba(124,92,219,.13)'],['#C47A08','rgba(224,147,15,.14)'],['#0E8A9E','rgba(14,138,158,.13)']];
+    let h = 0; for (let i=0;i<n.length;i++) h = (h*31 + n.charCodeAt(i)) >>> 0;
+    return paleta[h % paleta.length];
+  }
+  function tagPessoa(nome){ const c = corPessoa(nome); if (!c) return '';
+    return `<span class="t-pessoa" style="color:${c[0]};background:${c[1]}">${esc(String(nome).split(' ')[0])}</span>`; }
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const hhmm = t => String(t || '').slice(0, 5);
   const dataBR = d => { const [a,m,dd] = String(d).split('-'); return `${dd}/${m}`; };
@@ -107,7 +118,7 @@
     document.getElementById('lp').innerHTML = `
       <div class="cab"><div class="av">${esc(ini)}</div>
         <div style="min-width:0"><h3>${esc(l.nome || 'Sem nome')}</h3>
-          <div class="sub">${l.contato ? `<a class="lnk" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">${esc(l.contato)}</a>` : ''}${l.crianca ? ' · ' + esc(l.crianca) + (l.idade ? `, ${l.idade}` : '') : ''}${l.temperatura ? ' · ' + esc(l.temperatura) : ''}${l.atendente ? ' · ' + esc(l.atendente) : ''}${etAtual ? ' · ' + esc(etAtual.nome) : ''}${l.kommo_lead_id ? ` · <a class="lnk" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Kommo ↗</a>` : ''}</div></div>
+          <div class="sub">${l.contato ? `<a class="lnk" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">${esc(l.contato)}</a>` : ''}${l.crianca ? ' · ' + esc(l.crianca) + (l.idade ? `, ${l.idade}` : '') : ''}${l.temperatura ? ' · ' + esc(l.temperatura) : ''}${l.atendente ? ' · ' + tagPessoa(l.atendente) : ''}${l.atendente ? ' · ' + esc(l.atendente) : ''}${etAtual ? ' · ' + esc(etAtual.nome) : ''}${l.kommo_lead_id ? ` · <a class="lnk" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Kommo ↗</a>` : ''}</div></div>
         <button class="x" onclick="LeadPainel.fechar()" title="Fechar">×</button></div>
       <div class="abas">${abas.map(([k,t]) => `<button class="${S.aba===k?'on':''}" onclick="LeadPainel.aba('${k}')">${t}</button>`).join('')}</div>
       ${S.aba === 'conversa' ? vConversa(l, et) : S.aba === 'dados' ? vDados(l, et) : vAgendar(l)}`;

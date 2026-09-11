@@ -235,6 +235,8 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .cel.livre .lv2.ultimo{color:var(--morno);font-weight:800}
 .hora-livre span.ultimo{color:var(--morno);font-weight:800}
 .hora-livre.cheia span{color:var(--quente);font-weight:700}
+.t-pessoa{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;text-transform:none;letter-spacing:0;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.t-pessoa:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -294,6 +296,19 @@ const ajuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
 // mostra o dia seguinte.
 function hojeLocal(){ const d = new Date(Date.now() - 4*3600*1000); return d.toISOString().slice(0,10); }
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// Cada atendente ganha uma cor fixa, para bater o olho e saber de quem é o lead
+function corPessoa(nome){
+  const n = String(nome || '').trim().toLowerCase(); if (!n) return null;
+  const paleta = [['#2E5BFF','rgba(46,91,255,.12)'],['#16A34A','rgba(22,163,74,.12)'],['#E8734A','rgba(232,115,74,.14)'],
+                  ['#7C5CDB','rgba(124,92,219,.13)'],['#C47A08','rgba(224,147,15,.14)'],['#0E8A9E','rgba(14,138,158,.13)']];
+  let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0;
+  return paleta[h % paleta.length];
+}
+function tagPessoa(nome, extra){
+  const c = corPessoa(nome); if (!c) return '';
+  return `<span class="t-pessoa" style="color:${c[0]};background:${c[1]}" title="${extra || 'quem está atendendo'}">${esc(String(nome).split(' ')[0])}</span>`;
+}
 const DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'], DIAS3 = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const hoje = hojeLocal();
 const iso = d => d.toISOString().slice(0,10);

@@ -193,6 +193,8 @@ button{font-family:inherit;cursor:pointer}
 .lado-lead{border-top:1px solid var(--line);padding:10px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted);background:var(--bg)}
 .lado-lead b{color:var(--ink)}.lado-lead .bt{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--brand);cursor:pointer;font-family:inherit}
 .wrap{grid-template-columns:340px 1fr}
+.t-pessoa{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;text-transform:none;letter-spacing:0;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.t-pessoa:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -272,6 +274,19 @@ async function api(acao, extra = {}) {
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 
+// Cada atendente ganha uma cor fixa, para bater o olho e saber de quem é o lead
+function corPessoa(nome){
+  const n = String(nome || '').trim().toLowerCase(); if (!n) return null;
+  const paleta = [['#2E5BFF','rgba(46,91,255,.12)'],['#16A34A','rgba(22,163,74,.12)'],['#E8734A','rgba(232,115,74,.14)'],
+                  ['#7C5CDB','rgba(124,92,219,.13)'],['#C47A08','rgba(224,147,15,.14)'],['#0E8A9E','rgba(14,138,158,.13)']];
+  let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0;
+  return paleta[h % paleta.length];
+}
+function tagPessoa(nome, extra){
+  const c = corPessoa(nome); if (!c) return '';
+  return `<span class="t-pessoa" style="color:${c[0]};background:${c[1]}" title="${extra || 'quem está atendendo'}">${esc(String(nome).split(' ')[0])}</span>`;
+}
+
 function fone(n) {
   const d = String(n || '').replace(/\D/g, '');
   const s = d.startsWith('55') ? d.slice(2) : d;
@@ -317,7 +332,7 @@ function desenharLista(){
     return `<button class="conv ${c.resolvida_em?'res':''}" data-id="${c.id}" aria-current="${c.id === atual}">
       <span class="conv-av">${esc(iniciais(nome))}</span>
       <span class="conv-mid"><span class="conv-nome">${esc(nome)}</span><span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span>
-        <span class="conv-tags">${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?`<span class="mini-tag mt-at">${esc(at)}</span>`:''}${c.resolvida_em?'<span class="mini-tag mt-at">resolvida</span>':''}</span></span>
+        <span class="conv-tags">${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?tagPessoa(at, 'atendendo: ' + at):''}${c.resolvida_em?'<span class="mini-tag mt-at">resolvida</span>':''}</span></span>
       <span class="conv-dir"><span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>` : ''}</span></button>`;
   }).join('');
   elConvs.querySelectorAll('.conv').forEach(b => { b.onclick = () => abrir(b.dataset.id); });
