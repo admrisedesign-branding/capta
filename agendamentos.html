@@ -194,6 +194,16 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .cel .t .cap{font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:99px;background:var(--line-2);color:var(--muted)}
 .cel .t .cap.alerta{background:var(--morno-bg);color:var(--morno)}
 .cel .t .cap.cheio{background:var(--quente-bg);color:var(--quente)}
+
+.hora-livre{display:flex;align-items:center;gap:9px;border:1px dashed var(--line);border-radius:12px;padding:9px 12px;margin-top:7px;cursor:pointer;transition:.12s}
+.hora-livre:hover{border-color:var(--exp);background:var(--exp-bg)}
+.hora-livre b{font-size:14px;font-weight:800;color:var(--ink)}
+.hora-livre span{font-size:12.5px;color:var(--muted);font-weight:600}
+.hora-livre .cadeiras{margin-left:auto;display:flex;gap:3px}
+.hora-livre .cadeiras i{width:11px;height:11px;border-radius:3px;background:var(--exp);opacity:.85;display:inline-block}
+.hora-livre .cadeiras i.ocup{background:var(--line);opacity:1}
+.hora-livre.cheia{cursor:default;opacity:.6}
+.hora-livre.cheia:hover{border-color:var(--line);background:transparent}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -320,6 +330,26 @@ function lado(){
     <div class="leg"><span><i style="background:var(--brand-2)"></i>Aluno matriculado — aula de 2 horas</span><span><i style="background:var(--exp)"></i>Aula experimental — 1 hora, kit First</span><span><i style="background:#7C5CDB"></i>Reposição — 1 hora, kit do aluno</span></div></div>`;
 }
 
+
+// Cada hora do bloco vira um balão com os lugares livres, em cadeirinhas.
+// Clicar abre o agendamento já naquele dia e horário.
+function horasLivres(d, t){
+  const ini = hN(t.hora_inicio), fim = hN(t.hora_fim);
+  const out = [];
+  for (let h = ini; h < fim; h++) {
+    const usados = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) === h).length;
+    const v = VAGAS.find(x => x.data === d && hN(x.hora_inicio) === h);
+    const total = v ? (v.capacidade ?? 8) : 8;
+    const livres = v ? v.vagas : Math.max(0, total - usados);
+    if (livres <= 0) { out.push(`<div class="hora-livre cheia"><b>${String(h).padStart(2,'0')}:00</b><span>sem kit livre</span></div>`); continue; }
+    const cad = Array.from({ length: Math.min(total, 10) }, (_, i) =>
+      `<i class="${i < (total - livres) ? 'ocup' : ''}"></i>`).join('');
+    out.push(`<div class="hora-livre" onclick="novoAgendamento('${d}','${t.id}',${h})" title="marcar aula experimental às ${String(h).padStart(2,'0')}:00">
+      <b>${String(h).padStart(2,'0')}:00</b><span>${livres} vaga${livres>1?'s':''}</span><span class="cadeiras">${cad}</span></div>`);
+  }
+  return out.join('');
+}
+
 function vDia(d){
   const ts = turmasDo(d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
   const out = ts.map(t => {
@@ -347,7 +377,7 @@ function vDia(d){
           ${expV.filter(ehExp).map(cartao).join('')}
           ${expV.filter(ehRep).map(r => { const alu = (D.alunos||[]).find(x => x.id === r.aluno_id) || {};
             return `<div class="al rep" onclick="abrirAluno('${r.aluno_id}')"><span class="k"></span><span class="n">${esc(r.crianca_nome||alu.nome||'')}</span><span class="hr">reposição ${hh(r.hora_inicio)}</span></div>`; }).join('')}
-          ${!expV.length ? `<div class="al mais" onclick="novoAgendamento()">+ marcar aula experimental</div>` : ''}
+          ${horasLivres(d, t)}
         </div>
       </div></div>`;
   }).filter(Boolean).join('');
@@ -388,16 +418,14 @@ function vSemanaGrade(){
       const cls = !v ? '' : v.n <= 0 ? 'cheio' : v.n <= 2 ? 'alerta' : '';
       h += `<div class="cel ${expV.length?'temexp':''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${t?hN(t.hora_inicio):'null'})">
         <div class="t"><span><b>${als.length + expV.length}</b>/${sala} na sala</span>
-          ${v ? `<span class="cap ${cls}" title="kits ${esc(v.t && v.t.kit_experimental || 'First')} livres para aula experimental">${v.n}${v.cap?'/'+v.cap:''} livre${v.n===1?'':'s'}</span>` : ''}</div>
+          ${v ? `<span class="cap ${cls}" title="kits First livres para aula experimental nesta hora">${v.n} livre${v.n===1?'':'s'}</span>` : ''}</div>
         ${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('')}
         ${als.length && expV.length ? '<div class="sep"></div>' : ''}
         ${expV.map(a => { const l = leadDe(a); const alu = (D.alunos||[]).find(x => x.id === a.aluno_id) || {};
           return ehRep(a)
             ? `<div class="al rep" onclick="abrirAluno('${a.aluno_id}')" title="reposição de ${esc(alu.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||alu.nome||'')}</span><span class="hr">rep ${hh(a.hora_inicio)}</span></div>`
             : `<div class="al exp" onclick="irDia('${d}')" title="aula experimental · ${esc(l.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||l.nome||'visita')}</span><span class="hr">${hh(a.hora_inicio)}</span></div>`; }).join('')}
-        ${v && v.n > 0 && TIPO !== 'alunos' ? `<div class="al mais" onclick="novoAgendamento()">+ marcar experimental</div>` : ''}
-        <div class="kits">${(D.kits||[]).map(k => { const u = porKit[k.kit]||0, liv = k.capacidade - u;
-          return `<span class="kt ${liv<=0?'cheio':liv<=2?'alerta':''}" title="${esc(k.kit)}: ${u} de ${k.capacidade} kits em uso">${esc(k.kit.replace('App Developer','App').replace('Bot',''))} ${u}/${k.capacidade}</span>`; }).join('')}</div>
+        ${v && v.n > 0 && TIPO !== 'alunos' ? `<div class="al mais" onclick="novoAgendamento()">+ ${v.n} livre${v.n>1?'s':''}</div>` : ''}
       </div>`;
     }
   }
@@ -508,9 +536,10 @@ async function remarcar(id, turmaId, data){ try { await api('remarcar', { agenda
 
 // ---- novo agendamento: busca o lead, criança, escolhe a vaga ----
 let NA = { leads: null, lead: null, vagas: null, vaga: null, q: '' };
-async function novoAgendamento(){
-  NA = { leads: null, lead: null, vagas: null, vaga: null, q: '' }; desenharNA();
-  try { const [f, ag] = await Promise.all([api('funil'), api('agenda', { dias: 30 })]); NA.leads = f.leads || []; NA.vagas = (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0); }
+async function novoAgendamento(data, turmaId, hora){
+  NA = { leads: null, lead: null, vagas: null, vaga: null, q: '', fixo: data ? { data, turma_id: turmaId, hora } : null }; desenharNA();
+  try { const [f, ag] = await Promise.all([api('funil'), api('agenda', { dias: 30 })]); NA.leads = f.leads || []; NA.vagas = (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0);
+    if (NA.fixo) NA.vaga = NA.vagas.find(h => h.data === NA.fixo.data && hN(h.hora_inicio) === NA.fixo.hora) || null; }
   catch(e){ NA.leads = []; NA.vagas = []; toast(e.message, { tipo:'erro' }); }
   desenharNA();
 }
@@ -525,7 +554,10 @@ function desenharNA(){
       ${NA.leads === null ? '<div class="lista-leads"><div class="lead-op"><small>carregando leads…</small></div></div>' : NA.lead ? `<div class="lista-leads"><div class="lead-op on"><span>${esc(NA.lead.nome||'')}</span><small>${esc(NA.lead.contato||'')}</small></div></div>` :
         `<div class="lista-leads">${lista.map(l => `<div class="lead-op" onclick="NA.lead=${JSON.stringify({id:l.id,nome:l.nome,contato:l.contato,crianca:l.crianca,idade:l.idade}).replace(/"/g,'&quot;')};desenharNA()"><span>${esc(l.nome||'Sem nome')}</span><small>${esc(l.contato||'')}${l.temperatura?' · '+esc(l.temperatura):''}</small></div>`).join('') || '<div class="lead-op"><small>nenhum lead encontrado</small></div>'}</div>`}</div>
     <div class="l2"><div class="campo"><label>Criança</label><input id="na-cri" value="${esc(NA.lead && NA.lead.crianca || '')}" placeholder="Nome da criança"></div><div class="campo"><label>Idade</label><input id="na-id" type="number" min="3" max="17" value="${NA.lead && NA.lead.idade || ''}"></div></div>
-    <div class="campo"><label>Vaga — ofereça duas opções</label>${NA.vagas === null ? '<p>Buscando vagas…</p>' : `<div class="vagas3">${vg('Manhã','manha')}${vg('Tarde','tarde')}${vg('Sábado','sab')}</div>`}</div>
+    ${NA.fixo && NA.vaga ? `<div class="campo"><label>Horário escolhido</label>
+      <div class="vg on" style="cursor:default"><b>${DIAS[dow(NA.vaga.data)]} ${fmt(NA.vaga.data,{day:'2-digit',month:'2-digit'})} · ${hh(NA.vaga.hora_inicio)}</b><small>${NA.vaga.vagas} kit${NA.vaga.vagas>1?'s':''} First livre${NA.vaga.vagas>1?'s':''}</small></div>
+      <button class="btn g sm" style="margin-top:8px" onclick="NA.fixo=null;NA.vaga=null;desenharNA()">escolher outro horário</button></div>`
+    : `<div class="campo"><label>Vaga — ofereça duas opções</label>${NA.vagas === null ? '<p>Buscando vagas…</p>' : `<div class="vagas3">${vg('Manhã','manha')}${vg('Tarde','tarde')}${vg('Sábado','sab')}</div>`}</div>`}
     <div class="fim"><button class="btn g" onclick="fecharModal()">Cancelar</button><button class="btn" onclick="confirmarNA()" ${NA.lead && NA.vaga ? '' : 'disabled'}>Agendar</button></div></div></div>`;
   document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
 }
