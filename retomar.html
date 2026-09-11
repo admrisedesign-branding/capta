@@ -73,6 +73,20 @@
 .carregando{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13.5px;padding:20px 0}
 .pt{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:gira .7s linear infinite}
 @keyframes gira{to{transform:rotate(360deg)}}
+
+.resumo{align-items:center}
+.ver-criterio{margin-left:auto;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 11px;
+  font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
+.ver-criterio:hover{border-color:var(--brand);color:var(--brand)}
+.criterios{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+  padding:16px 20px;margin-bottom:14px;font-size:13.5px;line-height:1.65;color:var(--muted)}
+.criterios b{color:var(--ink)}
+.criterios ol,.criterios ul{margin:8px 0 14px 20px}
+.criterios li{margin-bottom:5px}
+.criterios .obs{display:block;font-size:12.5px;color:var(--faint);border-top:1px solid var(--line-2);padding-top:10px}
+.criterio-linha{display:flex;gap:14px;flex-wrap:wrap;margin-top:9px}
+.cl{font-size:12.5px;font-weight:700;color:var(--ink);display:flex;flex-direction:column;gap:1px}
+.cl i{font-style:normal;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
 </style>
 <script>
 function toast(msg, opts){ opts = opts || {}; let box = document.getElementById('toasts'); if(!box){ box=document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
@@ -102,7 +116,14 @@ const fmtD = d => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day:'2
 const diaDe = d => DIAS[new Date(d + 'T12:00:00').getDay()];
 const primeiro = n => String(n || '').trim().split(' ')[0] || '';
 
-let F = { fila: [], vagas: [], total: 0, motivos: {} }, FEITOS = new Set(), ESCOLHA = {};
+let F = { fila: [], vagas: [], total: 0, motivos: {} }, FEITOS = new Set(), ESCOLHA = {}, VERC = false;
+const CRITERIO = {
+  sem_resposta: 'Conversa com mensagem do cliente ainda não respondida e não marcada como resolvida.',
+  quente_sem_aula: 'Lead marcado como <b>Quente</b> (pontuação alta ou disse que quer matricular) e sem aula experimental agendada.',
+  evento: 'Entrou por evento e continua em <b>Novo lead</b> — deixou o contato e ninguém retomou.',
+  parado: 'Em <b>Em contato</b> ou <b>Qualificado</b>, sem mudar de etapa há 3 dias ou mais.',
+  remarketing: 'Em <b>Remarketing</b> há 20 dias ou mais.'
+};
 
 async function api(acao, extra = {}) {
   const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -206,8 +227,26 @@ function desenhar(){
     </div>
     <div class="resumo">
       <div><b>${F.total}</b>esperando retomada</div>
-      ${Object.entries(F.motivos || {}).map(([m, q]) => `<div class="${m==='sem_resposta'?'bad':m==='quente_sem_aula'?'hot':''}"><b>${q}</b>${rot[m] || m}</div>`).join('')}
+      ${Object.entries(F.motivos || {}).map(([m, q]) => `<div class="${m==='sem_resposta'?'bad':m==='quente_sem_aula'?'hot':''}"><b>${q}</b>${rot[m] || m}${ajuda(CRITERIO[m] || '')}</div>`).join('')}
+      <button class="ver-criterio" onclick="VERC=!VERC;desenhar()">${VERC ? 'esconder critérios' : 'como a fila é montada?'}</button>
     </div>
+    ${VERC ? `<div class="criterios">
+      <b>Quem entra na fila, em ordem de urgência</b>
+      <ol>
+        <li><b>Sem resposta</b> — o cliente mandou mensagem e ninguém respondeu (conversa com mensagem não lida, não resolvida).</li>
+        <li><b>Quer fechar, sem aula</b> — lead marcado como <b>Quente</b> e sem nenhuma aula experimental agendada.</li>
+        <li><b>Evento</b> — entrou por evento e continua em <b>Novo lead</b>: deixou o contato e ninguém retomou.</li>
+        <li><b>Parado</b> — está em <b>Em contato</b> ou <b>Qualificado</b> e não muda de etapa há <b>3 dias ou mais</b> (quanto mais dias, mais acima na fila).</li>
+        <li><b>Remarketing</b> — em Remarketing há <b>20 dias ou mais</b>.</li>
+      </ol>
+      <b>Quem fica de fora</b>
+      <ul>
+        <li>Alunos ativos e leads perdidos de propósito.</li>
+        <li>Quem não tem telefone.</li>
+        <li>Quem você já falou: some por <b>5 dias</b>. "Falar daqui a 7 dias" some por 7. "Não insistir" sai de vez.</li>
+      </ul>
+      <span class="obs">O tempo parado conta desde a última mudança de etapa — ou desde a entrada, se nunca mudou.</span>
+    </div>` : ''}
     <div class="dois"><div>
     ${!pend.length ? (F.total
       ? `<div class="fim-dia">Você falou com todos da fila de hoje 👏<br><span style="font-weight:600;color:var(--muted)">Ainda há ${F.total} esperando — recarregue para pegar os próximos.</span>
@@ -226,7 +265,15 @@ function cartao(x){
     <div class="topo">
       <div>
         <div class="quem">${esc(x.nome || 'Sem nome')}${x.crianca ? `<em>${esc(x.crianca)}${x.idade?`, ${x.idade} anos`:''}</em>` : ''}</div>
-        <div class="porque">${esc(x.porque)}${x.etapa ? ` · <b>${esc(x.etapa)}</b>` : ''}${x.atendente ? ` · com ${esc(x.atendente)}` : ''}</div>
+        <div class="porque">${esc(x.porque)}</div>
+        <div class="criterio-linha">
+          ${x.etapa ? `<span class="cl"><i>etapa</i>${esc(x.etapa)}</span>` : ''}
+          <span class="cl"><i>parado há</i>${x.parado_ha < 900 ? x.parado_ha + (x.parado_ha === 1 ? ' dia' : ' dias') : '—'}</span>
+          ${x.temperatura ? `<span class="cl"><i>temperatura</i>${esc(x.temperatura)}</span>` : ''}
+          ${x.porta ? `<span class="cl"><i>como chegou</i>${esc(x.porta)}</span>` : ''}
+          ${x.atendente ? `<span class="cl"><i>com</i>${esc(x.atendente)}</span>` : ''}
+          ${x.criado_em ? `<span class="cl"><i>entrou em</i>${new Date(x.criado_em).toLocaleDateString('pt-BR')}</span>` : ''}
+        </div>
       </div>
       <span class="selo ${x.motivo}">${rot[x.motivo] || x.motivo}</span>
       ${x.kommo_lead_id ? `<a class="lk" style="flex-basis:100%;margin-top:2px" href="${KOMMO}${x.kommo_lead_id}" target="_blank" rel="noopener" onclick="event.stopPropagation()">abrir no Kommo ↗</a>` : ''}
