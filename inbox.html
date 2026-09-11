@@ -146,6 +146,14 @@ button{font-family:inherit;cursor:pointer}
 .transcricao{margin-top:7px;padding-top:7px;border-top:1px solid rgba(105,112,137,.2);font-size:13px;line-height:1.5;color:var(--muted);white-space:pre-wrap}
 .msg.saida .transcricao{border-top-color:rgba(31,122,77,.25);color:#3f5c3c}
 .pendente{margin-top:6px;font-size:11.5px;color:var(--faint)}
+.sugestoes{position:absolute;left:18px;right:18px;bottom:64px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 34px rgba(20,26,46,.18);z-index:6;overflow:hidden}
+.sugestoes .cab{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid var(--line);font-size:11.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em}
+.sugestoes .cab button{margin-left:auto;border:0;background:none;color:var(--faint);font-size:16px;cursor:pointer}
+.sg{padding:10px 13px;border-bottom:1px solid var(--line-2);cursor:pointer}
+.sg:last-child{border:0}.sg:hover{background:var(--brand-softer)}
+.sg b{display:block;font-size:11.5px;color:var(--brand);margin-bottom:3px}
+.sg span{font-size:13px;line-height:1.5;color:var(--ink);white-space:pre-wrap}
+.ico.ia{color:var(--brand);border-color:var(--brand-soft);background:var(--brand-softer)}
 /* inbox v2 */
 
 .conv{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--line-2);background:transparent;cursor:pointer;font-family:inherit}
@@ -363,6 +371,7 @@ async function abrir(id) {
       <div class="respondendo" id="respondendo" style="display:none"></div>
       <div class="desce" id="desce" onclick="document.getElementById('fluxo').scrollTop = document.getElementById('fluxo').scrollHeight" title="Ir para o fim">↓</div>
       <div class="escrever">
+        <button class="ico ia" title="A IA lê a conversa e sugere o que responder" onclick="sugerir()">✨</button>
         <button class="ico" title="Respostas prontas (ou digite /)" onclick="abrirRapidas()">⚡</button>
         <button class="ico" title="Anexar imagem, áudio ou arquivo" onclick="document.getElementById('anexo').click()">📎</button>
         <input type="file" id="anexo" style="display:none" accept="image/*,audio/*,.pdf,.doc,.docx" onchange="enviarAnexo(this)">
@@ -559,6 +568,26 @@ async function transcrever(id){
 async function transcreverPendentes(){
   const pend = (CONV_MSGS||[]).filter(m => m.tipo === 'audio' && !m.transcricao && m.direcao === 'entrada').slice(0, 3);
   for (const m of pend) { await transcrever(m.id); }
+}
+
+
+// ---- IA sugere o que responder, olhando a conversa, a etapa e as vagas ----
+async function sugerir(){
+  const box = document.getElementById('rapidas'); if (!box || !atual) return;
+  box.innerHTML = `<div class="sugestoes"><div class="cab">pensando na melhor resposta…<button onclick="fecharRapidas()">×</button></div></div>`;
+  try {
+    const d = await api('sugerir', { conversa_id: atual });
+    if (d.erro) { box.innerHTML = ''; return toast(d.erro, { tipo:'erro' }); }
+    const sg = d.sugestoes || [];
+    box.innerHTML = `<div class="sugestoes"><div class="cab">sugestões — toque para usar<button onclick="fecharRapidas()">×</button></div>
+      ${sg.map((x,i) => `<div class="sg" onclick="usarSugestao(${i})"><b>${esc(x.titulo||'Sugestão')}</b><span>${esc(x.texto||'')}</span></div>`).join('') || '<div class="sg"><span>Nada a sugerir agora.</span></div>'}</div>`;
+    window.__sug = sg;
+  } catch(e){ box.innerHTML = ''; toast(e.message, { tipo:'erro' }); }
+}
+function usarSugestao(i){
+  const x = (window.__sug || [])[i]; const t = document.getElementById('txt');
+  if (x && t) { t.value = x.texto; t.focus(); t.dispatchEvent(new Event('input')); }
+  fecharRapidas();
 }
 
 async function enviar() {

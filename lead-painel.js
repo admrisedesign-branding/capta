@@ -45,6 +45,16 @@
   #lp .del{width:100%;margin-top:14px;background:none;border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:8px;font-size:12.5px;cursor:pointer;font-family:inherit}
   @media(max-width:760px){#lp.aberto{width:100%;max-width:100%}#lp .corpo{padding:12px 14px}#lp .escrever{padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}#lp .cab{padding:12px 14px}}
   `;
+  const AJUDA_ETAPA = {
+    'novo lead': 'Chegou e ninguém falou com ele ainda.',
+    'em contato': 'Uma pessoa da escola já respondeu; ainda não se sabe o suficiente sobre a criança.',
+    'qualificado': 'Já sabemos nome e idade da criança e a família respondeu sobre horário ou valor.',
+    'aula agendada': 'Tem dia e hora marcados (o Capta põe aqui sozinho ao agendar).',
+    'matrícula em andamento': 'Fez a aula e quer, mas ainda não pagou.',
+    'aluno ativo': 'Matriculado.',
+    'remarketing': 'Não fechou agora, mas pode voltar.',
+    'perdido': 'Sem interesse, idade fora ou sumiu.',
+  };
   const FONTES = ['anúncio','instagram','google busca','google business','evento','direto','indicação'];
   const PORTAS = ['site','whatsapp-bot','whatsapp-direto','evento','my robot'];
   const ATEND = ['Rafael','Bento','RISE'];
@@ -105,7 +115,7 @@
     const ms = document.getElementById('lp-msgs'); if (ms) ms.scrollTop = ms.scrollHeight;
   }
   function chipsEtapa(l, et) {
-    return `<div class="sec">Etapa</div><div class="chips">${et.map(e => `<button class="chip ${e.tipo||''} ${l.etapa_id===e.id?'on':''}" onclick="LeadPainel.mudarEtapa('${e.id}')">${esc(e.nome)}</button>`).join('')}</div>`;
+    return `<div class="sec">Etapa</div><div class="chips">${et.map(e => `<button class="chip ${e.tipo||''} ${l.etapa_id===e.id?'on':''}" onclick="LeadPainel.mudarEtapa('${e.id}')" title="${esc(AJUDA_ETAPA[String(e.nome||'').toLowerCase()] || '')}">${esc(e.nome)}</button>`).join('')}</div>`;
   }
   async function mudarEtapa(etapaId) {
     const l = S.lead; if (!l || l.etapa_id === etapaId) return;
@@ -139,7 +149,7 @@
     return `${acoes}<div class="corpo">${chipsEtapa(l, et)}<div class="sec">Conversa</div>${corpo}</div>
       ${c && c.agente_ativo ? `<div class="aviso" style="margin:0 18px 8px">Se você responder por aqui, o robô para de responder nesta conversa.</div>` : ''}
       <div id="lp-rapidas"></div>
-      ${conectado ? `<div class="escrever"><button class="ico" title="Respostas prontas (ou digite /)" onclick="LeadPainel.rapidas()">⚡</button><button class="ico" title="Anexar" onclick="document.getElementById('lp-anexo').click()">📎</button><input type="file" id="lp-anexo" style="display:none" accept="image/*,audio/*,.pdf,.doc,.docx" onchange="LeadPainel.anexo(this)"><textarea id="lp-txt" rows="1" placeholder="Escreva uma mensagem — / para respostas prontas"></textarea><button class="btn" id="lp-btn" onclick="LeadPainel.enviar()">Enviar</button></div>` : ''}`;
+      ${conectado ? `<div class="escrever"><button class="ico" style="color:var(--brand)" title="A IA sugere o que responder" onclick="LeadPainel.sugerir()">✨</button><button class="ico" title="Respostas prontas (ou digite /)" onclick="LeadPainel.rapidas()">⚡</button><button class="ico" title="Anexar" onclick="document.getElementById('lp-anexo').click()">📎</button><input type="file" id="lp-anexo" style="display:none" accept="image/*,audio/*,.pdf,.doc,.docx" onchange="LeadPainel.anexo(this)"><textarea id="lp-txt" rows="1" placeholder="Escreva uma mensagem — / para respostas prontas"></textarea><button class="btn" id="lp-btn" onclick="LeadPainel.enviar()">Enviar</button></div>` : ''}`;
   }
   async function carregarMidias() {
     for (const el of document.querySelectorAll('#lp [data-midia]')) {
@@ -317,11 +327,24 @@
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
 
+  async function sugerir(){
+    const box = document.getElementById('lp-rapidas'); if (!box) return;
+    box.innerHTML = `<div class="rapidas"><div class="rp"><small>pensando na melhor resposta…</small></div></div>`;
+    try {
+      const d = await api('sugerir', S.info?.conversa ? { conversa_id: S.info.conversa.id } : { lead_id: S.lead.id });
+      if (d.erro) { box.innerHTML = ''; return say(d.erro, { tipo:'erro' }); }
+      S.sug = d.sugestoes || [];
+      box.innerHTML = `<div class="rapidas">${S.sug.map((x,i) => `<div class="rp" onclick="LeadPainel.usarSugestao(${i})"><b>${esc(x.titulo||'Sugestão')}</b><small style="white-space:normal">${esc(x.texto||'')}</small></div>`).join('') || '<div class="rp"><small>Nada a sugerir agora.</small></div>'}</div>`;
+    } catch (e) { box.innerHTML = ''; say(e.message, { tipo:'erro' }); }
+  }
+  function usarSugestao(i){ const x = (S.sug||[])[i]; const t = document.getElementById('lp-txt');
+    if (x && t) { t.value = x.texto; t.focus(); t.dispatchEvent(new Event('input')); }
+    const b = document.getElementById('lp-rapidas'); if (b) b.innerHTML = ''; }
   async function transcrever(id){
     try { const d = await api('transcrever', { mensagem_id: id });
       if (d.erro) return say(d.erro, { tipo:'erro' });
       S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
-  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, mudarEtapa, verHorarios, agendarManual, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
+  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, sugerir, usarSugestao, mudarEtapa, verHorarios, agendarManual, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
 })();

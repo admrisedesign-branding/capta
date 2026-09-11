@@ -110,6 +110,9 @@ body.embed .raias{min-height:calc(100vh - 120px)}
   .filtros-bar{position:sticky;top:0;background:var(--bg);z-index:3;padding:8px 0}
   .fb-busca{min-width:0;flex:1}
 }
+.raia-cab .ajuda .balao{left:0;transform:none;max-width:260px}
+.raia-cab .ajuda .balao:after{left:14px;transform:none}
+.raia-cab{overflow:visible}.raia{overflow:visible}
 .filtros-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 body.embed .topbar{display:none}
 .fb-busca,.fb-sel{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 10px;font-size:12.5px;font-family:inherit;color:var(--ink)}
@@ -222,6 +225,20 @@ async function carregar() {
   }
 }
 
+
+// O que cada coluna quer dizer — para quem abre o Pipeline sem ter combinado o critério
+const AJUDA_ETAPA = {
+  'novo lead': 'Chegou e <b>ninguém falou com ele ainda</b>. Sai daqui sozinho assim que uma pessoa (não o robô) responde.',
+  'em contato': 'Uma pessoa da escola já respondeu. Aqui a conversa está viva, mas ainda não se sabe o suficiente sobre a criança.',
+  'qualificado': 'Você já sabe <b>nome e idade da criança</b> e a família respondeu sobre horário ou valor. O interesse é real — falta só marcar a aula.',
+  'aula agendada': 'Tem <b>dia e hora marcados</b>. O Capta coloca aqui sozinho quando você agenda; o lembrete D-1 e D0 sai automático.',
+  'matrícula em andamento': 'Fez a aula experimental e disse que quer, mas ainda não pagou ou está decidindo.',
+  'aluno ativo': 'Matriculado. Vira aluno na tela de Alunos e entra na receita do Painel.',
+  'remarketing': 'Não fechou agora, mas pode voltar: orçamento, horário que não bateu, "vou pensar". Vale retomar mais pra frente.',
+  'perdido': 'Sem interesse, idade fora ou sumiu. Fica no histórico e conta como perda no Painel.',
+};
+const ajudaEtapa = nome => AJUDA_ETAPA[String(nome||'').toLowerCase().trim()] || null;
+const iconeAjuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
 const F = { parado: 0, temp: '', busca: '', ordem: 'recente', esconderFrios: false };
 const diasParado = l => Math.floor((Date.now() - new Date(l.etapa_em || l.criado_em).getTime()) / 864e5);
 function filtrar(lista) {
@@ -259,7 +276,7 @@ function desenhar() {
     <section class="raia ${mob && (ci > 0 || !c.itens.length) ? 'fechada' : ''}" data-etapa="${c.e.id}" ${mob ? 'onclick="if(event.target.closest(\'.raia-cab\'))this.classList.toggle(\'fechada\')"' : ''}>
       <div class="raia-cab">
         <span class="raia-cor" style="background:${esc(c.e.cor || '#2E5BFF')}"></span>
-        <span class="raia-nome">${esc(c.e.nome)}</span>
+        <span class="raia-nome">${esc(c.e.nome)}${ajudaEtapa(c.e.nome) ? iconeAjuda(ajudaEtapa(c.e.nome)) : ''}</span>
         <span class="raia-qtd">${c.itens.length}</span>
       </div>
       <div class="raia-corpo">
