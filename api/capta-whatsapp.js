@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -122,6 +122,9 @@ module.exports = async function handler(req, res) {
         case 'sem_data':      return await acaoSemData(tenant, body, res);
         case 'saude':         return await acaoSaude(tenant, body, res);
         case 'transcrever':   return await acaoTranscrever(tenant, body, res);
+        case 'vagas_kit':     return await acaoVagasKit(tenant, body, res);
+        case 'repor':         return await acaoRepor(tenant, body, res);
+        case 'faltas_aluno':  return await acaoFaltasAluno(tenant, body, res);
         case 'recepcao':      return await acaoRecepcao(tenant, body, res);
         case 'checkin':       return await acaoCheckin(tenant, body, res);
         case 'feedback':      return await acaoFeedback(tenant, body, res);
@@ -543,7 +546,7 @@ async function acaoAgenda(tenant, body, res) {
       .catch(() => rpc('capta_horarios_disponiveis', { p_tenant: tenant.id, p_dias: dias })),
     sb(`capta_agendamentos?tenant_id=eq.${tenant.id}` +
        `&status=in.(agendado,confirmado,compareceu,faltou)` +
-       `&select=id,data,hora_inicio,hora_fim,status,crianca_nome,crianca_idade,turma_id,` +
+       `&select=id,data,hora_inicio,hora_fim,status,crianca_nome,crianca_idade,turma_id,tipo,aluno_id,` +
        `confirmado_em,lead:lead_id(id,nome,contato)&order=data.asc,hora_inicio.asc&limit=300`)
   ]);
 
@@ -839,7 +842,7 @@ async function acaoExperimentais(tenant, body, res) {
   const de = body.de || new Date(Date.now() - 14*864e5).toISOString().slice(0,10);
   const ate = body.ate || new Date(Date.now() + 30*864e5).toISOString().slice(0,10);
   const [ags, turmas] = await Promise.all([
-    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&data=gte.${de}&data=lte.${ate}&select=id,lead_id,turma_id,data,hora_inicio,hora_fim,crianca_nome,crianca_idade,status,compareceu_em,observacao,criado_em,motivo_id,remarcado_de,remarcado_para&order=data,hora_inicio`),
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&data=gte.${de}&data=lte.${ate}&select=id,lead_id,turma_id,data,hora_inicio,hora_fim,crianca_nome,crianca_idade,status,compareceu_em,observacao,criado_em,motivo_id,remarcado_de,remarcado_para,tipo,aluno_id,repoe_data&order=data,hora_inicio`),
     sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim`)
   ]);
   const ids = [...new Set((ags || []).map(a => a.lead_id).filter(Boolean))];
@@ -1485,6 +1488,66 @@ async function acaoTranscrever(tenant, body, res) {
     await registrarFalha(tenant.id, 'transcricao', e.message).catch(() => null);
     return res.status(200).json({ erro: e.message });
   }
+}
+
+
+// ---------------------------------------------------------------------
+// REPOSIÇÃO — aluno que faltou repõe a aula em até 7 dias, no kit dele
+// ---------------------------------------------------------------------
+async function acaoVagasKit(tenant, body, res) {
+  const kit = body.kit || 'First';
+  const dias = Math.min(Number(body.dias) || 7, 30);
+  const horarios = await rpc('capta_vagas_por_kit', { p_tenant: tenant.id, p_kit: kit, p_dias: dias }).catch(() => []);
+  return res.status(200).json({ horarios: horarios || [], kit });
+}
+
+// aulas da turma do aluno nos últimos 21 dias em que ele não teve presença
+async function acaoFaltasAluno(tenant, body, res) {
+  const id = body.aluno_id; if (!id) return res.status(400).json({ erro: 'Informe o aluno.' });
+  const [al] = await sb(`capta_alunos?id=eq.${id}&tenant_id=eq.${tenant.id}&select=id,nome,kit,turma_id&limit=1`);
+  if (!al) return res.status(404).json({ erro: 'Aluno não encontrado.' });
+  const [turma] = al.turma_id ? await sb(`capta_turmas?id=eq.${al.turma_id}&select=dia_semana,hora_inicio,hora_fim,nome&limit=1`) : [];
+  const de = new Date(Date.now() - 21 * 864e5 - 4 * 3600e3).toISOString().slice(0, 10);
+  const [presencas, reposicoes] = await Promise.all([
+    sb(`capta_presencas?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&data=gte.${de}&select=data,entrada_em`).catch(() => []),
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&tipo=eq.reposicao&select=id,data,hora_inicio,status,repoe_data&order=data.desc&limit=10`).catch(() => [])
+  ]);
+  const veio = new Set((presencas || []).filter(p => p.entrada_em).map(p => p.data));
+  const reposto = new Set((reposicoes || []).map(r => r.repoe_data).filter(Boolean));
+  const faltas = [];
+  if (turma) {
+    const hoje = hojeManaus();
+    for (let d = new Date(de + 'T12:00:00'); d.toISOString().slice(0, 10) <= hoje; d.setDate(d.getDate() + 1)) {
+      const dia = d.toISOString().slice(0, 10);
+      if (d.getDay() !== turma.dia_semana) continue;
+      if (veio.has(dia) || reposto.has(dia)) continue;
+      faltas.push({ data: dia, hora_inicio: turma.hora_inicio });
+    }
+  }
+  return res.status(200).json({ aluno: al, turma: turma || null, faltas: faltas.reverse(), reposicoes: reposicoes || [] });
+}
+
+async function acaoRepor(tenant, body, res) {
+  const { aluno_id, turma_id, data, repoe_data } = body;
+  if (!aluno_id || !turma_id || !data) return res.status(400).json({ erro: 'Dados incompletos.' });
+  const [al] = await sb(`capta_alunos?id=eq.${aluno_id}&tenant_id=eq.${tenant.id}&select=id,nome,nome_curto,kit&limit=1`);
+  if (!al) return res.status(404).json({ erro: 'Aluno não encontrado.' });
+  const [t] = await sb(`capta_turmas?id=eq.${turma_id}&select=hora_inicio,hora_fim&limit=1`);
+  if (!t) return res.status(404).json({ erro: 'Turma não encontrada.' });
+  // limite: 7 dias a partir de hoje
+  const limite = new Date(Date.now() + 7 * 864e5 - 4 * 3600e3).toISOString().slice(0, 10);
+  if (data > limite) return res.status(400).json({ erro: 'A reposição precisa ser em até 7 dias.' });
+  // não repetir reposição no mesmo dia
+  const ja = await sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&aluno_id=eq.${aluno_id}&data=eq.${data}&select=id&limit=1`).catch(() => []);
+  if (ja?.length) return res.status(409).json({ erro: 'Este aluno já tem aula marcada nesse dia.' });
+  const novo = await sb('capta_agendamentos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+    tenant_id: tenant.id, tipo: 'reposicao', aluno_id, turma_id, data,
+    hora_inicio: t.hora_inicio, hora_fim: t.hora_fim,
+    crianca_nome: al.nome_curto || al.nome, status: 'agendado',
+    repoe_data: repoe_data || null,
+    observacao: `reposição${repoe_data ? ' da aula de ' + repoe_data.split('-').reverse().join('/') : ''} · kit ${al.kit || ''}`,
+    criado_por: body.atendente || 'painel' }) });
+  return res.status(200).json({ ok: true, agendamento: novo?.[0] || null });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
