@@ -64,6 +64,18 @@ async function obterCodigo(canal, numero) {
   return r.code || r.value || r.pairingCode || null;
 }
 
+// Envio de mídia (imagem / áudio / documento) em base64 (data URI) ou URL
+async function enviarMidia(canal, telefone, tipo, dados, extra = {}) {
+  const phone = comDDI(telefone);
+  if (!phone) throw new Error('Telefone inválido');
+  let rota, body;
+  if (tipo === 'imagem')   { rota = 'send-image';   body = { phone, image: dados, caption: extra.legenda || undefined }; }
+  else if (tipo === 'audio') { rota = 'send-audio'; body = { phone, audio: dados }; }
+  else { const ext = (extra.nome || 'arquivo.pdf').split('.').pop().toLowerCase(); rota = `send-document/${ext}`; body = { phone, document: dados, fileName: extra.nome || 'arquivo' }; }
+  const r = await zapiFetch(canal, rota, { method: 'POST', body: JSON.stringify(body) });
+  return { provedor_msg_id: r.messageId || r.id || null, bruto: r };
+}
+
 // ---------------------------------------------------------------------
 // 2. STATUS DA CONEXÃO
 //
@@ -171,7 +183,34 @@ function normalizarWebhook(payload) {
     criado_em: payload.momment ? new Date(payload.momment).toISOString() : new Date().toISOString(),
     tipo,
     texto,
-    midia                                       // { url, mime, nome } ou null
+    midia,                                      // { url, mime, nome } ou null
+    anuncio: extrairAnuncio(payload)            // veio de anúncio? traz a campanha
+  };
+}
+
+// ---------------------------------------------------------------------
+// Anúncio "clique para conversar": quando a pessoa vem de um anúncio do
+// Facebook/Instagram, a Meta manda junto o referral — de qual anúncio veio.
+// É o único jeito de separar anúncio pago de Instagram orgânico sem
+// depender de alguém preencher o campo na mão.
+// ---------------------------------------------------------------------
+function extrairAnuncio(p) {
+  const r = p.referralMessage || p.referral || p.adReferral ||
+            p.text?.referralMessage || p.image?.referralMessage || null;
+  if (!r) return null;
+  const url = r.sourceUrl || r.source_url || '';
+  const utm = {};
+  try { const u = new URL(url); u.searchParams.forEach((v, k) => { if (/^utm_/i.test(k)) utm[k.toLowerCase()] = v; }); } catch (e) {}
+  return {
+    origem: r.sourceType || r.source_type || 'ad',          // ad | post
+    anuncio_id: r.sourceId || r.source_id || null,
+    titulo: r.title || r.headline || null,
+    corpo: r.body || null,
+    url,
+    utm_campanha: utm.utm_campaign || null,
+    utm_conteudo: utm.utm_content || null,
+    utm_midia: utm.utm_medium || null,
+    utm_fonte: utm.utm_source || null
   };
 }
 
@@ -239,7 +278,7 @@ module.exports = {
   enviarTexto,
   normalizarWebhook,
   configurarWebhooks,
-  comDDI, obterCodigo };
+  comDDI, obterCodigo, enviarMidia };
 
 // =====================================================================
 // NOTAS
