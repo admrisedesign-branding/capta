@@ -67,7 +67,12 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .dcell.hoje{border-color:var(--brand)}.dcell.fora{opacity:.4}
 .dcell .n{font-weight:800;font-size:13px}
 .dcell .i{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.5}
-.dcell .i b{color:var(--ink)}.dcell .i .e{color:var(--exp);font-weight:700}.dcell .i .z{color:var(--quente);font-weight:700}
+.dcell .i b{color:var(--ink)}
+.dcell .lin{cursor:pointer;padding:1px 0;border-radius:4px}
+.dcell .lin:hover{background:var(--brand-softer)}
+.dcell .lin.e{color:var(--exp)}.dcell .lin.e b{color:var(--exp)}
+.dcell .lin.r{color:#5B3FBF}.dcell .lin.r b{color:#5B3FBF}
+.dcell .lin.z{color:var(--quente);font-weight:700;cursor:default}.dcell .i .e{color:var(--exp);font-weight:700}.dcell .i .z{color:var(--quente);font-weight:700}
 .btn{border:0;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer}.btn.g{background:var(--card);color:var(--muted);border:1px solid var(--line)}
 .fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
 .janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:520px;box-shadow:0 20px 50px rgba(20,26,46,.2);max-height:92vh;overflow-y:auto}
@@ -120,10 +125,16 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .acts-mini .yes{background:var(--verde);border-color:var(--verde);color:#fff}.acts-mini .nope{background:rgba(224,49,39,.1);border-color:rgba(224,49,39,.25);color:var(--quente)}
 .mes{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;min-width:760px}.mes .hd{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:2px 6px}
 .dcell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;min-height:84px;cursor:pointer}.dcell:hover,.dcell.hoje{border-color:var(--brand)}.dcell.fora{opacity:.4}
-.dcell .n{font-weight:800;font-size:13px}.dcell .i{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.5}.dcell .i b{color:var(--ink)}.dcell .i .e{color:var(--verde);font-weight:700}.dcell .i .z{color:var(--quente);font-weight:700}
+.dcell .n{font-weight:800;font-size:13px}.dcell .i{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.5}.dcell .i b{color:var(--ink)}
+.dcell .lin{cursor:pointer;padding:1px 0;border-radius:4px}
+.dcell .lin:hover{background:var(--brand-softer)}
+.dcell .lin.e{color:var(--exp)}.dcell .lin.e b{color:var(--exp)}
+.dcell .lin.r{color:#5B3FBF}.dcell .lin.r b{color:#5B3FBF}
+.dcell .lin.z{color:var(--quente);font-weight:700;cursor:default}.dcell .i .e{color:var(--verde);font-weight:700}.dcell .i .z{color:var(--quente);font-weight:700}
 .ev[draggable]{cursor:grab}.cardx[draggable]{cursor:grab}.cardx[draggable] button,.cardx[draggable] input,.cardx[draggable] textarea{cursor:pointer}
 
 /* filtro de tipo e reposição */
+.filtro-linha{display:flex;align-items:center;gap:10px;margin:0 0 14px;flex-wrap:wrap}
 .filtro-tipo{display:flex;gap:4px;background:var(--line-2);padding:3px;border-radius:10px}
 .filtro-tipo button{border:0;background:transparent;font-weight:700;font-size:12.5px;color:var(--muted);padding:6px 12px;border-radius:8px;cursor:pointer;font-family:inherit}
 .filtro-tipo button.on{background:var(--card);color:var(--brand);box-shadow:var(--shadow)}
@@ -205,7 +216,7 @@ const hN = t => parseInt(String(t||'0').slice(0,2), 10);
 const fmt = (d, o) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', o);
 const KITCUR = k => (k||'').replace('App Developer','APP').replace('Bot','').toUpperCase();
 
-let MODO = 'dia', SEL = hoje, D = { turmas: [], alunos: [], kits: [] }, EXP = [], LEADS = [], VAGAS = [], carregadoDe = null, carregadoAte = null;
+let MODO = 'semana', SEL = hoje, D = { turmas: [], alunos: [], kits: [] }, EXP = [], LEADS = [], VAGAS = [], carregadoDe = null, carregadoAte = null;
 
 const CACHE = new Map();
 async function api(acao, extra = {}, cacheMs) {
@@ -226,7 +237,7 @@ async function carregar(){
   } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
 function modo(m){ MODO = m; desenhar(); }
-const abasHtml = () => `<div class="abas" style="margin-left:auto">${[['dia','Dia'],['semana','Semana'],['mes','Mês']].map(([k,t])=>`<button class="${MODO===k?'on':''}" onclick="modo('${k}')">${t}</button>`).join('')}</div>`;
+const abasHtml = () => `<div class="abas" style="margin-left:auto">${[['semana','Semana'],['mes','Mês'],['dia','Dia']].map(([k,t])=>`<button class="${MODO===k?'on':''}" onclick="modo('${k}')">${t}</button>`).join('')}</div>`;
 function mover(n){
   if (MODO === 'dia') SEL = addDias(SEL, n); else if (MODO === 'semana') SEL = addDias(SEL, 7*n);
   else { const x = new Date(SEL + 'T12:00:00'); x.setMonth(x.getMonth() + n, 1); SEL = iso(x); }
@@ -234,9 +245,9 @@ function mover(n){
 }
 function irDia(d){ SEL = d; modo('dia'); }
 const turmasDo = d => D.turmas.filter(t => t.ativa !== false && t.dia_semana === dow(d));
-const alunosDa = t => (TIPO === 'experimental' || TIPO === 'reposicao') ? [] : D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo');
+const alunosDa = t => TIPO === 'experimental' ? [] : D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo');
 const expDo = d => EXP.filter(a => a.data === d && !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para
-  && (TIPO === 'todos' || (TIPO === 'experimental' && ehExp(a)) || (TIPO === 'reposicao' && ehRep(a)) || (TIPO === 'alunos' && false)));
+  && (TIPO === 'todos' || (TIPO === 'experimental' && ehExp(a)) || (TIPO === 'alunos' && ehRep(a))));
 const leadDe = a => LEADS.find(l => l.id === a.lead_id) || {};
 const vagaDe = (t, d) => VAGAS.find(v => v.turma_id === t.id && v.data === d);
 function vagasHora(d, h){ // turma que cobre a hora h no dia d
@@ -252,12 +263,12 @@ function tally(dias){
   const exps = dias.reduce((s, d) => s + EXP.filter(a => a.data === d && ehExp(a) && !['cancelado','remarcado'].includes(a.status)).length, 0);
   let semVaga = 0; dias.forEach(d => turmasDo(d).forEach(t => { const v = vagasHora(d, hN(t.hora_inicio)); if (v && v.n <= 0) semVaga++; }));
   const reps = dias.reduce((s, d) => s + EXP.filter(a => a.data === d && ehRep(a) && !['cancelado','remarcado'].includes(a.status)).length, 0);
-  return `<div class="tally"><div><b>${emAula}</b><small>alunos ativos em aula</small></div><div><b>${exps}</b><small>aulas experimentais</small></div>${reps?`<div><b>${reps}</b><small>reposições</small></div>`:''}<div class="bad"><b>${semVaga}</b><small>horários sem vaga${ajuda('Blocos em que todos os kits First já estão ocupados — não dá pra encaixar aula experimental.')}</small></div></div>`;
+  return `<div class="tally"><div><b>${emAula}</b><small>alunos em aula${ajuda('Crianças já matriculadas, nas turmas do período. A vaga delas é fixa: não entra na conta da aula experimental.')}</small></div><div><b>${exps}</b><small>aulas experimentais${ajuda('Visitas de 1 hora de quem ainda não é aluno. Ocupam um kit First só naquela hora.')}</small></div>${reps?`<div><b>${reps}</b><small>reposições${ajuda('Aluno que faltou e vem repor em outro horário, no kit dele, dentro de 7 dias.')}</small></div>`:''}<div class="bad"><b>${semVaga}</b><small>horas sem kit livre${ajuda('Horas em que todos os kits First já estão ocupados — não dá pra encaixar aula experimental ali.')}</small></div></div>`;
 }
 function lado(){
   const kits = D.kits.length ? D.kits : [{kit:'First',capacidade:8},{kit:'OneBot',capacidade:6},{kit:'TechBot',capacidade:5},{kit:'Autobot',capacidade:4},{kit:'App Developer',capacidade:4},{kit:'GameBot',capacidade:2}];
-  return `<div class="lado"><h5>Kits disponíveis</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
-    <div class="leg"><span><i style="background:var(--brand-2)"></i>Turma de aluno ativo ocupa 2 horas</span><span><i style="background:var(--exp)"></i>Aula experimental ocupa 1 hora</span></div></div>`;
+  return `<div class="lado"><h5>Kits por hora${ajuda('Quantos kits de cada tipo a escola tem. Duas crianças não usam o mesmo kit na mesma hora — é isso que limita a vaga.')}</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
+    <div class="leg"><span><i style="background:var(--brand-2)"></i>Aluno matriculado — aula de 2 horas</span><span><i style="background:var(--exp)"></i>Aula experimental — 1 hora, kit First</span><span><i style="background:#7C5CDB"></i>Reposição — 1 hora, kit do aluno</span></div></div>`;
 }
 
 function vDia(d){
@@ -269,8 +280,8 @@ function vDia(d){
     const tIni = ts.find(t => hN(t.hora_inicio) === h);
     const exH = ex.filter(e => hN(e.hora_inicio) === h);
     const v = vagasHora(d, h);
-    const horaCel = hh => { const vv = vagasHora(d, hh); return `<div class="hora"><b>${String(hh).padStart(2,'0')}:00</b><div class="v ${!vv?'n':vv.n<=0?'z':''}">${!vv ? (hh===12||hh===13?'':'sem turma') : vv.n <= 0 ? 'sem vaga' : vv.n + ' vaga' + (vv.n>1?'s':'')}</div></div>`; };
-    if (tIni) {
+    const horaCel = hh => { const vv = vagasHora(d, hh); return `<div class="hora"><b>${String(hh).padStart(2,'0')}:00</b><div class="v ${!vv?'n':vv.n<=0?'z':''}">${!vv ? (hh===12||hh===13?'':'fechado') : vv.n <= 0 ? 'sem kit livre' : vv.n + (vv.n>1?' kits livres':' kit livre')}</div>${vv?'<div class="kf">p/ experimental</div>':''}</div>`; };
+    if (tIni && TIPO !== 'experimental') {
       const als = alunosDa(tIni); const porKit = {}; als.forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);
       const ex2 = ex.filter(e => hN(e.hora_inicio) === h + 1);
       rows += `<div class="linha" style="min-height:150px">
@@ -283,7 +294,7 @@ function vDia(d){
     rows += `<div class="linha"><div>${horaCel(h)}</div><div class="cel">${h===12||h===13?'<div class="interv">intervalo</div>':''}</div><div class="cel" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${h})">${expBloco(exH, h)}</div></div>`;
     i++;
   }
-  return `<div class="dia"><div class="cab"><div></div><div>Turmas · alunos ativos · 2h</div><div>Aulas experimentais · 1h</div></div>${rows}</div>`;
+  return `<div class="dia"><div class="cab"><div></div><div>${TIPO === 'experimental' ? '' : 'Turmas · alunos matriculados · 2h'}</div><div>${TIPO === 'alunos' ? 'Reposições · 1h' : 'Aulas experimentais e reposições · 1h'}</div></div>${rows}</div>`;
 }
 function expBloco(list, h){
   if (!list.length) return '';
@@ -301,7 +312,7 @@ function vSemana(){
   const seg = segunda(SEL), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
   return `<div class="scrollx"><div class="sem">${dias.map(d => {
     const ts = turmasDo(d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
-    const itens = [...ts.map(t => ({ h: hN(t.hora_inicio), html: (() => { const als = alunosDa(t), v = vagasHora(d, hN(t.hora_inicio)); return `<div class="mini"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)} · ${als.length} em aula</b>First: <span class="v ${v&&v.n<=0?'z':''}">${v ? (v.n<=0?'sem vaga':v.n+' vaga'+(v.n>1?'s':'')) : '—'}</span></div>`; })() })),
+    const itens = [...(TIPO === 'experimental' ? [] : ts).map(t => ({ h: hN(t.hora_inicio), html: (() => { const als = alunosDa(t), v = vagasHora(d, hN(t.hora_inicio)); return `<div class="mini"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)} · ${als.length} aluno${als.length===1?'':'s'}</b><span class="v ${v&&v.n<=0?'z':''}">${v ? (v.n<=0?'sem kit p/ experimental':v.n+' kit'+(v.n>1?'s':'')+' livre'+(v.n>1?'s':'')+' p/ experimental') : '—'}</span></div>`; })() })),
       ...expDo(d).map(e => ({ h: hN(e.hora_inicio) + 0.5, html: ehRep(e)
         ? `<div class="mini rep" onclick="abrirAluno('${e.aluno_id}')"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||'')}</b>reposição</div>`
         : `<div class="mini exp" draggable="true" ondragstart="dragExp(event,'${e.id}')" onclick="LeadPainel.abrir('${e.lead_id}','agendar')"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||leadDe(e).nome||'')}</b>experimental${e.crianca_idade?' · '+e.crianca_idade+' anos':''}</div>` }))].sort((a,b)=>a.h-b.h);
@@ -313,11 +324,46 @@ function vMes(){
   const ini = segunda(iso(new Date(ano, m, 1, 12))); const fim = iso(new Date(ano, m + 1, 0, 12));
   const dias = []; for (let d = ini; d <= addDias(fim, 6 - (dow(fim)||7)); d = addDias(d, 1)) if (dow(d) !== 0) dias.push(d);
   return `<div class="scrollx"><div class="mes">${DIAS3.slice(1).map(n=>`<div class="hd">${n}</div>`).join('')}${dias.map(d => {
-    const ts = turmasDo(d), al = ts.reduce((s,t)=>s+alunosDa(t).length,0), ex = expDo(d).length;
-    const sem = ts.filter(t => { const v = vagasHora(d, hN(t.hora_inicio)); return v && v.n <= 0; }).length;
+    const ts = turmasDo(d);
+    const nAl = ts.reduce((s,t)=>s+alunosDa(t).length,0);
+    const nEx = EXP.filter(a => a.data === d && ehExp(a) && viva(a)).length;
+    const nRe = EXP.filter(a => a.data === d && ehRep(a) && viva(a)).length;
+    const semKit = ts.filter(t => { const v = vagasHora(d, hN(t.hora_inicio)); return v && v.n <= 0; }).length;
     const fora = new Date(d+'T12:00').getMonth() !== m;
-    return `<div class="dcell ${d===hoje?'hoje':''} ${fora?'fora':''}" onclick="irDia('${d}')"><div class="n">${new Date(d+'T12:00').getDate()}</div>
-      <div class="i">${ts.length ? `<b>${ts.length}</b> turma${ts.length>1?'s':''} · ${al} alunos` : '<span style="color:var(--faint)">sem turmas</span>'}${ex ? `<br><span class="e">${ex} experimental${ex>1?'is':''}</span>` : ''}${sem ? `<br><span class="z">${sem} sem vaga</span>` : ''}</div></div>`; }).join('')}</div></div>`;
+    const mostra = TIPO !== 'experimental';
+    return `<div class="dcell ${d===hoje?'hoje':''} ${fora?'fora':''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}')">
+      <div class="n" onclick="irDia('${d}')" style="cursor:pointer" title="abrir o dia">${new Date(d+'T12:00').getDate()}</div>
+      <div class="i">
+        ${mostra && nAl ? `<div class="lin" onclick="quemNoDia('${d}','alunos')"><b>${nAl}</b> aluno${nAl>1?'s':''}</div>` : ''}
+        ${TIPO !== 'alunos' && nEx ? `<div class="lin e" onclick="quemNoDia('${d}','exp')"><b>${nEx}</b> experimental${nEx>1?'is':''}</div>` : ''}
+        ${mostra && nRe ? `<div class="lin r" onclick="quemNoDia('${d}','rep')"><b>${nRe}</b> reposiç${nRe>1?'ões':'ão'}</div>` : ''}
+        ${!nAl && !nEx && !nRe ? `<span style="color:var(--faint)">${ts.length ? 'sem ninguém' : 'fechado'}</span>` : ''}
+        ${semKit ? `<div class="lin z">${semKit} hora${semKit>1?'s':''} sem kit</div>` : ''}
+      </div></div>`; }).join('')}</div></div>`;
+}
+// quem está em cada dia, ao clicar no número do mês
+function quemNoDia(d, tipo){
+  const ts = turmasDo(d);
+  let titulo = '', corpo = '';
+  if (tipo === 'alunos') {
+    titulo = `Alunos em aula · ${DIAS[dow(d)]} ${fmt(d,{day:'2-digit',month:'2-digit'})}`;
+    corpo = ts.map(t => { const als = alunosDa(t); if (!als.length) return '';
+      return `<div style="margin-bottom:12px"><div style="font-size:11.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${hh(t.hora_inicio)}–${hh(t.hora_fim)} · ${als.length}</div>
+        <div class="pills">${als.map(a => `<span class="pill cont" onclick="fecharModal();abrirAluno('${a.id}')">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('')}</div></div>`; }).join('') || '<p>Ninguém neste dia.</p>';
+  } else {
+    const lista = EXP.filter(a => a.data === d && viva(a) && (tipo === 'exp' ? ehExp(a) : ehRep(a)))
+      .sort((a,b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+    titulo = `${tipo === 'exp' ? 'Aulas experimentais' : 'Reposições'} · ${DIAS[dow(d)]} ${fmt(d,{day:'2-digit',month:'2-digit'})}`;
+    corpo = lista.length ? lista.map(a => { const l = leadDe(a); const al = (D.alunos||[]).find(x => x.id === a.aluno_id) || {};
+      return `<div class="linha-f" style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line-2)">
+        <span><b>${hh(a.hora_inicio)}</b> · ${esc(a.crianca_nome || l.nome || al.nome || '')}${a.crianca_idade?`, ${a.crianca_idade}`:''}${tipo==='rep'&&al.kit?` · ${esc(al.kit)}`:''}${tipo==='exp'&&l.nome?` <span style="color:var(--muted)">com ${esc(l.nome.split(' ')[0])}</span>`:''}</span>
+        <button class="btn g sm" onclick="fecharModal();${tipo==='exp'?`irDia('${d}')`:`abrirAluno('${a.aluno_id}')`}">abrir</button></div>`; }).join('')
+      : '<p>Nada neste dia.</p>';
+  }
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela" style="max-width:560px">
+    <h3>${titulo}</h3><div style="margin-top:14px;max-height:60vh;overflow-y:auto">${corpo}</div>
+    <div class="fim"><button class="btn g" onclick="fecharModal()">Fechar</button><button class="btn" onclick="fecharModal();irDia('${d}')">Ver o dia inteiro</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
 }
 
 function desenhar(){
@@ -335,7 +381,7 @@ function desenhar(){
   else { const x = new Date(SEL+'T12:00:00'); periodo = x.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); const f = iso(new Date(x.getFullYear(), x.getMonth()+1, 0, 12)); dias = []; for (let d = iso(new Date(x.getFullYear(), x.getMonth(), 1, 12)); d <= f; d = addDias(d,1)) dias.push(d); corpo = vMes(); }
   document.getElementById('raiz').innerHTML = `
     <div class="barra">${VAGAS.length?'':'<span style="font-size:12px;color:var(--faint)">carregando vagas…</span>'}<button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}<button class="btn" onclick="novoAgendamento()">+ Novo agendamento</button></div>
-    ${barraTipo(nAlunos, nExp, nRep)}
+    <div class="filtro-linha">${barraTipo(nAlunos, nExp, nRep)}</div>
     ${tally(dias)}
     <div class="corpo"><div>${corpo}</div>${lado()}</div>`;
 }
@@ -487,13 +533,44 @@ async function desfazer(id){ try { await api('desfazer', { agendamento_id: id })
 
 
 // ---------------- filtro de tipo ----------------
-let TIPO = 'todos';   // todos | alunos | experimental | reposicao
+// A mesma tela serve a dois trabalhos: quem atende lead (comercial) e quem cuida
+// dos alunos (secretaria). A visão troca o que aparece, sem esconder nada do outro.
+let TIPO = 'todos';   // todos | experimental | alunos
+try { TIPO = localStorage.getItem('capta_visao_agenda') || 'todos'; } catch(e){}
 const ehRep = a => (a.tipo || 'experimental') === 'reposicao';
 const ehExp = a => (a.tipo || 'experimental') === 'experimental';
-function mudarTipo(t){ TIPO = t; desenhar(); }
+function mudarTipo(t){ TIPO = t; try { localStorage.setItem('capta_visao_agenda', t); } catch(e){} desenhar(); }
 function barraTipo(nAl, nEx, nRe){
-  const b = (k, t, q) => `<button class="${TIPO===k?'on':''}" onclick="mudarTipo('${k}')">${t}${q!=null?`<span class="q">${q}</span>`:''}</button>`;
-  return `<div class="filtro-tipo">${b('todos','Todos')}${b('alunos','Alunos ativos',nAl)}${b('experimental','Experimentais',nEx)}${b('reposicao','Reposições',nRe)}</div>`;
+  const b = (k, t, sub, q) => `<button class="${TIPO===k?'on':''}" onclick="mudarTipo('${k}')" title="${sub}">${t}${q!=null?`<span class="q">${q}</span>`:''}</button>`;
+  return `<div class="filtro-tipo">
+    ${b('todos','Tudo','Turmas, aulas experimentais e reposições')}
+    ${b('experimental','Aulas experimentais','Quem vem conhecer a escola — trabalho do comercial', nEx)}
+    ${b('alunos','Alunos e reposições','Quem já estuda aqui — trabalho da secretaria', nAl + nRe)}
+  </div>
+  <button class="btn g" style="margin-left:auto" onclick="listaAlunos()">Lista de matriculados</button>`;
+}
+
+// lista de quem está matriculado, agrupada por turma
+function listaAlunos(){
+  const turmas = (D.turmas||[]).filter(t => t.ativa !== false)
+    .sort((a,b) => (a.dia_semana - b.dia_semana) || String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+  const semTurma = (D.alunos||[]).filter(a => a.status === 'ativo' && !a.turma_id);
+  const total = (D.alunos||[]).filter(a => a.status === 'ativo').length;
+  const trancados = (D.alunos||[]).filter(a => a.status === 'trancado');
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela" style="max-width:620px">
+    <h3>Alunos matriculados</h3><p>${total} ativos${trancados.length?` · ${trancados.length} trancado${trancados.length>1?'s':''}`:''} — toque no nome para ver faltas e marcar reposição</p>
+    <div style="margin-top:14px;max-height:62vh;overflow-y:auto">
+    ${turmas.map(t => { const als = (D.alunos||[]).filter(a => a.turma_id === t.id && a.status === 'ativo');
+      if (!als.length) return '';
+      return `<div style="margin-bottom:14px"><div style="font-size:11.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${DIAS[t.dia_semana]} ${hh(t.hora_inicio)}–${hh(t.hora_fim)} · ${als.length} aluno${als.length>1?'s':''}</div>
+        <div class="pills">${als.map(a => `<span class="pill cont" onclick="fecharModal();abrirAluno('${a.id}')">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('')}</div></div>`; }).join('')}
+    ${semTurma.length ? `<div style="margin-bottom:14px"><div style="font-size:11.5px;font-weight:800;color:var(--morno);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Sem turma definida</div>
+      <div class="pills">${semTurma.map(a => `<span class="pill cont" onclick="fecharModal();abrirAluno('${a.id}')">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('')}</div></div>` : ''}
+    ${trancados.length ? `<div><div style="font-size:11.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Trancados</div>
+      <div class="pills">${trancados.map(a => `<span class="pill" style="opacity:.6">${esc(a.nome_curto||a.nome)}<small>${a.trancado_ate ? 'até ' + fmt(a.trancado_ate,{day:'2-digit',month:'2-digit'}) : ''}</small></span>`).join('')}</div></div>` : ''}
+    </div>
+    <div class="fim"><button class="btn g" onclick="fecharModal()">Fechar</button><button class="btn" onclick="fecharModal();irPara('/alunos.html')">Abrir tela de Alunos</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
 }
 
 // ---------------- reposição ----------------
