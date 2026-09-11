@@ -185,6 +185,7 @@ window.CaptaUser = (function(){
 </script>
 <style>@media(max-width:760px){body.embed .wrap{padding-bottom:80px}.grade,.corpo{grid-template-columns:1fr!important}.tally{gap:14px;padding:10px 12px}.tally b{font-size:19px}}</style>
 <link rel="stylesheet" href="/mobile.css">
+<script src="/capta-ui.js"></script>
 </head>
 <body>
 <div class="topbar">
@@ -199,7 +200,7 @@ window.CaptaUser = (function(){
 const p = new URLSearchParams(location.search);
 const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
 document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
-const ajuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
+const ajuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
 
 // Data de hoje no fuso de Manaus — new Date().toISOString() usa UTC e, depois das 20h,
 // mostra o dia seguinte.
@@ -255,7 +256,7 @@ function vagasHora(d, h){ // turma que cobre a hora h no dia d
   const v = vagaDe(t, d); if (v) return { n: v.vagas, t };
   // sem cálculo do servidor (data passada): estima pelo kit First
   const cap = (D.kits.find(k => k.kit === 'First') || {}).capacidade || 8;
-  return { n: Math.max(0, cap - alunosDa(t).filter(a => a.kit === 'First').length - expDo(d).filter(e => e.turma_id === t.id).length), t };
+  return { n: Math.max(0, cap - alunosDa(t).filter(a => a.kit === 'First').length - expDo(d).filter(e => e.turma_id === t.id).length), cap, t };
 }
 
 function tally(dias){
@@ -272,29 +273,34 @@ function lado(){
 }
 
 function vDia(d){
-  const ts = turmasDo(d), ex = expDo(d);
-  const horas = [8,9,10,11,12,13,14,15,16,17];
-  let rows = ''; let i = 0;
-  while (i < horas.length) {
-    const h = horas[i];
-    const tIni = ts.find(t => hN(t.hora_inicio) === h);
-    const exH = ex.filter(e => hN(e.hora_inicio) === h);
-    const v = vagasHora(d, h);
-    const horaCel = hh => { const vv = vagasHora(d, hh); return `<div class="hora"><b>${String(hh).padStart(2,'0')}:00</b><div class="v ${!vv?'n':vv.n<=0?'z':''}">${!vv ? (hh===12||hh===13?'':'fechado') : vv.n <= 0 ? 'sem kit livre' : vv.n + (vv.n>1?' kits livres':' kit livre')}</div>${vv?'<div class="kf">p/ experimental</div>':''}</div>`; };
-    if (tIni && TIPO !== 'experimental') {
-      const als = alunosDa(tIni); const porKit = {}; als.forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);
-      const ex2 = ex.filter(e => hN(e.hora_inicio) === h + 1);
-      rows += `<div class="linha" style="min-height:150px">
-        <div>${horaCel(h)}${horaCel(h+1)}</div>
-        <div class="cel"><div class="bloco"><div class="t">${hh(tIni.hora_inicio)}–${hh(tIni.hora_fim)} · <b>${als.length} em aula</b>${Object.entries(porKit).map(([k,n])=>' · '+KITCUR(k)+' '+n).join('')}</div>
-          <div class="pills">${als.map(a=>`<span class="pill cont" onclick="abrirAluno('${a.id}')" title="ver ficha e marcar reposição">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('') || '<span class="interv">sem alunos</span>'}</div></div></div>
-        <div class="cel" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${h})">${expBloco(exH, h)}${expBloco(ex2, h+1)}</div></div>`;
-      i += 2; continue;
-    }
-    rows += `<div class="linha"><div>${horaCel(h)}</div><div class="cel">${h===12||h===13?'<div class="interv">intervalo</div>':''}</div><div class="cel" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${h})">${expBloco(exH, h)}</div></div>`;
-    i++;
-  }
-  return `<div class="dia"><div class="cab"><div></div><div>${TIPO === 'experimental' ? '' : 'Turmas · alunos matriculados · 2h'}</div><div>${TIPO === 'alunos' ? 'Reposições · 1h' : 'Aulas experimentais e reposições · 1h'}</div></div>${rows}</div>`;
+  const ts = turmasDo(d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+  const blocos = ts.map(t => {
+    const als = alunosDa(t);
+    const exps = EXP.filter(a => a.data === d && viva(a) && hh(a.hora_inicio) >= hh(t.hora_inicio) && hh(a.hora_inicio) < hh(t.hora_fim));
+    const expV = TIPO === 'alunos' ? exps.filter(ehRep) : TIPO === 'experimental' ? exps.filter(ehExp) : exps;
+    if (TIPO === 'experimental' && !expV.length) return '';
+    const v = vagasHora(d, hN(t.hora_inicio));
+    const cls = !v ? '' : v.n <= 0 ? 'cheio' : v.n <= 2 ? 'alerta' : '';
+    const porKit = {}; als.forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);
+    return `<div class="bloco-dia">
+      <div class="bd-cab"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)}</b>
+        <span class="bd-sub">${als.length} matriculado${als.length===1?'':'s'}${expV.length?` · ${expV.length} visita${expV.length>1?'s':''}`:''}</span>
+        ${v ? `<span class="cap ${cls}" title="kits First livres para aula experimental nesta hora">${v.n}/${v.cap ?? ''} kit${v.n===1?'':'s'} livre${v.n===1?'':'s'}</span>` : ''}</div>
+      <div class="bd-corpo">
+        ${TIPO === 'experimental' ? '' : `<div class="bd-col">
+          <div class="bd-tit azul">Matriculados${Object.keys(porKit).length?` · ${Object.entries(porKit).map(([k,n]) => KITCUR(k)+' '+n).join(' · ')}`:''}</div>
+          <div class="assentos">${als.map(a => `<span class="as aluno" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)}">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('') || '<span class="as livre" style="cursor:default">ninguém</span>'}</div>
+        </div>`}
+        <div class="bd-col" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hN(t.hora_inicio)})">
+          <div class="bd-tit laranja">Aula experimental e reposição${v && v.n > 0 ? ` · ${v.n} kit${v.n>1?'s':''} livre${v.n>1?'s':''}` : ''}</div>
+          ${expV.filter(ehExp).map(cartao).join('')}
+          ${expV.filter(ehRep).length ? `<div class="assentos" style="margin-top:6px">${expV.filter(ehRep).map(r => { const al = (D.alunos||[]).find(x => x.id === r.aluno_id) || {};
+            return `<span class="as rep" onclick="abrirAluno('${r.aluno_id}')">${esc(r.crianca_nome || al.nome || '')}<small>reposição ${hh(r.hora_inicio)}</small></span>`; }).join('')}</div>` : ''}
+          ${!expV.length ? `<span class="as livre" onclick="novoAgendamento()">+ marcar aula experimental</span>` : ''}
+        </div>
+      </div></div>`;
+  }).filter(Boolean).join('');
+  return blocos || `<div class="vazio">Nada marcado neste dia.<br><button class="btn" style="margin-top:12px" onclick="novoAgendamento()">+ Novo agendamento</button></div>`;
 }
 function expBloco(list, h){
   if (!list.length) return '';
@@ -306,6 +312,48 @@ function expBloco(list, h){
     <div class="pills">${rep.map(r => { const al = (D.alunos||[]).find(a => a.id === r.aluno_id) || {};
       return `<span class="pill rep" onclick="abrirAluno('${r.aluno_id}')">${esc(r.crianca_nome || al.nome || 'Aluno')}<small>reposição${al.kit?' · '+esc(al.kit):''}</small></span>`; }).join('')}</div></div>`;
   return out;
+}
+
+
+// Semana em grade: linha = bloco de horário, coluna = dia. Dentro da célula,
+// cada criança é um "assento": azul = matriculado, laranja = experimental, roxo = reposição.
+function vSemanaGrade(){
+  const seg = segunda(SEL), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
+  // blocos existentes na semana (hora_inicio–hora_fim das turmas)
+  const blocos = [...new Set((D.turmas||[]).filter(t => t.ativa !== false)
+    .map(t => `${hh(t.hora_inicio)}|${hh(t.hora_fim)}`))].sort();
+  const cel = (d, bloco) => {
+    const [ini, fim] = bloco.split('|');
+    const t = (D.turmas||[]).find(x => x.dia_semana === dow(d) && hh(x.hora_inicio) === ini && x.ativa !== false);
+    const exps = EXP.filter(a => a.data === d && viva(a) && hh(a.hora_inicio) >= ini && hh(a.hora_inicio) < fim);
+    const alunos = t ? alunosDa(t) : [];
+    const expV = TIPO === 'alunos' ? exps.filter(ehRep) : TIPO === 'experimental' ? exps.filter(ehExp) : exps;
+    if (!t && !expV.length) return `<div class="cel vaga">—</div>`;
+    const v = t ? vagasHora(d, hN(t.hora_inicio)) : null;
+    const livres = v ? v.n : null;
+    const cls = livres === null ? '' : livres <= 0 ? 'cheio' : livres <= 2 ? 'alerta' : '';
+    return `<div class="cel ${expV.length?'temexp':''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${t?hN(t.hora_inicio):'null'})">
+      <div class="topo"><b>${ini}</b>–${fim}
+        ${livres !== null ? `<span class="cap ${cls}" title="kits First livres para aula experimental">${livres}/${v.cap ?? ''} livre${livres===1?'':'s'}</span>` : ''}</div>
+      <div class="assentos">
+        ${alunos.map(a => `<span class="as aluno" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}">${esc((a.nome_curto||a.nome).split(' ')[0])}<small>${KITCUR(a.kit)}</small></span>`).join('')}
+        ${alunos.length && expV.length ? '<div class="div" style="width:100%"></div>' : ''}
+        ${expV.map(a => { const l = leadDe(a); const al = (D.alunos||[]).find(x => x.id === a.aluno_id) || {};
+          return ehRep(a)
+            ? `<span class="as rep" onclick="abrirAluno('${a.aluno_id}')" title="reposição">${esc((a.crianca_nome||al.nome||'').split(' ')[0])}<small>rep</small></span>`
+            : `<span class="as exp" onclick="irDia('${d}')" title="${esc(l.nome||'')} · ${hh(a.hora_inicio)}">${esc((a.crianca_nome||l.nome||'visita').split(' ')[0])}<small>${hh(a.hora_inicio)}</small></span>`; }).join('')}
+        ${livres > 0 && TIPO !== 'alunos' ? `<span class="as livre" onclick="novoAgendamento()" title="marcar aula experimental aqui">+ ${livres}</span>` : ''}
+      </div></div>`;
+  };
+  return `<div class="scrollx"><div class="gradeq">
+    <div class="hd"></div>${dias.map(d => `<div class="hd" style="${d===hoje?'color:var(--brand)':''}">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}</div>`).join('')}
+    ${blocos.map(b => `<div class="hora-lb">${b.split('|')[0]}<br><span style="font-weight:600;color:var(--faint)">${b.split('|')[1]}</span></div>
+      ${dias.map(d => cel(d, b)).join('')}`).join('')}
+  </div></div>
+  <div class="legenda-q"><span><i style="background:var(--brand-soft);border:1px solid rgba(46,91,255,.3)"></i>aluno matriculado</span>
+    <span><i style="background:var(--exp-bg);border:1px solid #F3D3C4"></i>aula experimental (1h)</span>
+    <span><i style="background:#EFEAFF;border:1px solid #D9CEFF"></i>reposição</span>
+    <span><i style="border:1px dashed var(--line)"></i>kit livre para experimental</span></div>`;
 }
 
 function vSemana(){
@@ -377,7 +425,7 @@ function desenhar(){
   const nExp = EXP.filter(a => diasVis.includes(a.data) && ehExp(a) && !['cancelado','remarcado'].includes(a.status)).length;
   const nRep = EXP.filter(a => diasVis.includes(a.data) && ehRep(a) && !['cancelado','remarcado'].includes(a.status)).length;
   if (MODO === 'dia') { periodo = fmt(SEL, { weekday:'long', day:'numeric', month:'long' }); dias = [SEL]; corpo = vDia(SEL); }
-  else if (MODO === 'semana') { const s = segunda(SEL); dias = [0,1,2,3,4,5].map(n => addDias(s, n)); periodo = `${fmt(dias[0],{day:'numeric',month:'long'})} a ${fmt(dias[5],{day:'numeric',month:'long'})}`; corpo = vSemana(); }
+  else if (MODO === 'semana') { const s = segunda(SEL); dias = [0,1,2,3,4,5].map(n => addDias(s, n)); periodo = `${fmt(dias[0],{day:'numeric',month:'long'})} a ${fmt(dias[5],{day:'numeric',month:'long'})}`; corpo = vSemanaGrade(); }
   else { const x = new Date(SEL+'T12:00:00'); periodo = x.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); const f = iso(new Date(x.getFullYear(), x.getMonth()+1, 0, 12)); dias = []; for (let d = iso(new Date(x.getFullYear(), x.getMonth(), 1, 12)); d <= f; d = addDias(d,1)) dias.push(d); corpo = vMes(); }
   document.getElementById('raiz').innerHTML = `
     <div class="barra">${VAGAS.length?'':'<span style="font-size:12px;color:var(--faint)">carregando vagas…</span>'}<button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}<button class="btn" onclick="novoAgendamento()">+ Novo agendamento</button></div>

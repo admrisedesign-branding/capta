@@ -128,17 +128,3 @@ body.embed .wrap{padding-top:16px}
 
 @media print{.topbar,.barra,.nota{display:none}body{background:#fff}.card,.bloco,.tally{box-shadow:none;break-inside:avoid}}
 
-/* ícone de ajuda com balão explicativo */
-.ajuda{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;
-  border:1.5px solid var(--faint);color:var(--faint);font-size:10.5px;font-weight:800;cursor:help;
-  margin-left:6px;position:relative;flex:0 0 16px;font-style:normal;vertical-align:middle;background:transparent}
-.ajuda:hover,.ajuda:focus{border-color:var(--brand);color:var(--brand);outline:none}
-.ajuda .balao{position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%);
-  background:var(--ink);color:#fff;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:500;
-  line-height:1.5;width:max-content;max-width:290px;text-align:left;letter-spacing:0;text-transform:none;
-  opacity:0;visibility:hidden;transition:.14s;z-index:60;box-shadow:0 8px 24px rgba(20,26,46,.22);pointer-events:none}
-.ajuda .balao b{color:#fff}
-.ajuda .balao:after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
-  border:6px solid transparent;border-top-color:var(--ink)}
-.ajuda:hover .balao,.ajuda:focus .balao{opacity:1;visibility:visible}
-@media(max-width:760px){.ajuda .balao{left:auto;right:-8px;transform:none;max-width:74vw}.ajuda .balao:after{left:auto;right:14px;transform:none}}

@@ -31,7 +31,8 @@ body.embed .raias{min-height:calc(100vh - 120px)}
 .raia.alvo{border-color:var(--brand);background:var(--brand-softer)}
 .raia-cab{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
 .raia-cor{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
-.raia-nome{font-weight:700;font-size:13.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.raia-nome{font-weight:700;font-size:13.5px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.raia-cab .ajuda{margin-right:auto}
 .raia-qtd{font-size:12px;font-weight:700;color:var(--muted);background:var(--gray-bg);border-radius:99px;padding:2px 8px}
 .raia-corpo{padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;flex:1}
 
@@ -110,9 +111,6 @@ body.embed .raias{min-height:calc(100vh - 120px)}
   .filtros-bar{position:sticky;top:0;background:var(--bg);z-index:3;padding:8px 0}
   .fb-busca{min-width:0;flex:1}
 }
-.raia-cab .ajuda .balao{left:0;transform:none;max-width:260px}
-.raia-cab .ajuda .balao:after{left:14px;transform:none}
-.raia-cab{overflow:visible}.raia{overflow:visible}
 .filtros-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 body.embed .topbar{display:none}
 .fb-busca,.fb-sel{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 10px;font-size:12.5px;font-family:inherit;color:var(--ink)}
@@ -165,6 +163,7 @@ window.CaptaUser = (function(){
 })();
 </script>
 <link rel="stylesheet" href="/mobile.css">
+<script src="/capta-ui.js"></script>
 </head>
 <body>
 <div class="topbar">
@@ -238,7 +237,7 @@ const AJUDA_ETAPA = {
   'perdido': 'Sem interesse, idade fora ou sumiu. Fica no histórico e conta como perda no Painel.',
 };
 const ajudaEtapa = nome => AJUDA_ETAPA[String(nome||'').toLowerCase().trim()] || null;
-const iconeAjuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
+const iconeAjuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
 const F = { parado: 0, temp: '', busca: '', ordem: 'recente', esconderFrios: false };
 const diasParado = l => Math.floor((Date.now() - new Date(l.etapa_em || l.criado_em).getTime()) / 864e5);
 function filtrar(lista) {
@@ -276,7 +275,7 @@ function desenhar() {
     <section class="raia ${mob && (ci > 0 || !c.itens.length) ? 'fechada' : ''}" data-etapa="${c.e.id}" ${mob ? 'onclick="if(event.target.closest(\'.raia-cab\'))this.classList.toggle(\'fechada\')"' : ''}>
       <div class="raia-cab">
         <span class="raia-cor" style="background:${esc(c.e.cor || '#2E5BFF')}"></span>
-        <span class="raia-nome">${esc(c.e.nome)}${ajudaEtapa(c.e.nome) ? iconeAjuda(ajudaEtapa(c.e.nome)) : ''}</span>
+        <span class="raia-nome">${esc(c.e.nome)}</span>${ajudaEtapa(c.e.nome) ? iconeAjuda(ajudaEtapa(c.e.nome)) : ''}
         <span class="raia-qtd">${c.itens.length}</span>
       </div>
       <div class="raia-corpo">

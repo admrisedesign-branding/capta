@@ -134,6 +134,7 @@ window.CaptaUser = (function(){
 </script>
 <style>@media(max-width:760px){body.embed .wrap{padding-bottom:80px}.grade,.corpo{grid-template-columns:1fr!important}.tally{gap:14px;padding:10px 12px}.tally b{font-size:19px}}</style>
 <link rel="stylesheet" href="/mobile.css">
+<script src="/capta-ui.js"></script>
 </head>
 <body>
 <div class="topbar">
@@ -191,7 +192,7 @@ function montarMeses(){
 
 
 // ícone de ajuda: <span class="ajuda">i<span class="balao">…</span></span>
-const ajuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
+const ajuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
 const dias = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 864e5));
 const META_K = 'capta_meta_' + SLUG;
 function metas(){ try { return JSON.parse(localStorage.getItem(META_K) || '{}'); } catch(e){ return {}; } }

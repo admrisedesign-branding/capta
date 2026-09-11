@@ -142,6 +142,7 @@ window.CaptaUser = (function(){
 </script>
 <style>@media(max-width:760px){body.embed .wrap{padding-bottom:80px}.grade,.corpo{grid-template-columns:1fr!important}.tally{gap:14px;padding:10px 12px}.tally b{font-size:19px}}</style>
 <link rel="stylesheet" href="/mobile.css">
+<script src="/capta-ui.js"></script>
 </head>
 <body>
 <div class="topbar">
@@ -158,7 +159,7 @@ window.CaptaUser = (function(){
 const p = new URLSearchParams(location.search);
 const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
 document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
-const ajuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
+const ajuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const DIAS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const hh = t => String(t||'').slice(0,2).replace(/^0/,'') + 'h';
