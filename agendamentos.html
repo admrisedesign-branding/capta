@@ -228,6 +228,9 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .al.mais{color:var(--brand);font-weight:700;justify-content:center;border:1px dashed var(--brand-2);
   background:rgba(46,91,255,.05);margin-top:5px;font-size:12px;padding:5px 4px}
 .al.mais:hover{border-color:var(--brand);background:var(--brand-soft)}
+.cel.passou{opacity:.45}
+.cel.passou .al{cursor:default}
+.grade .gh.passou{opacity:.5}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -445,7 +448,7 @@ function vSemanaGrade(){
     ...EXP.filter(a => dias.includes(a.data) && viva(a)).map(a => hN(a.hora_inicio)),
   ])].sort((a,b) => a-b);
 
-  let h = `<div class="scrollx"><div class="grade"><div></div>${dias.map(d => `<div class="gh" style="${d===hoje?'color:var(--brand)':''}">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}</div>`).join('')}`;
+  let h = `<div class="scrollx"><div class="grade"><div></div>${dias.map(d => `<div class="gh ${d < hoje ? 'passou' : ''}" style="${d===hoje?'color:var(--brand)':''}">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}${d===hoje?' · hoje':''}</div>`).join('')}`;
   for (const hora of horas) {
     const hs = String(hora).padStart(2,'0') + ':00';
     h += `<div class="gb">${hs}</div>`;
@@ -469,7 +472,7 @@ function vSemanaGrade(){
       const v = aberta ? { n: aberta.vagas, cap: aberta.capacidade } : null;
       const cls = !v ? '' : v.n <= 0 ? 'cheio' : v.n <= 2 ? 'alerta' : '';
       const naSala = (t ? alunosDa(t).length : 0) + expV.length;
-      h += `<div class="cel ${expV.length?'temexp':''} ${t && !primeira ? 'cont' : ''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hora})">
+      h += `<div class="cel ${expV.length?'temexp':''} ${t && !primeira ? 'cont' : ''} ${d < hoje ? 'passou' : ''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hora})" title="${d < hoje ? 'dia que já passou' : ''}">
         <div class="t">
           <span>${t ? (primeira ? `<b>${naSala}</b>/${t.limite_sala||18} na sala` : `<span class="segue">${hh(t.hora_inicio)}–${hh(t.hora_fim)} · continua</span>`) : ''}</span>
           ${v && (v.n <= 0 || TIPO === 'alunos') ? `<span class="cap ${cls}" title="kits First livres nesta hora">${v.n<=0?'sem kit livre':v.n+' livre'+(v.n===1?'':'s')}</span>` : ''}</div>
