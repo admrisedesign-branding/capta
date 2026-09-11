@@ -44,14 +44,27 @@ async function metaContas(token) {
 
 // gasto por campanha no período (a Meta devolve por dia; somamos por mês)
 async function metaGasto(token, contaId, desde, ate) {
-  const campos = 'campaign_name,spend,impressions,clicks,date_start';
+  // "actions" traz as conversas de WhatsApp iniciadas pelo anúncio — é o número
+  // que a própria Meta contabiliza, sem depender de tag no CRM.
+  const campos = 'campaign_name,spend,impressions,clicks,date_start,actions,cost_per_action_type';
   const url = `${META_API}/${contaId}/insights?level=campaign&fields=${campos}&time_range=${encodeURIComponent(JSON.stringify({ since: desde, until: ate }))}&time_increment=monthly&limit=200&access_token=${encodeURIComponent(token)}`;
   const r = await fetch(url);
   const j = await r.json();
   if (j.error) throw new Error(j.error.message || 'A Meta recusou a consulta.');
+  const acao = (lista, tipos) => {
+    for (const t of tipos) { const a = (lista || []).find(x => x.action_type === t); if (a) return Number(a.value || 0); }
+    return 0;
+  };
   return (j.data || []).map(x => ({
     campanha: x.campaign_name || 'Campanha', mes: String(x.date_start).slice(0, 7) + '-01',
     valor: Number(x.spend || 0), impressoes: Number(x.impressions || 0), cliques: Number(x.clicks || 0),
+    // conversas de WhatsApp que a Meta atribui ao anúncio
+    conversas: acao(x.actions, [
+      'onsite_conversion.total_messaging_connection',
+      'onsite_conversion.messaging_conversation_started_7d',
+      'onsite_conversion.messaging_first_reply'
+    ]),
+    cliques_link: acao(x.actions, ['link_click'])
   }));
 }
 
@@ -66,7 +79,8 @@ async function sincronizarMeta(tenant, meses = 3) {
     for (const l of linhas) {
       const ja = await sb(`capta_investimento?tenant_id=eq.${tenant.id}&mes=eq.${l.mes}&campanha=eq.${encodeURIComponent(l.campanha)}&canal=eq.meta&select=id&limit=1`).catch(() => []);
       const dados = { tenant_id: tenant.id, mes: l.mes, campanha: l.campanha, canal: 'meta', valor: l.valor,
-        observacao: `${l.impressoes} impressões · ${l.cliques} cliques · atualizado ${new Date().toLocaleDateString('pt-BR')}` };
+        impressoes: l.impressoes, cliques: l.cliques, conversas: l.conversas,
+        observacao: `${l.impressoes} impressões · ${l.cliques} cliques${l.conversas ? ' · ' + l.conversas + ' conversas' : ''} · atualizado ${new Date().toLocaleDateString('pt-BR')}` };
       if (ja?.[0]) await sb(`capta_investimento?id=eq.${ja[0].id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
       else await sb('capta_investimento', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
     }
@@ -142,7 +156,7 @@ module.exports = async function handler(req, res) {
         return res.status(200).json(await sincronizarMeta(tenant, Number(body.meses) || 3));
 
       case 'investimento': {
-        const linhas = await sb(`capta_investimento?tenant_id=eq.${tenant.id}&select=id,mes,campanha,canal,valor,observacao&order=mes.desc,canal`).catch(() => []);
+        const linhas = await sb(`capta_investimento?tenant_id=eq.${tenant.id}&select=id,mes,campanha,canal,valor,observacao,impressoes,cliques,conversas&order=mes.desc,canal`).catch(() => []);
         return res.status(200).json({ investimento: linhas || [], integracoes: await integracoes(tenant) });
       }
 
@@ -155,7 +169,7 @@ module.exports = async function handler(req, res) {
           if (i.id) await sb(`capta_investimento?id=eq.${i.id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
           else await sb('capta_investimento', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ tenant_id: tenant.id, ...dados }) });
         }
-        const linhas = await sb(`capta_investimento?tenant_id=eq.${tenant.id}&select=id,mes,campanha,canal,valor,observacao&order=mes.desc,canal`).catch(() => []);
+        const linhas = await sb(`capta_investimento?tenant_id=eq.${tenant.id}&select=id,mes,campanha,canal,valor,observacao,impressoes,cliques,conversas&order=mes.desc,canal`).catch(() => []);
         return res.status(200).json({ ok: true, investimento: linhas || [] });
       }
 
