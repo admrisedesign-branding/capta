@@ -242,7 +242,7 @@
     if (!v) return `<div class="vaga"><div class="sec" style="margin:0 0 4px">${rotulo}</div><div class="liv">Sem vaga livre nos próximos 30 dias.</div></div>`;
     return `<div class="vaga"><div class="sec" style="margin:0 0 4px">${rotulo}</div><b>${v.data === hojeLocal() ? 'hoje' : nomeDia(v.data)} ${dataBR(v.data)} · ${hhmm(v.hora_inicio)}–${hhmm(v.hora_fim)}</b>
       <div class="liv">${v.vagas} de ${v.capacidade} kits First livres${v.sala_livre!=null?' · sala '+v.sala_livre:''} · opção ${idx+1} de ${lista.length}</div>
-      <div class="acs"><button class="btn" onclick="LeadPainel.confirmarAgenda('${v.turma_id}','${v.data}')">Agendar nessa</button><button class="btn g" onclick="LeadPainel.idx('${tipo}',${idx+1},${lista.length})" ${idx>=lista.length-1?'disabled':''}>Outra →</button>${idx>0?`<button class="btn g" onclick="LeadPainel.idx('${tipo}',${idx-1},${lista.length})">←</button>`:''}</div></div>`;
+      <div class="acs"><button class="btn" onclick="LeadPainel.confirmarAgenda('${v.turma_id||''}','${v.data}','${v.hora_inicio||''}')">Agendar nessa</button><button class="btn g" onclick="LeadPainel.idx('${tipo}',${idx+1},${lista.length})" ${idx>=lista.length-1?'disabled':''}>Outra →</button>${idx>0?`<button class="btn g" onclick="LeadPainel.idx('${tipo}',${idx-1},${lista.length})">←</button>`:''}</div></div>`;
   }
   function idx(t, i, n) { S.idx[t] = Math.max(0, Math.min(i, n-1)); desenhar(); }
   function historico(l) {
@@ -307,12 +307,12 @@
     const data = (document.getElementById('lp-a-data') || {}).value;
     const turma = (document.getElementById('lp-a-hora') || {}).value;
     if (!data || !turma) return say('Escolha o dia e o horário.', { tipo:'erro' });
-    return confirmarAgenda(turma, data);
+    const h = (S.horarios||[]).find(x => String(x.turma_id) === String(turma)); return confirmarAgenda(turma, data, h ? h.hora_inicio : undefined);
   }
   async function confirmarAgenda(turmaId, data) {
     const l = S.lead; const crianca = document.getElementById('lp-a-cri').value.trim(), idade = document.getElementById('lp-a-id').value;
     if (!crianca) { say('Informe o nome da criança.', { tipo:'erro' }); document.getElementById('lp-a-cri').focus(); return; }
-    try { await api('agendar', { turma_id: turmaId, data, crianca_nome: crianca, crianca_idade: idade || null, lead_id: l.id });
+    try { await api('agendar', { turma_id: turmaId || null, data, hora_inicio: hora || undefined, crianca_nome: crianca, crianca_idade: idade || null, lead_id: l.id });
       if (!l.atendente && EU()) { api('campos', { lead_id: l.id, atendente: EU() }).catch(()=>{}); l.atendente = EU(); }
       l.crianca = crianca; l.idade = idade ? Number(idade) : l.idade; const et = await etapas(); const e = et.find(x => /aula agendada/i.test(x.nome)); if (e) { l.etapa_id = e.id; l.etapa_em = new Date().toISOString(); }
       say(`<b>${esc(crianca)}</b> · aula marcada ${nomeDia(data)} ${dataBR(data)} · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' });

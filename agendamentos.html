@@ -622,7 +622,7 @@ function desenharNA(){
 async function confirmarNA(){
   const crianca = document.getElementById('na-cri').value.trim(), idade = document.getElementById('na-id').value;
   if (!crianca) return toast('Informe o nome da criança.', { tipo:'erro' });
-  try { await api('agendar', { turma_id: NA.vaga.turma_id, data: NA.vaga.data, crianca_nome: crianca, crianca_idade: idade || null, lead_id: NA.lead.id }); fecharModal(); toast(`<b>${esc(crianca)}</b> agendada · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' }); await carregar(); }
+  try { await api('agendar', { turma_id: NA.vaga.turma_id || null, data: NA.vaga.data, hora_inicio: NA.vaga.hora_inicio, crianca_nome: crianca, crianca_idade: idade || null, lead_id: NA.lead.id }); fecharModal(); toast(`<b>${esc(crianca)}</b> agendada · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' }); await carregar(); }
   catch(e){ toast(e.message, { tipo:'erro' }); }
 }
 
