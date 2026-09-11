@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -128,6 +128,8 @@ module.exports = async function handler(req, res) {
         case 'sugerir':       return await acaoSugerir(tenant, body, res);
         case 'triagem':       return await acaoTriagem(tenant, body, res);
         case 'triagem_aplicar': return await acaoTriagemAplicar(tenant, body, res);
+        case 'retomada':      return await acaoRetomada(tenant, body, res);
+        case 'retomada_marcar': return await acaoRetomadaMarcar(tenant, body, res);
         case 'recepcao':      return await acaoRecepcao(tenant, body, res);
         case 'checkin':       return await acaoCheckin(tenant, body, res);
         case 'feedback':      return await acaoFeedback(tenant, body, res);
@@ -277,6 +279,17 @@ async function acaoEnviar(tenant, canal, body, res) {
 
   let conversa = null;
   let telefone = body.telefone ? prov.comDDI(body.telefone) : null;
+
+  // pela fila de retomada vem só o lead: acha a conversa dele ou usa o telefone
+  if (!body.conversa_id && !telefone && body.lead_id) {
+    const c = await sb(`capta_conversas?lead_id=eq.${body.lead_id}&tenant_id=eq.${tenant.id}&select=id,telefone&order=ultima_mensagem_em.desc&limit=1`).catch(() => []);
+    if (c?.[0]) { conversa = c[0]; telefone = c[0].telefone; }
+    else {
+      const l = await sb(`capta_leads?id=eq.${body.lead_id}&tenant_id=eq.${tenant.id}&select=contato&limit=1`).catch(() => []);
+      if (l?.[0]?.contato) telefone = prov.comDDI(l[0].contato);
+      else return res.status(404).json({ erro: 'Esse lead não tem telefone.' });
+    }
+  }
 
   if (body.conversa_id) {
     const rows = await sb(
@@ -1754,6 +1767,97 @@ async function acaoTriagemAplicar(tenant, body, res) {
     } catch (e) { falhas.push({ lead_id: it.lead_id, erro: e.message }); }
   }
   return res.status(200).json({ movidos: feitos.length, falhas });
+}
+
+
+// ---------------------------------------------------------------------
+// FILA DE RETOMADA — lead que já custou dinheiro e está parado.
+// Devolve poucos por vez, com a mensagem pronta, e guarda quem já foi falado
+// para a pessoa não aparecer de novo amanhã.
+// ---------------------------------------------------------------------
+async function acaoRetomada(tenant, body, res) {
+  const hoje = hojeManaus();
+  const limite = Math.min(Number(body.limite) || 10, 30);
+
+  const [etapas, leads, ags, convs, feitas] = await Promise.all([
+    sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome,tipo,ordem&order=ordem.asc`),
+    sb(`capta_leads?tenant_id=eq.${tenant.id}&select=id,nome,contato,temperatura,crianca,idade,etapa_id,etapa_em,criado_em,fonte,porta,atendente,notas,campanha&limit=1500`),
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&select=lead_id,data,status&order=data.desc&limit=800`).catch(() => []),
+    sb(`capta_conversas?tenant_id=eq.${tenant.id}&select=lead_id,ultima_mensagem_em,nao_lidas,resolvida_em&limit=500`).catch(() => []),
+    sb(`capta_retomadas?tenant_id=eq.${tenant.id}&select=lead_id,acao,adiar_ate,criado_em&order=criado_em.desc&limit=1000`).catch(() => [])
+  ]);
+
+  const etapaDe = id => (etapas || []).find(e => e.id === id) || {};
+  const temAula = new Set((ags || []).filter(a => ['agendado','confirmado','compareceu'].includes(a.status)).map(a => a.lead_id));
+  const convDe = Object.fromEntries((convs || []).map(c => [c.lead_id, c]));
+  // quem já foi trabalhado: descartado nunca mais; enviado/adiado só depois do prazo
+  const bloqueado = new Map();
+  for (const r of feitas || []) {
+    if (bloqueado.has(r.lead_id)) continue;
+    if (r.acao === 'descartado') { bloqueado.set(r.lead_id, '9999-12-31'); continue; }
+    const ate = r.adiar_ate || new Date(new Date(r.criado_em).getTime() + 5 * 864e5).toISOString().slice(0, 10);
+    bloqueado.set(r.lead_id, ate);
+  }
+  const livre = id => { const ate = bloqueado.get(id); return !ate || ate < hoje; };
+  const dias = d => d ? Math.floor((new Date(hoje + 'T12:00') - new Date(d)) / 864e5) : 999;
+
+  const fila = [];
+  for (const l of leads || []) {
+    if (!livre(l.id)) continue;
+    const et = etapaDe(l.etapa_id);
+    if (['ganha','perdida'].includes(et.tipo)) continue;       // aluno ou já perdido de propósito
+    if (!l.contato) continue;
+    const c = convDe[l.id];
+    const paradoHa = dias(l.etapa_em || l.criado_em);
+    const quente = String(l.temperatura || '').toLowerCase() === 'quente';
+    let motivo = null, urgencia = 0, porque = '';
+
+    if ((c?.nao_lidas || 0) > 0 && !c?.resolvida_em) {
+      motivo = 'sem_resposta'; urgencia = 100;
+      porque = 'mandou mensagem e ninguém respondeu';
+    } else if (quente && !temAula.has(l.id)) {
+      motivo = 'quente_sem_aula'; urgencia = 90;
+      porque = 'está quente e não tem aula marcada';
+    } else if ((l.porta === 'evento' || l.fonte === 'evento') && /novo lead/i.test(et.nome || '')) {
+      motivo = 'evento'; urgencia = 80;
+      porque = 'deixou o contato num evento e ninguém retomou';
+    } else if (paradoHa >= 3 && /em contato|qualificado/i.test(et.nome || '')) {
+      motivo = 'parado'; urgencia = 60 + Math.min(paradoHa, 30);
+      porque = `parado há ${paradoHa} dias em ${et.nome}`;
+    } else if (/remarketing/i.test(et.nome || '') && paradoHa >= 20) {
+      motivo = 'remarketing'; urgencia = 40;
+      porque = `em remarketing há ${paradoHa} dias`;
+    }
+    if (!motivo) continue;
+    fila.push({
+      lead_id: l.id, nome: l.nome, contato: l.contato, crianca: l.crianca, idade: l.idade,
+      temperatura: l.temperatura, etapa: et.nome, atendente: l.atendente, notas: l.notas,
+      motivo, porque, parado_ha: paradoHa, urgencia
+    });
+  }
+  fila.sort((a, b) => b.urgencia - a.urgencia || b.parado_ha - a.parado_ha);
+
+  // duas vagas reais para oferecer na mensagem
+  const horarios = await rpc('capta_vagas_experimental', { p_tenant: tenant.id, p_dias: 10 }).catch(() => []);
+  const livres = (horarios || []).filter(h => (h.vagas ?? 0) > 0).slice(0, 8)
+    .map(h => ({ data: h.data, hora: String(h.hora_inicio).slice(0, 5), turma_id: h.turma_id }));
+
+  return res.status(200).json({
+    total: fila.length,
+    fila: fila.slice(0, limite),
+    vagas: livres,
+    por_motivo: fila.reduce((a, x) => { a[x.motivo] = (a[x.motivo] || 0) + 1; return a; }, {})
+  });
+}
+
+async function acaoRetomadaMarcar(tenant, body, res) {
+  const { lead_id, acao, motivo, observacao, adiar_dias } = body;
+  if (!lead_id || !acao) return res.status(400).json({ erro: 'Informe o lead e a ação.' });
+  const adiar = adiar_dias ? new Date(Date.now() + Number(adiar_dias) * 864e5 - 4 * 3600e3).toISOString().slice(0, 10) : null;
+  await sb('capta_retomadas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    tenant_id: tenant.id, lead_id, acao, motivo: motivo || null,
+    atendente: body.atendente || null, observacao: observacao || null, adiar_ate: adiar }) });
+  return res.status(200).json({ ok: true });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
