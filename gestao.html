@@ -279,13 +279,26 @@ function render(){
     <div class="cab"><div><h2>${esc(TENANT.nome||'')}</h2><div class="sub">${k ? rotulo(k) : 'Todo o período'} · gerado ${new Date().toLocaleDateString('pt-BR')}</div></div></div>
     <div class="kpis">${kpis}</div>
     <div class="grid">
+      ${(() => {
+        const comCamp = doMes.filter(l => l.campanha);
+        if (!comCamp.length) return '';
+        const m = new Map(); comCamp.forEach(l => m.set(l.campanha, (m.get(l.campanha)||0) + 1));
+        const linhas = [...m.entries()].sort((a,b) => b[1]-a[1]);
+        const mx = Math.max(1, ...linhas.map(x => x[1]));
+        return `<div class="card full"><h3>De qual anúncio veio${ajuda('Só aparece quando a pessoa clica num anúncio de “Enviar mensagem” do Facebook/Instagram: a Meta informa a campanha, e o Capta grava sozinho. Lead que chega por outro caminho não tem campanha.')}</h3>
+          <div class="h">${comCamp.length} de ${doMes.length} leads do mês vieram por anúncio identificado</div>
+          <table><tr><th>Campanha</th><th>Leads</th><th class="n">Matr.</th></tr>
+          ${linhas.map(([c,q]) => { const mt = comCamp.filter(l => l.campanha === c && ganhou(l)).length;
+            return `<tr><td>${esc(c)}</td><td><div class="bar"><i style="width:${Math.round(q/mx*100)}%"></i></div>${q}</td><td class="n">${mt}</td></tr>`; }).join('')}
+          </table></div>`;
+      })()}
       ${tabela(porFonte,'Por onde veio','Anúncio, Instagram, Google, evento, indicação…','<b>Onde a pessoa viu a My Robot</b> — vem do campo <b>Fonte</b> do Kommo.<br><br><b>“não informado”</b> = o campo ficou em branco naquele lead. Não é um canal: é dado que faltou preencher. Quanto mais preenchido, mais confiável fica o custo por canal aqui embaixo.')}
       ${tabela(porPorta,'Como chegou','Site, WhatsApp pelo bot, WhatsApp direto, evento…','<b>Por onde a conversa começou</b> — vem do campo <b>Porta</b> do Kommo.<br><br>Hoje quase tudo aparece como <b>“não informado”</b> porque o bot grava a informação como <i>tag</i> e não neste campo. O Capta passou a deduzir pela tag quando o campo está vazio.')}
       ${(() => { const g = INVEST.filter(i => !k || i.mes.slice(0,7) === k); if (!g.length) return '';
         const porCanal = {}; g.forEach(i => porCanal[i.canal] = (porCanal[i.canal]||0) + Number(i.valor||0));
         const NOME = { meta:'Meta Ads', google:'Google', evento:'Evento', material:'Material', outro:'Outro' };
         const leadsDe = canal => doMes.filter(l => { const f = (l.fonte||l.origem||'').toLowerCase(); const p = (l.porta||'').toLowerCase();
-          if (canal === 'meta') return f.includes('anúncio') || f.includes('anuncio') || f.includes('instagram');
+          if (canal === 'meta') return f.includes('anúncio') || f.includes('anuncio') || f.includes('instagram') || p === 'whatsapp-anuncio';
           if (canal === 'google') return f.includes('google');
           if (canal === 'evento') return f.includes('evento') || p === 'evento'; return false; }).length;
         return `<div class="card"><h3>Investimento por canal${ajuda('Gasto do mês dividido pelos leads e pelas matrículas de cada canal. O gasto do Meta vem automático da conta de anúncios; evento e material são lançados à mão em Ajustes → Integrações.')}</h3><div class="h">Quanto custou cada lead e cada matrícula</div>
