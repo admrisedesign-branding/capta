@@ -1244,7 +1244,7 @@ async function acaoEventoLeads(tenant, body, res) {
     return res.status(200).json({ leads: leads || [], eventos: evs });
   }
   const id = body.evento_id; if (!id) return res.status(400).json({ erro: 'Informe o evento.' });
-  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&evento_id=eq.${id}&select=id,nome,contato,temperatura,score,etapa_id,atendente,data_aula,ganho_em,valor,criado_em,kommo_lead_id,tags&order=criado_em.desc`).catch(() => []);
+  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&evento_id=eq.${id}&select=id,nome,contato,temperatura,score,etapa_id,atendente,data_aula,ganho_em,valor,criado_em,kommo_lead_id,tags,kommo_criado_em&order=criado_em.desc`).catch(() => []);
   const etapas = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome,tipo&order=ordem`).catch(() => []);
   return res.status(200).json({ leads: leads || [], etapas: etapas || [] });
 }
