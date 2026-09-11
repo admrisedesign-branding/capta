@@ -326,6 +326,23 @@ async function acaoEnviar(tenant, canal, body, res) {
     })
   });
 
+  // Quem responde primeiro fica com o lead: evita duas pessoas atendendo o mesmo pai.
+  const quem = body.autor && !['bot','agente','sistema'].includes(body.autor) ? body.autor : null;
+  if (quem) {
+    const cl = await sb(`capta_conversas?id=eq.${conversa.id}&select=lead_id,atendente&limit=1`).catch(() => []);
+    const leadDono = cl?.[0]?.lead_id;
+    if (!cl?.[0]?.atendente) {
+      await sb(`capta_conversas?id=eq.${conversa.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ atendente: quem }) }).catch(() => null);
+    }
+    if (leadDono) {
+      const ld = await sb(`capta_leads?id=eq.${leadDono}&select=atendente&limit=1`).catch(() => []);
+      if (!ld?.[0]?.atendente) {
+        await sb(`capta_leads?id=eq.${leadDono}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ atendente: quem }) }).catch(() => null);
+        await kommoCampos(tenant.id, leadDono, { atendente: quem }).catch(() => null);
+      }
+    }
+  }
+
   // Humano assumiu: o agente para de responder nesta conversa.
   await sb(`capta_conversas?id=eq.${conversa.id}`, {
     method: 'PATCH', headers: { Prefer: 'return=minimal' },
