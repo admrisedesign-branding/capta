@@ -206,10 +206,14 @@ const p = new URLSearchParams(location.search);
 const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
 document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
 const ajuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
+
+// Data de hoje no fuso de Manaus — new Date().toISOString() usa UTC e, depois das 20h,
+// mostra o dia seguinte.
+function hojeLocal(){ const d = new Date(Date.now() - 4*3600*1000); return d.toISOString().slice(0,10); }
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
 const hh = t => String(t||'').slice(0,5);
-const hoje = new Date().toISOString().slice(0,10);
+const hoje = hojeLocal();
 const MOTIVOS = ['Orçamento','Horário não bate','Vai pensar','Distância','Criança não se adaptou','Só pesquisando'];
 const PAGTOS = ['Pix','cartão','boleto','recorrente'];
 const KITS = ['First','OneBot','TechBot','Autobot','App Developer','GameBot'];

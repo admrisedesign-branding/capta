@@ -50,6 +50,7 @@
   const ATEND = ['Rafael','Bento','RISE'];
   const EU = () => (window.CaptaUser && CaptaUser.nome()) || '';
   const DIAS_N = ['dom','seg','ter','qua','qui','sex','sáb'];
+  function hojeLocal(){ const d = new Date(Date.now() - 4*3600*1000); return d.toISOString().slice(0,10); }
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const hhmm = t => String(t || '').slice(0, 5);
   const dataBR = d => { const [a,m,dd] = String(d).split('-'); return `${dd}/${m}`; };
@@ -223,13 +224,13 @@
     clearTimeout(S.timer); S.timer = setTimeout(() => { if (S.lead && S.aba === 'agendar') carregarAgenda(true); }, 60000);
   }
   function vagasPor(tipo) {
-    const hs = (S.agenda && S.agenda.horarios || []).filter(h => (h.vagas ?? 1) > 0 && h.data > new Date().toISOString().slice(0,10));
+    const hs = (S.agenda && S.agenda.horarios || []).filter(h => (h.vagas ?? 1) > 0);
     return hs.filter(h => { const dow = new Date(h.data+'T12:00:00').getDay(), hi = parseInt(h.hora_inicio); return tipo==='sab' ? dow===6 : tipo==='manha' ? (dow!==6&&hi<12) : (dow!==6&&hi>=12); }).sort((a,b) => (a.data+a.hora_inicio).localeCompare(b.data+b.hora_inicio));
   }
   function cardVaga(tipo, rotulo) {
     const lista = vagasPor(tipo); const idx = S.idx[tipo] || 0; const v = lista[idx];
     if (!v) return `<div class="vaga"><div class="sec" style="margin:0 0 4px">${rotulo}</div><div class="liv">Sem vaga livre nos próximos 30 dias.</div></div>`;
-    return `<div class="vaga"><div class="sec" style="margin:0 0 4px">${rotulo}</div><b>${nomeDia(v.data)} ${dataBR(v.data)} · ${hhmm(v.hora_inicio)}–${hhmm(v.hora_fim)}</b>
+    return `<div class="vaga"><div class="sec" style="margin:0 0 4px">${rotulo}</div><b>${v.data === hojeLocal() ? 'hoje' : nomeDia(v.data)} ${dataBR(v.data)} · ${hhmm(v.hora_inicio)}–${hhmm(v.hora_fim)}</b>
       <div class="liv">${v.vagas} de ${v.capacidade} kits First livres${v.sala_livre!=null?' · sala '+v.sala_livre:''} · opção ${idx+1} de ${lista.length}</div>
       <div class="acs"><button class="btn" onclick="LeadPainel.confirmarAgenda('${v.turma_id}','${v.data}')">Agendar nessa</button><button class="btn g" onclick="LeadPainel.idx('${tipo}',${idx+1},${lista.length})" ${idx>=lista.length-1?'disabled':''}>Outra →</button>${idx>0?`<button class="btn g" onclick="LeadPainel.idx('${tipo}',${idx-1},${lista.length})">←</button>`:''}</div></div>`;
   }
@@ -266,7 +267,7 @@
       ${!S.agenda ? `<div class="aviso-p">Buscando vagas…</div>` : S.agenda.erro ? `<div class="aviso-p">${esc(S.agenda.erro)}</div>` : cardVaga('manha','Manhã') + cardVaga('tarde','Tarde') + cardVaga('sab','Sábado')}
       <div class="sec">Outro dia e horário</div>
       <div class="vaga" style="background:var(--card)">
-        <div class="l2"><div class="campo"><label>Dia</label><input id="lp-a-data" type="date" min="${new Date().toISOString().slice(0,10)}" value="${S.escolhido?.data || ''}" onchange="LeadPainel.verHorarios(this.value)" max="${new Date(Date.now()+120*864e5).toISOString().slice(0,10)}"></div>
+        <div class="l2"><div class="campo"><label>Dia</label><input id="lp-a-data" type="date" min="${hojeLocal()}" value="${S.escolhido?.data || ''}" onchange="LeadPainel.verHorarios(this.value)" max="${new Date(Date.now()+120*864e5).toISOString().slice(0,10)}"></div>
           <div class="campo"><label>Horário</label><select id="lp-a-hora" ${S.horarios ? '' : 'disabled'}>${
             !S.horarios ? '<option>escolha o dia</option>' :
             !S.horarios.length ? '<option>sem turma nesse dia</option>' :

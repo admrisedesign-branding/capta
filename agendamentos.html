@@ -134,9 +134,13 @@ const p = new URLSearchParams(location.search);
 const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
 document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
 const ajuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
+
+// Data de hoje no fuso de Manaus — new Date().toISOString() usa UTC e, depois das 20h,
+// mostra o dia seguinte.
+function hojeLocal(){ const d = new Date(Date.now() - 4*3600*1000); return d.toISOString().slice(0,10); }
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'], DIAS3 = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-const hoje = new Date().toISOString().slice(0,10);
+const hoje = hojeLocal();
 const iso = d => d.toISOString().slice(0,10);
 const addDias = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return iso(x); };
 const segunda = d => { const x = new Date(d + 'T12:00:00'); const w = x.getDay(); x.setDate(x.getDate() - (w === 0 ? 6 : w - 1)); return iso(x); };
@@ -285,7 +289,7 @@ async function remarcar(id, turmaId, data){ try { await api('remarcar', { agenda
 let NA = { leads: null, lead: null, vagas: null, vaga: null, q: '' };
 async function novoAgendamento(){
   NA = { leads: null, lead: null, vagas: null, vaga: null, q: '' }; desenharNA();
-  try { const [f, ag] = await Promise.all([api('funil'), api('agenda', { dias: 30 })]); NA.leads = f.leads || []; NA.vagas = (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0 && h.data > hoje); }
+  try { const [f, ag] = await Promise.all([api('funil'), api('agenda', { dias: 30 })]); NA.leads = f.leads || []; NA.vagas = (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0); }
   catch(e){ NA.leads = []; NA.vagas = []; toast(e.message, { tipo:'erro' }); }
   desenharNA();
 }
