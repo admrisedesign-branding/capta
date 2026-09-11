@@ -858,8 +858,8 @@ async function desfazer(id){ try { await api('desfazer', { agendamento_id: id })
 // ---------------- filtro de tipo ----------------
 // A mesma tela serve a dois trabalhos: quem atende lead (comercial) e quem cuida
 // dos alunos (secretaria). A visão troca o que aparece, sem esconder nada do outro.
-let KITS_ABERTO = false;
-try { KITS_ABERTO = localStorage.getItem('capta_kits_abertos') === '1'; } catch(e){}
+let KITS_ABERTO = true;
+try { const v = localStorage.getItem('capta_kits_abertos'); if (v !== null) KITS_ABERTO = v === '1'; } catch(e){}
 let TIPO = 'todos';   // todos | experimental | alunos
 try { TIPO = localStorage.getItem('capta_visao_agenda') || 'todos'; } catch(e){}
 const ehRep = a => (a.tipo || 'experimental') === 'reposicao';
