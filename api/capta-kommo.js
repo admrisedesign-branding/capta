@@ -33,6 +33,24 @@ function statusDe(st) {
   if (ehPerda(st)) return 'perdido';
   return /novo lead|incoming/i.test(st.nome || '') ? 'novo' : 'contatado';
 }
+
+// O bot grava o canal como TAG, não no campo Porta. Quando o campo está vazio,
+// deduzimos pela tag — assim o painel de canais para de dizer "não informado".
+function portaPorTag(tags) {
+  const t = (tags || []).map(x => String(x).toLowerCase());
+  const tem = alvo => t.some(x => x.includes(alvo));
+  let porta = null, fonte = null;
+  if (tem('whatsapp-bot')) porta = 'whatsapp-bot';
+  else if (tem('whatsapp-direto')) porta = 'whatsapp-direto';
+  else if (tem('site')) porta = 'site';
+  else if (tem('evento')) porta = 'evento';
+  else if (tem('my robot')) porta = 'my robot';
+  if (tem('anúncio') || tem('anuncio')) fonte = 'anúncio';
+  else if (tem('instagram')) fonte = 'instagram';
+  else if (tem('evento')) fonte = 'evento';
+  else if (tem('indica')) fonte = 'indicação';
+  return { porta, fonte };
+}
 const cap = s => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1).toLowerCase() : null);
 
 // O bot do WhatsApp grava o NÚMERO da opção; o formulário do site já grava o texto.
@@ -154,6 +172,7 @@ async function espelhar(leadId) {
     }
   }
 
+  const porTag = portaPorTag((lead._embedded?.tags || []).map(t => t.name));
   const linha = {
     tenant_id: await tenantId(),
     kommo_lead_id: lead.id,
@@ -174,8 +193,8 @@ async function espelhar(leadId) {
       traduz('momento', valorCampo(lead, CAMPOS.momento)) ? 'Momento: '  + traduz('momento', valorCampo(lead, CAMPOS.momento)) : null,
       valorCampo(lead, CAMPOS.trilha) ? 'Trilha: ' + valorCampo(lead, CAMPOS.trilha) : null,
     ].filter(Boolean).join(' · ') || null,
-    fonte: valorCampo(lead, CAMPOS.fonte),
-    porta: valorCampo(lead, CAMPOS.porta),
+    fonte: valorCampo(lead, CAMPOS.fonte) || porTag.fonte,
+    porta: valorCampo(lead, CAMPOS.porta) || porTag.porta,
     atendente: valorCampo(lead, CAMPOS.atendente),
     crianca: criancaDe(valorCampo(lead, CAMPOS.crianca)).nome,
     idade: idadeContato(contato) ?? criancaDe(valorCampo(lead, CAMPOS.crianca)).idade ?? null,
