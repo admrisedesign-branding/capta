@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Organizar o funil — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/capta.css">
+<style>
+.wrap{padding:20px 26px 60px;max-width:980px}
+.intro{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:14px}
+.intro h2{font-size:19px;font-weight:800;letter-spacing:-.01em}
+.intro p{color:var(--muted);font-size:13.5px;line-height:1.6;margin-top:6px}
+.aviso{background:var(--morno-bg);color:var(--morno);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.55;margin-top:12px;font-weight:600}
+.sug{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start}
+.sug.meta{border-color:var(--morno)}
+.sug input[type=checkbox]{width:18px;height:18px;margin-top:2px;flex:0 0 18px;accent-color:var(--brand)}
+.sug .corpo{flex:1;min-width:0}
+.sug .nome{font-weight:800;font-size:14.5px}
+.sug .fone{font-size:12.5px;color:var(--muted);margin-left:6px;font-weight:600}
+.mov{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;font-size:13px}
+.et{font-size:11.5px;font-weight:800;padding:3px 10px;border-radius:99px;background:var(--line-2);color:var(--muted)}
+.et.nova{background:var(--brand-soft);color:var(--brand)}
+.et.nova.meta{background:var(--morno-bg);color:var(--morno)}
+.seta{color:var(--faint);font-weight:700}
+.motivo{font-size:13px;color:var(--muted);margin-top:7px;line-height:1.5}
+.motivo b{color:var(--ink);font-weight:700}
+.conf{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:99px}
+.conf.alta{background:var(--verde-bg);color:var(--verde)}
+.conf.media{background:var(--line-2);color:var(--muted)}
+.conf.baixa{background:var(--morno-bg);color:var(--morno)}
+.acs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.acs button{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 11px;font-weight:700;font-size:12px;color:var(--muted);cursor:pointer;font-family:inherit}
+.acs button:hover{border-color:var(--brand);color:var(--brand)}
+.acs .ind{background:var(--morno);border-color:var(--morno);color:#fff}
+.acs .ind:hover{opacity:.9;color:#fff}
+.barra-baixo{position:sticky;bottom:0;background:rgba(244,246,251,.95);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:14px 0;margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.barra-baixo .qtd{font-weight:700;font-size:13.5px}
+.vazio{border:1px dashed var(--line);border-radius:var(--r);padding:40px;text-align:center;color:var(--faint);line-height:1.7}
+.carregando{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13.5px;padding:20px 0}
+.pt{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:gira .7s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+.fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:50}
+.janela{background:var(--card);border-radius:var(--r);padding:22px;width:100%;max-width:520px;box-shadow:0 20px 50px rgba(20,26,46,.2);max-height:90vh;overflow-y:auto}
+.conversa{background:var(--bg);border-radius:12px;padding:12px;margin-top:12px;max-height:46vh;overflow-y:auto;font-size:13px;line-height:1.55}
+.conversa .m{margin-bottom:8px}
+.conversa .m b{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);display:block}
+</style>
+<script>
+function toast(msg, opts){ opts = opts || {}; let box = document.getElementById('toasts'); if(!box){ box = document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
+  const el = document.createElement('div'); el.className = 'toast' + (opts.tipo?' '+opts.tipo:''); el.innerHTML = `<span>${msg}</span>`;
+  box.appendChild(el); setTimeout(() => el.remove(), opts.ms || 4000); return el; }
+function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
+</script>
+<script src="/capta-ui.js"></script>
+<link rel="stylesheet" href="/mobile.css">
+<script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+</head>
+<body>
+<div class="topbar">
+  <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
+  <h1>Organizar o funil</h1>
+</div>
+<div class="wrap" id="raiz"><div class="carregando"><span class="pt"></span>Carregando…</div></div>
+<div id="modal"></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ajuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
+
+let SUG = [], MARCADOS = new Set(), RODANDO = false;
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ acao, slug: SLUG, token: TOKEN, email_atual: (window.CaptaUser && CaptaUser.email && CaptaUser.email()) || undefined, ...extra }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`);
+  return d;
+}
+
+function desenhar(){
+  const marcaveis = SUG.filter(s => !s.avisa_meta);
+  document.getElementById('raiz').innerHTML = `
+    <div class="intro">
+      <h2>Organizar o funil${ajuda('A IA lê as conversas que o Capta tem e sugere em que etapa cada lead deveria estar. Nada é movido sem a sua aprovação.')}</h2>
+      <p>A leitura é feita nas conversas de WhatsApp que já estão no Capta. Para cada lead, a sugestão vem com o motivo — do que foi dito na conversa. Você aprova o que concorda.</p>
+      <div class="aviso">Mover para <b>Qualificado</b> ou <b>Aula agendada</b> dispara um evento de conversão na Meta (configurado no Kommo). Por isso esses dois só saem um de cada vez, com confirmação — para não sujar os dados dos anúncios.</div>
+      <div class="acs" style="margin-top:14px">
+        <button class="btn" onclick="analisar()" ${RODANDO?'disabled':''}>${RODANDO ? 'Lendo conversas…' : (SUG.length ? 'Ler mais conversas' : 'Analisar conversas')}</button>
+      </div>
+    </div>
+    ${RODANDO ? '<div class="carregando"><span class="pt"></span>Lendo as conversas uma a uma. Leva alguns segundos por lead.</div>' : ''}
+    ${!RODANDO && !SUG.length ? '<div class="vazio">Nenhuma sugestão por enquanto.<br>Toque em <b>Analisar conversas</b> para a IA ler o que já chegou.</div>' : ''}
+    ${SUG.map((s, i) => `
+      <div class="sug ${s.avisa_meta?'meta':''}">
+        ${s.avisa_meta ? '<div style="width:18px"></div>' : `<input type="checkbox" ${MARCADOS.has(s.lead_id)?'checked':''} onchange="marcar('${s.lead_id}', this.checked)">`}
+        <div class="corpo">
+          <div><span class="nome">${esc(s.nome || 'Sem nome')}</span><span class="fone">${esc(s.contato || '')}</span>
+            <span class="conf ${s.confianca}" style="margin-left:8px">${s.confianca === 'alta' ? 'confiança alta' : s.confianca === 'baixa' ? 'confiança baixa' : 'confiança média'}</span></div>
+          <div class="mov"><span class="et">${esc(s.etapa_atual || 'sem etapa')}</span><span class="seta">→</span>
+            <span class="et nova ${s.avisa_meta?'meta':''}">${esc(s.etapa_nova)}</span>
+            ${s.crianca ? `<span style="font-size:12.5px;color:var(--muted)">· criança: <b>${esc(s.crianca)}</b>${s.idade?`, ${s.idade} anos`:''}</span>` : ''}</div>
+          <div class="motivo">${esc(s.motivo)}</div>
+          <div class="acs">
+            <button onclick="verConversa(${i})">ver a conversa</button>
+            ${s.avisa_meta ? `<button class="ind" onclick="aplicarUm(${i})">mover só este (avisa a Meta)</button>` : ''}
+            <button onclick="descartar(${i})">ignorar</button>
+          </div>
+        </div>
+      </div>`).join('')}
+    ${marcaveis.length ? `<div class="barra-baixo">
+      <button class="btn g" onclick="marcarTodos(true)">marcar todos</button>
+      <button class="btn g" onclick="marcarTodos(false)">desmarcar</button>
+      <span class="qtd">${MARCADOS.size} selecionado${MARCADOS.size===1?'':'s'}</span>
+      <button class="btn" style="margin-left:auto" onclick="aplicar()" ${MARCADOS.size?'':'disabled'}>Mover ${MARCADOS.size || ''} no Capta e no Kommo</button>
+    </div>` : ''}`;
+}
+
+async function analisar(){
+  RODANDO = true; desenhar();
+  try {
+    const d = await api('triagem', { limite: 8 });
+    if (d.erro) { RODANDO = false; desenhar(); return toast(d.erro, { tipo:'erro' }); }
+    const novos = (d.sugestoes || []).filter(n => !SUG.some(s => s.lead_id === n.lead_id));
+    SUG = [...SUG, ...novos];
+    if (!novos.length) toast('Nada novo para sugerir por aqui.');
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+  RODANDO = false; desenhar();
+}
+function marcar(id, on){ on ? MARCADOS.add(id) : MARCADOS.delete(id); desenhar(); }
+function marcarTodos(on){ MARCADOS = new Set(on ? SUG.filter(s => !s.avisa_meta).map(s => s.lead_id) : []); desenhar(); }
+function descartar(i){ const s = SUG[i]; MARCADOS.delete(s.lead_id); SUG.splice(i, 1); desenhar(); }
+
+async function aplicar(){
+  const itens = SUG.filter(s => MARCADOS.has(s.lead_id) && !s.avisa_meta);
+  if (!itens.length) return;
+  try {
+    const d = await api('triagem_aplicar', { itens });
+    toast(`${d.movidos} lead${d.movidos===1?'':'s'} movido${d.movidos===1?'':'s'} · Kommo atualizado`, { tipo:'ok' });
+    SUG = SUG.filter(s => !MARCADOS.has(s.lead_id)); MARCADOS = new Set(); desenhar();
+    if (d.falhas?.length) toast(`${d.falhas.length} não deu certo`, { tipo:'erro' });
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function aplicarUm(i){
+  const s = SUG[i];
+  if (!confirm(`Mover ${s.nome || 'este lead'} para "${s.etapa_nova}"?\n\nIsso envia um evento de conversão para a Meta. Só confirme se a informação estiver certa.`)) return;
+  try {
+    const d = await api('triagem_aplicar', { itens: [{ ...s, confirmado_individual: true }] });
+    if (d.movidos) { toast(`${esc(s.nome||'Lead')} → ${esc(s.etapa_nova)}`, { tipo:'ok' }); SUG.splice(i, 1); desenhar(); }
+    else toast(d.falhas?.[0]?.erro || 'Não deu certo', { tipo:'erro' });
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
+async function verConversa(i){
+  const s = SUG[i];
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela">
+    <h3>${esc(s.nome || 'Lead')}</h3><p>${esc(s.etapa_atual || 'sem etapa')} → <b>${esc(s.etapa_nova)}</b> · ${esc(s.motivo)}</p>
+    <div class="conversa" id="conv">carregando…</div>
+    <div class="fim"><button class="btn g" onclick="fecharModal()">Fechar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
+  try {
+    const d = await api('mensagens', { conversa_id: s.conversa_id });
+    const ms = (d.mensagens || []).slice(-30);
+    document.getElementById('conv').innerHTML = ms.map(m => `<div class="m"><b>${m.direcao === 'entrada' ? 'cliente' : 'escola'} · ${new Date(m.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</b>${esc(m.texto || m.transcricao || '['+(m.tipo||'mídia')+']')}</div>`).join('') || 'Sem mensagens.';
+  } catch(e){ document.getElementById('conv').textContent = e.message; }
+}
+function fecharModal(){ document.getElementById('modal').innerHTML = ''; }
+
+if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.';
+else desenhar();
+</script>
+</body>
+</html>
