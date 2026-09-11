@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Retomar — Capta</title>
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/capta.css">
+<style>
+.wrap{padding:20px 26px 60px;max-width:760px}
+.cabeca{margin-bottom:16px}
+.cabeca h2{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.cabeca p{color:var(--muted);font-size:13.5px;line-height:1.6;margin-top:5px}
+.resumo{display:flex;gap:20px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow);padding:12px 18px;margin:14px 0}
+.resumo div{font-size:12.5px;color:var(--muted);font-weight:600}
+.resumo b{display:block;font-size:20px;font-weight:800;color:var(--ink)}
+.resumo .bad b{color:var(--quente)}.resumo .hot b{color:var(--morno)}
+
+.cartao{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:18px 20px;margin-bottom:12px}
+.cartao.feito{opacity:.45}
+.topo{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.quem{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.quem em{font-style:normal;font-weight:600;color:var(--faint);font-size:13px;margin-left:6px}
+.selo{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:99px;margin-left:auto}
+.selo.sem_resposta{background:var(--quente-bg);color:var(--quente)}
+.selo.quente_sem_aula{background:var(--morno-bg);color:var(--morno)}
+.selo.evento{background:rgba(124,92,219,.13);color:#5B3FBF}
+.selo.parado{background:var(--line-2);color:var(--muted)}
+.selo.remarketing{background:var(--brand-soft);color:var(--brand)}
+.porque{font-size:13.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+.nota{font-size:12.5px;color:var(--faint);background:var(--line-2);border-radius:10px;padding:9px 11px;margin-top:9px;line-height:1.5}
+.msg{margin-top:12px}
+.msg textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 13px;font-size:13.5px;
+  font-family:inherit;line-height:1.55;min-height:92px;resize:vertical;color:var(--ink);background:var(--bg)}
+.msg textarea:focus{outline:0;border-color:var(--brand);background:var(--card)}
+.variantes{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.variantes button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:5px 10px;
+  font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
+.variantes button:hover,.variantes button.on{border-color:var(--brand);color:var(--brand)}
+.acoes{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+.acoes .btn{padding:10px 16px;font-size:13px}
+.acoes .depois{border:0;background:none;color:var(--faint);font-size:12.5px;font-weight:700;cursor:pointer;
+  text-decoration:underline;font-family:inherit}
+.acoes .depois:hover{color:var(--muted)}
+.vazio{border:1px dashed var(--line);border-radius:var(--r);padding:44px;text-align:center;color:var(--faint);line-height:1.8}
+.vazio b{color:var(--ink);font-size:15px}
+.fim-dia{background:var(--verde-bg);border-radius:14px;padding:18px 20px;text-align:center;color:var(--verde);font-weight:700;line-height:1.6}
+.carregando{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13.5px;padding:20px 0}
+.pt{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:gira .7s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+</style>
+<script>
+function toast(msg, opts){ opts = opts || {}; let box = document.getElementById('toasts'); if(!box){ box=document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
+  const el=document.createElement('div'); el.className='toast'+(opts.tipo?' '+opts.tipo:''); el.innerHTML=`<span>${msg}</span>`;
+  box.appendChild(el); setTimeout(()=>el.remove(), opts.ms||3500); }
+function irPara(pagina){ if(window.parent !== window) window.parent.postMessage({ capta:'ir', pagina }, '*'); else location.href = pagina + location.search; }
+</script>
+<script src="/capta-ui.js"></script>
+<link rel="stylesheet" href="/mobile.css">
+<script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+</head>
+<body>
+<div class="topbar">
+  <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
+  <h1>Retomar</h1>
+</div>
+<div class="wrap" id="raiz"><div class="carregando"><span class="pt"></span>Montando a fila…</div></div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
+document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ajuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
+const DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+const fmtD = d => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+const diaDe = d => DIAS[new Date(d + 'T12:00:00').getDay()];
+const primeiro = n => String(n || '').trim().split(' ')[0] || '';
+
+let F = { fila: [], vagas: [], total: 0, motivos: {} }, FEITOS = new Set(), ESCOLHA = {};
+
+async function api(acao, extra = {}) {
+  const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ acao, slug: SLUG, token: TOKEN, email_atual: (window.CaptaUser && CaptaUser.email && CaptaUser.email()) || undefined, ...extra }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`);
+  return d;
+}
+
+// ---- mensagens prontas, por motivo. Duas vagas reais vão no texto. ----
+function vagasTexto(){
+  const v = (F.vagas || []).slice(0, 2);
+  if (!v.length) return 'me diz um horário que fica bom que eu vejo aqui';
+  return v.map(x => `${diaDe(x.data)} ${fmtD(x.data)} às ${x.hora}`).join(' ou ');
+}
+function modelos(item){
+  const n = primeiro(item.nome), c = primeiro(item.crianca);
+  const kid = c ? c : 'a criança';
+  const vg = vagasTexto();
+  const base = {
+    sem_resposta: [
+      ['Pedir desculpa', `Oi ${n}, tudo bem? Me desculpa a demora pra responder 🙏 Ainda posso te ajudar com a aula experimental d${c?'o(a) '+c:'a criança'}?`],
+      ['Ir direto', `Oi ${n}! Vi que você nos chamou e ficou sem resposta. Tenho ${vg} pra aula experimental — algum desses serve?`]
+    ],
+    quente_sem_aula: [
+      ['Oferecer horário', `Oi ${n}! Consegui duas vagas pra aula experimental d${c?'o(a) '+c:'a criança'}: ${vg}. Qual fica melhor pra vocês?`],
+      ['Criar urgência', `Oi ${n}! As vagas da aula experimental estão acabando essa semana. Tenho ${vg} — quer que eu segure uma pra ${kid}?`]
+    ],
+    evento: [
+      ['Lembrar do evento', `Oi ${n}! Aqui é da My Robot Manaus 🤖 Nos conhecemos no evento e você deixou seu contato pra aula experimental gratuita. O convite continua de pé! Tenho ${vg}.`],
+      ['Curto', `Oi ${n}, tudo bem? Da My Robot Manaus, do evento 🤖 Ainda quer conhecer a escola com ${kid}? Tenho ${vg}.`]
+    ],
+    parado: [
+      ['Retomar leve', `Oi ${n}, tudo bem? Passando pra saber se ainda tem interesse na aula experimental d${c?'o(a) '+c:'a criança'} 😊`],
+      ['Com horário', `Oi ${n}! Voltando aqui: tenho ${vg} pra aula experimental. Algum serve pra vocês?`]
+    ],
+    remarketing: [
+      ['Novidade', `Oi ${n}! Tudo bem? Abrimos turmas novas na My Robot e lembrei de vocês. Quer conhecer a escola com ${kid}? A aula experimental é gratuita.`],
+      ['Sem pressão', `Oi ${n}! Faz um tempo que conversamos. Se ainda fizer sentido pra ${kid}, o convite pra aula experimental continua de pé 😊`]
+    ]
+  };
+  return base[item.motivo] || base.parado;
+}
+
+function desenhar(){
+  const raiz = document.getElementById('raiz');
+  const pend = F.fila.filter(x => !FEITOS.has(x.lead_id));
+  const rot = { sem_resposta:'sem resposta', quente_sem_aula:'quer fechar, sem aula', evento:'evento', parado:'parado', remarketing:'remarketing' };
+
+  raiz.innerHTML = `
+    <div class="cabeca">
+      <h2>Quem falar hoje${ajuda('A fila junta quem já custou dinheiro e está parado: mensagem sem resposta, lead quente sem aula, gente de evento que ninguém retomou, e parados há 3+ dias. Quem você já falou some por 5 dias.')}</h2>
+      <p>Uma pessoa por vez, com a mensagem pronta e as vagas reais. Quem você falar hoje só volta a aparecer daqui a cinco dias.</p>
+    </div>
+    <div class="resumo">
+      <div><b>${F.total}</b>esperando retomada</div>
+      ${Object.entries(F.motivos || {}).map(([m, q]) => `<div class="${m==='sem_resposta'?'bad':m==='quente_sem_aula'?'hot':''}"><b>${q}</b>${rot[m] || m}</div>`).join('')}
+    </div>
+    ${!pend.length ? (F.total
+      ? `<div class="fim-dia">Você falou com todos da fila de hoje 👏<br><span style="font-weight:600;color:var(--muted)">Ainda há ${F.total} esperando — recarregue para pegar os próximos.</span>
+          <div style="margin-top:14px"><button class="btn" onclick="carregar()">Pegar mais 10</button></div></div>`
+      : `<div class="vazio"><b>Ninguém esperando 🎉</b><br>Nenhum lead parado, sem resposta ou de evento sem contato.</div>`)
+      : pend.map(cartao).join('')}
+  `;
+}
+
+function cartao(x){
+  const ms = modelos(x); const i = ESCOLHA[x.lead_id] ?? 0;
+  const rot = { sem_resposta:'sem resposta', quente_sem_aula:'quer fechar', evento:'evento', parado:'parado', remarketing:'remarketing' };
+  return `<div class="cartao" id="c-${x.lead_id}">
+    <div class="topo">
+      <div>
+        <div class="quem">${esc(x.nome || 'Sem nome')}${x.crianca ? `<em>${esc(x.crianca)}${x.idade?`, ${x.idade} anos`:''}</em>` : ''}</div>
+        <div class="porque">${esc(x.porque)}${x.etapa ? ` · <b>${esc(x.etapa)}</b>` : ''}${x.atendente ? ` · com ${esc(x.atendente)}` : ''}</div>
+      </div>
+      <span class="selo ${x.motivo}">${rot[x.motivo] || x.motivo}</span>
+    </div>
+    ${x.notas ? `<div class="nota">${esc(String(x.notas).slice(0, 160))}</div>` : ''}
+    <div class="msg">
+      <textarea id="t-${x.lead_id}">${esc(ms[i][1])}</textarea>
+      <div class="variantes">${ms.map((m, j) => `<button class="${j===i?'on':''}" onclick="trocar('${x.lead_id}',${j})">${esc(m[0])}</button>`).join('')}
+        <button onclick="verLead('${x.lead_id}')">ver conversa</button></div>
+    </div>
+    <div class="acoes">
+      <button class="btn" onclick="enviar('${x.lead_id}','${x.motivo}')">Enviar no WhatsApp</button>
+      <button class="depois" onclick="adiar('${x.lead_id}','${x.motivo}',7)">falar daqui a 7 dias</button>
+      <button class="depois" onclick="descartar('${x.lead_id}','${x.motivo}')">não insistir</button>
+    </div>
+  </div>`;
+}
+function trocar(id, j){ ESCOLHA[id] = j; desenhar(); }
+function verLead(id){ irPara('/funil.html'); try { localStorage.setItem('capta_abrir_lead', id); } catch(e){} }
+
+async function enviar(id, motivo){
+  const texto = (document.getElementById('t-' + id) || {}).value;
+  if (!texto || !texto.trim()) return toast('A mensagem está vazia.', { tipo:'erro' });
+  const eu = (window.CaptaUser && CaptaUser.nome && CaptaUser.nome()) || undefined;
+  try {
+    await api('enviar', { lead_id: id, texto: texto.trim(), autor: eu });
+    await api('retomada_marcar', { lead_id: id, acao: 'enviado', motivo, atendente: eu, adiar_dias: 5 });
+    FEITOS.add(id); desenhar(); toast('Mensagem enviada 👍', { tipo:'ok' });
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function adiar(id, motivo, dias){
+  try { await api('retomada_marcar', { lead_id: id, acao: 'adiado', motivo, adiar_dias: dias,
+    atendente: (window.CaptaUser && CaptaUser.nome && CaptaUser.nome()) || undefined });
+    FEITOS.add(id); desenhar(); toast(`Volta a aparecer em ${dias} dias`); } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function descartar(id, motivo){
+  if (!confirm('Não insistir mais com esta pessoa?\n\nEla sai da fila de retomada de vez (o lead continua no funil).')) return;
+  try { await api('retomada_marcar', { lead_id: id, acao: 'descartado', motivo,
+    atendente: (window.CaptaUser && CaptaUser.nome && CaptaUser.nome()) || undefined });
+    FEITOS.add(id); desenhar(); toast('Fora da fila'); } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
+async function carregar(){
+  document.getElementById('raiz').innerHTML = '<div class="carregando"><span class="pt"></span>Montando a fila…</div>';
+  try {
+    const d = await api('retomada', { limite: 10 });
+    F = { fila: d.fila || [], vagas: d.vagas || [], total: d.total || 0, motivos: d.por_motivo || {} };
+    FEITOS = new Set(); ESCOLHA = {}; desenhar();
+  } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
+}
+
+if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.';
+else carregar();
+</script>
+</body>
+</html>

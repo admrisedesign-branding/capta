@@ -183,7 +183,7 @@ function desenhar(){
       <div class="hot" onclick="document.getElementById('sec-aulas').scrollIntoView({behavior:'smooth'})"><b>${pend.length}</b><small>sem desfecho</small></div>
       <div class="bad" onclick="document.getElementById('sec-resp').scrollIntoView({behavior:'smooth'})"><b>${semResp.length}</b><small>mensagens sem resposta</small></div>
       <div class="bad" onclick="document.getElementById('sec-quentes').scrollIntoView({behavior:'smooth'})"><b>${quentes.length}</b><small>querem fechar sem aula</small></div>
-      <div class="hot" onclick="document.getElementById('sec-evento').scrollIntoView({behavior:'smooth'})"><b>${(D.evParados||[]).length}</b><small>leads de evento sem contato</small></div>
+      <div class="hot" onclick="irPara('/retomar.html')" title="abrir a fila de retomada" style="cursor:pointer"><b>${(D.evParados||[]).length}</b><small>leads de evento sem contato</small></div>
       <div onclick="document.getElementById('sec-parados').scrollIntoView({behavior:'smooth'})"><b>${parados.length}</b><small>parados há 3+ dias</small></div>
     </div>
     <div class="grade">
