@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -130,6 +130,8 @@ module.exports = async function handler(req, res) {
         case 'triagem_aplicar': return await acaoTriagemAplicar(tenant, body, res);
         case 'retomada':      return await acaoRetomada(tenant, body, res);
         case 'retomada_marcar': return await acaoRetomadaMarcar(tenant, body, res);
+        case 'remarcar_aluno': return await acaoRemarcarAluno(tenant, body, res);
+        case 'desfazer_remarcacao': return await acaoDesfazerRemarcacao(tenant, body, res);
         case 'recepcao':      return await acaoRecepcao(tenant, body, res);
         case 'checkin':       return await acaoCheckin(tenant, body, res);
         case 'feedback':      return await acaoFeedback(tenant, body, res);
@@ -861,12 +863,15 @@ function blocoKommo(diaSemana, hi, hf) {
 // ALUNOS ATIVOS — grade por turma e kit
 // ---------------------------------------------------------------------
 async function acaoAlunos(tenant, body, res) {
+  // remarcações de aula de aluno (faltou e assiste em outro dia)
+  const remarcacoes = await sb(`capta_remarcacoes?tenant_id=eq.${tenant.id}&select=id,aluno_id,data_original,turma_original,data_nova,turma_nova,hora_inicio,hora_fim,motivo,atendente&order=data_nova.desc&limit=400`).catch(() => []);
+
   const [turmas, alunos, kits] = await Promise.all([
     sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim,capacidade,limite_sala,kit_experimental,ativa&order=dia_semana,hora_inicio`),
     sb(`capta_alunos?tenant_id=eq.${tenant.id}&select=id,nome,nome_curto,kit,matricula,turma_id,lead_id,status,trancado_ate,observacao&order=nome`).catch(() => []),
     sb(`capta_kits?tenant_id=eq.${tenant.id}&select=kit,capacidade,cor`).catch(() => [])
   ]);
-  return res.status(200).json({ turmas: turmas || [], alunos: alunos || [], kits: kits || [] });
+  return res.status(200).json({ turmas: turmas || [], alunos: alunos || [], kits: kits || [], remarcacoes: remarcacoes || [] });
 }
 
 // cria / edita um aluno (nome, kit, turma, status, observação)
@@ -1859,6 +1864,44 @@ async function acaoRetomadaMarcar(tenant, body, res) {
   await sb('capta_retomadas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
     tenant_id: tenant.id, lead_id, acao, motivo: motivo || null,
     atendente: body.atendente || null, observacao: observacao || null, adiar_ate: adiar }) });
+  return res.status(200).json({ ok: true });
+}
+
+
+// ---------------------------------------------------------------------
+// REMARCAÇÃO DE AULA DE ALUNO — faltou e vai assistir em outro dia.
+// A aula da semana muda de lugar: some (esmaecida) do dia original e
+// aparece no dia novo, com a etiqueta "remarcado" nos dois.
+// ---------------------------------------------------------------------
+async function acaoRemarcarAluno(tenant, body, res) {
+  const { aluno_id, data_original, data_nova, turma_nova, hora_inicio } = body;
+  if (!aluno_id || !data_original || !data_nova) return res.status(400).json({ erro: 'Informe o aluno, o dia da aula e o novo dia.' });
+  const [al] = await sb(`capta_alunos?id=eq.${aluno_id}&tenant_id=eq.${tenant.id}&select=id,nome,nome_curto,kit,turma_id&limit=1`);
+  if (!al) return res.status(404).json({ erro: 'Aluno não encontrado.' });
+
+  let hIni = hora_inicio ? String(hora_inicio).slice(0, 5) + ':00' : null, hFim = null, turma = turma_nova || null;
+  if (turma) {
+    const [t] = await sb(`capta_turmas?id=eq.${turma}&select=hora_inicio,hora_fim&limit=1`);
+    if (t) { hIni = hIni || t.hora_inicio; hFim = t.hora_fim; }
+  }
+  if (hIni && !hFim) { const n = Number(String(hIni).slice(0, 2)); hFim = String(n + 2).padStart(2, '0') + ':00:00'; }  // aula do aluno: 2 horas
+
+  const linha = {
+    tenant_id: tenant.id, aluno_id, data_original, turma_original: al.turma_id || null,
+    data_nova, turma_nova: turma, hora_inicio: hIni, hora_fim: hFim,
+    motivo: body.motivo || null, atendente: body.atendente || null
+  };
+  // se já havia remarcação para o mesmo dia, substitui
+  await sb(`capta_remarcacoes?tenant_id=eq.${tenant.id}&aluno_id=eq.${aluno_id}&data_original=eq.${data_original}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => null);
+  const nova = await sb('capta_remarcacoes', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(linha) });
+  return res.status(200).json({ ok: true, remarcacao: nova?.[0] || null });
+}
+
+async function acaoDesfazerRemarcacao(tenant, body, res) {
+  const { id, aluno_id, data_original } = body;
+  if (id) await sb(`capta_remarcacoes?id=eq.${id}&tenant_id=eq.${tenant.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  else if (aluno_id && data_original) await sb(`capta_remarcacoes?tenant_id=eq.${tenant.id}&aluno_id=eq.${aluno_id}&data_original=eq.${data_original}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  else return res.status(400).json({ erro: 'Informe a remarcação.' });
   return res.status(200).json({ ok: true });
 }
 
