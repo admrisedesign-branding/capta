@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -126,6 +126,8 @@ module.exports = async function handler(req, res) {
         case 'repor':         return await acaoRepor(tenant, body, res);
         case 'faltas_aluno':  return await acaoFaltasAluno(tenant, body, res);
         case 'sugerir':       return await acaoSugerir(tenant, body, res);
+        case 'triagem':       return await acaoTriagem(tenant, body, res);
+        case 'triagem_aplicar': return await acaoTriagemAplicar(tenant, body, res);
         case 'recepcao':      return await acaoRecepcao(tenant, body, res);
         case 'checkin':       return await acaoCheckin(tenant, body, res);
         case 'feedback':      return await acaoFeedback(tenant, body, res);
@@ -1635,6 +1637,106 @@ Devolva SOMENTE um JSON no formato {"sugestoes":[{"titulo":"...","texto":"..."}]
     await registrarFalha(tenant.id, 'sugestao', e.message).catch(() => null);
     return res.status(200).json({ erro: e.message });
   }
+}
+
+
+// ---------------------------------------------------------------------
+// TRIAGEM — a IA lê a conversa e PROPÕE a etapa. Quem decide é a pessoa.
+// Qualificado e Aula agendada disparam evento de conversão na Meta (webhook
+// do Kommo), por isso são marcados como "um de cada vez".
+// ---------------------------------------------------------------------
+const ETAPAS_META = ['qualificado', 'aula agendada'];   // não mover em lote
+
+async function acaoTriagem(tenant, body, res) {
+  const chave = process.env.ANTHROPIC_API_KEY;
+  if (!chave) return res.status(200).json({ erro: 'Triagem ainda não está ativa nesta conta.' });
+  const limite = Math.min(Number(body.limite) || 8, 15);
+
+  const etapas = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome,tipo&order=ordem.asc`);
+  // conversas com mensagem do cliente, do lead mais parado para o mais recente
+  const convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=not.is.null&select=id,lead_id,ultima_mensagem_em&order=ultima_mensagem_em.desc&limit=120`);
+  const vistos = new Set(); const alvo = [];
+  for (const c of convs || []) {
+    if (vistos.has(c.lead_id)) continue; vistos.add(c.lead_id);
+    alvo.push(c); if (alvo.length >= limite * 3) break;
+  }
+  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${alvo.map(c => c.lead_id).join(',')})&select=id,nome,contato,temperatura,crianca,idade,etapa_id,etapa_em,notas,data_aula`);
+  const porId = Object.fromEntries((leads || []).map(l => [l.id, l]));
+
+  const saida = [];
+  for (const c of alvo) {
+    if (saida.length >= limite) break;
+    const lead = porId[c.lead_id]; if (!lead) continue;
+    const etapaAtual = (etapas || []).find(e => e.id === lead.etapa_id);
+    // não mexe em quem já é aluno ou já foi perdido de propósito
+    if (etapaAtual && ['ganha', 'perdida'].includes(etapaAtual.tipo)) continue;
+
+    const msgs = await sb(`capta_mensagens?conversa_id=eq.${c.id}&select=direcao,autor,texto,transcricao,tipo,criado_em&order=criado_em.desc&limit=30`).catch(() => []);
+    const hist = (msgs || []).reverse()
+      .map(m => `${m.direcao === 'entrada' ? 'CLIENTE' : 'ESCOLA'}: ${(m.texto || m.transcricao || '[' + (m.tipo || 'mídia') + ']').slice(0, 300)}`).join('\n');
+    if (!hist || hist.length < 30) continue;    // conversa vazia não dá para julgar
+
+    const sistema = `Você organiza o funil de uma escola de robótica infantil em Manaus, lendo conversas de WhatsApp com pais.
+Classifique em UMA etapa, seguindo exatamente estes critérios:
+- "Novo lead": ninguém da escola respondeu ainda.
+- "Em contato": a escola já respondeu, mas ainda não se sabe nome e idade da criança nem houve conversa sobre horário/valor.
+- "Qualificado": sabe-se NOME e IDADE da criança E a família falou sobre horário ou valor. Interesse real, falta marcar a aula.
+- "Aula agendada": há dia e hora combinados na conversa.
+- "Matrícula em andamento": já fez a aula experimental e falou em fechar/pagar.
+- "Remarketing": disse que não pode agora, vai pensar, achou caro, horário não bate — mas pode voltar.
+- "Perdido": sem interesse, idade fora da faixa, pediu para não receber mais, ou sumiu há muito tempo depois de várias tentativas.
+Na dúvida entre duas, escolha a MENOS avançada. Responda SOMENTE com JSON:
+{"etapa":"<nome exato>","motivo":"<até 15 palavras citando o que na conversa indica isso>","confianca":"alta|media|baixa","crianca":"<nome ou null>","idade":<número ou null>}`;
+
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', headers: { 'x-api-key': chave, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, system: sistema,
+          messages: [{ role: 'user', content: `Etapa atual: ${etapaAtual?.nome || 'nenhuma'}\nCriança conhecida: ${lead.crianca || 'não'}${lead.idade ? ', ' + lead.idade + ' anos' : ''}\n\nCONVERSA\n${hist}` }] })
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error.message);
+      const txt = (j.content || []).filter(x => x.type === 'text').map(x => x.text).join('').trim();
+      const p = JSON.parse(txt.replace(/```json|```/g, '').trim());
+      const destino = (etapas || []).find(e => e.nome.toLowerCase().trim() === String(p.etapa || '').toLowerCase().trim());
+      if (!destino || destino.id === lead.etapa_id) continue;   // já está certo
+      saida.push({
+        lead_id: lead.id, nome: lead.nome, contato: lead.contato,
+        etapa_atual: etapaAtual?.nome || null, etapa_atual_id: lead.etapa_id || null,
+        etapa_nova: destino.nome, etapa_nova_id: destino.id,
+        motivo: p.motivo || '', confianca: p.confianca || 'media',
+        crianca: p.crianca || null, idade: p.idade || null,
+        avisa_meta: ETAPAS_META.includes(destino.nome.toLowerCase().trim()),
+        conversa_id: c.id
+      });
+    } catch (e) { /* uma conversa que falha não derruba a triagem */ }
+  }
+  return res.status(200).json({ sugestoes: saida, restantes: Math.max(0, vistos.size - saida.length) });
+}
+
+async function acaoTriagemAplicar(tenant, body, res) {
+  const itens = Array.isArray(body.itens) ? body.itens.slice(0, 30) : [];
+  if (!itens.length) return res.status(400).json({ erro: 'Nada para aplicar.' });
+  const etapas = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome`);
+  const feitos = [], falhas = [];
+  for (const it of itens) {
+    const destino = (etapas || []).find(e => e.id === it.etapa_nova_id);
+    if (!destino) { falhas.push({ lead_id: it.lead_id, erro: 'etapa não encontrada' }); continue; }
+    // trava: as duas etapas que disparam evento de conversão exigem confirmação individual
+    if (ETAPAS_META.includes(destino.nome.toLowerCase().trim()) && !it.confirmado_individual) {
+      falhas.push({ lead_id: it.lead_id, erro: 'esta etapa precisa ser confirmada uma a uma' }); continue;
+    }
+    try {
+      await moverLead(tenant.id, it.lead_id, destino.id, it.motivo || 'triagem');
+      await empurrarKommo(tenant.id, it.lead_id, destino.id, it.motivo || null).catch(() => null);
+      if (it.crianca || it.idade) {
+        await sb(`capta_leads?id=eq.${it.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ ...(it.crianca ? { crianca: it.crianca } : {}), ...(it.idade ? { idade: it.idade } : {}) }) }).catch(() => null);
+      }
+      feitos.push(it.lead_id);
+    } catch (e) { falhas.push({ lead_id: it.lead_id, erro: e.message }); }
+  }
+  return res.status(200).json({ movidos: feitos.length, falhas });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
