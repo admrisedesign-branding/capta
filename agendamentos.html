@@ -353,6 +353,21 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .minix.lost{background:var(--quente-bg);border-color:rgba(224,49,39,.3)}.minix.lost b,.minix.lost span{color:#9d2d24}
 .minix.hold{background:var(--morno-bg);border-color:rgba(224,147,15,.35)}.minix.hold b,.minix.hold span{color:#8a5a06}
 .minix.gone{opacity:.7}
+
+/* aula de aluno remarcada */
+.tg-rem{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;background:rgba(124,92,219,.14);
+  color:#5B3FBF;border-radius:99px;padding:1px 6px;margin-left:5px;white-space:nowrap}
+.tg-rem.forte{background:#7C5CDB;color:#fff}
+.al.saiu,.pill.saiu{opacity:.4;text-decoration:line-through}
+.al.saiu .tg-rem,.pill.saiu small{text-decoration:none;opacity:1}
+.al-linha{display:flex;align-items:center;gap:6px}
+.al-linha .al{flex:1;min-width:0}
+.al-linha.saiu .bt-rem{color:#5B3FBF}
+.bt-rem{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:2px 7px;font-size:10.5px;
+  font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;opacity:0;transition:.12s}
+.al-linha:hover .bt-rem{opacity:1}
+.bt-rem:hover{border-color:#7C5CDB;color:#5B3FBF}
+.dcell .lin.rm{color:#5B3FBF}.dcell .lin.rm b{color:#5B3FBF}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -522,7 +537,7 @@ function horasLivres(d, t){
 function vDia(d){
   const ts = turmasDo(d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
   const out = ts.map(t => {
-    const als = alunosDa(t).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome));
+    const als = alunosNoDia(t, d).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome));
     const ini = hN(t.hora_inicio), fim = hN(t.hora_fim);
     const horas = []; for (let x = ini; x < fim; x++) horas.push(x);
     const expDoBloco = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) >= ini && hN(a.hora_inicio) < fim);
@@ -551,8 +566,12 @@ function vDia(d){
         <span class="bd-sub"><b style="color:var(--ink)">${als.length + expDoBloco.length}</b>/${sala} na sala</span></div>
       <div class="bd-corpo">
         ${TIPO === 'experimental' ? '' : `<div class="bd-col">
-          <div class="bd-tit azul">Matriculados · ${als.length}</div>
-          ${als.map(a => `<div class="al" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)}${a.kit?' · '+esc(a.kit):''}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('') || '<div class="al" style="cursor:default;color:var(--faint)">ninguém nesta turma</div>'}
+          <div class="bd-tit azul">Matriculados · ${als.filter(a=>!a._rem).length}${als.filter(a=>a._rem).length?` <span class="tg-rem">${als.filter(a=>a._rem).length} remarcado${als.filter(a=>a._rem).length>1?'s':''}</span>`:''}</div>
+          ${als.map(a => `<div class="al-linha ${a._rem?'saiu':''}">
+            <div class="al" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)}${a.kit?' · '+esc(a.kit):''}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span>${tagRem(a)}</div>
+            ${a._rem ? `<button class="bt-rem" onclick="desfazerRemarcacao('${a._rem.id}')" title="desfazer">desfazer</button>`
+              : a._veio ? '' : `<button class="bt-rem" onclick="remarcarAluno('${a.id}','${d}')" title="marcar a aula desta semana para outro dia">remarcar</button>`}
+          </div>`).join('') || '<div class="al" style="cursor:default;color:var(--faint)">ninguém nesta turma</div>'}
           <div class="kits">${(D.kits||[]).map(k => { const u = porKit[k.kit]||0, liv = k.capacidade - u;
             return `<span class="kt ${liv<=0?'cheio':liv<=2?'alerta':''}" title="${esc(k.kit)}: ${u} de ${k.capacidade}">${esc(k.kit.replace('App Developer','App').replace('Bot',''))} ${u}/${k.capacidade}</span>`; }).join('')}</div>
         </div>`}
@@ -614,6 +633,75 @@ function expBloco(list, h){
 
 // Semana em grade: linha = bloco de horário, coluna = dia. Dentro da célula,
 // cada criança é um "assento": azul = matriculado, laranja = experimental, roxo = reposição.
+
+// ---- aula de aluno remarcada: sai do dia original, entra no novo ----
+const REMS = () => D.remarcacoes || [];
+const remDoDia = (alunoId, data) => REMS().find(r => r.aluno_id === alunoId && r.data_original === data);
+const vindosPara = (data, turmaId) => REMS().filter(r => r.data_nova === data && (!turmaId || !r.turma_nova || r.turma_nova === turmaId));
+const alunoDe = id => (D.alunos || []).find(a => a.id === id) || {};
+
+// lista de alunos de uma turma num dia: tira quem remarcou, põe quem vem de outro dia
+function alunosNoDia(t, d){
+  const base = alunosDa(t).map(a => ({ ...a, _rem: remDoDia(a.id, d) }));
+  const extras = vindosPara(d, t.id)
+    .filter(r => { const a = alunoDe(r.aluno_id); return a.id && a.turma_id !== t.id || (r.turma_nova === t.id); })
+    .filter(r => !r.hora_inicio || hh(r.hora_inicio) === hh(t.hora_inicio))
+    .map(r => ({ ...alunoDe(r.aluno_id), _veio: r }));
+  return [...base, ...extras];
+}
+function tagRem(a){
+  if (a._rem) return `<span class="tg-rem" title="remarcou para ${fmt(a._rem.data_nova,{day:'2-digit',month:'2-digit'})}">remarcado</span>`;
+  if (a._veio) return `<span class="tg-rem forte" title="veio da aula de ${fmt(a._veio.data_original,{day:'2-digit',month:'2-digit'})}">remarcado</span>`;
+  return '';
+}
+
+// diálogo: escolher dia e horário da remarcação
+let REMEX = null;
+// próxima data da turma a partir de hoje
+function proximaAulaDo(t){
+  for (let i = 0; i < 14; i++) { const d = addDias(hoje, i); if (dow(d) === t.dia_semana) return d; }
+  return hoje;
+}
+function remarcarAluno(alunoId, dataOriginal){
+  const a = alunoDe(alunoId); if (!a.id) return;
+  REMEX = { aluno: a, data_original: dataOriginal, data: '', turma: '' };
+  desenharRemarcar();
+}
+function desenharRemarcar(){
+  const a = REMEX.aluno;
+  const opts = (D.turmas||[]).filter(t => t.ativa !== false && (!REMEX.data || t.dia_semana === dow(REMEX.data)))
+    .sort((x,y)=>String(x.hora_inicio).localeCompare(String(y.hora_inicio)));
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela" style="max-width:470px">
+    <h3>Remarcar aula de ${esc(a.nome_curto || a.nome)}</h3>
+    <p>Aula de ${fmt(REMEX.data_original,{day:'2-digit',month:'2-digit'})} — escolha para quando vai.</p>
+    <div class="l2">
+      <div class="campo"><label>Novo dia</label><input id="rm-d" type="date" value="${REMEX.data}" min="${hoje}" onchange="REMEX.data=this.value;REMEX.turma='';desenharRemarcar()"></div>
+      <div class="campo"><label>Horário</label><select id="rm-t" ${REMEX.data?'':'disabled'} onchange="REMEX.turma=this.value">
+        ${!REMEX.data ? '<option>escolha o dia</option>' : !opts.length ? '<option>sem turma nesse dia</option>'
+          : ['<option value="">escolha…</option>', ...opts.map(t => `<option value="${t.id}" ${REMEX.turma===t.id?'selected':''}>${hh(t.hora_inicio)}–${hh(t.hora_fim)}</option>`)].join('')}
+      </select></div>
+    </div>
+    <div class="campo"><label>Motivo (opcional)</label><input id="rm-m" placeholder="faltou, viagem, consulta…"></div>
+    <div class="fim"><button class="btn g" onclick="fecharModal()">Cancelar</button>
+      <button class="btn" onclick="confirmarRemarcar()" ${REMEX.data&&REMEX.turma?'':'disabled'}>Remarcar</button></div>
+  </div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
+}
+async function confirmarRemarcar(){
+  const motivo = (document.getElementById('rm-m')||{}).value || null;
+  try {
+    await api('remarcar_aluno', { aluno_id: REMEX.aluno.id, data_original: REMEX.data_original,
+      data_nova: REMEX.data, turma_nova: REMEX.turma, motivo,
+      atendente: (window.CaptaUser&&CaptaUser.nome())||undefined });
+    fecharModal(); toast(`Aula remarcada para ${fmt(REMEX.data,{day:'2-digit',month:'2-digit'})}`, { tipo:'ok' });
+    await carregar();
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function desfazerRemarcacao(id){
+  try { await api('desfazer_remarcacao', { id }); toast('Remarcação desfeita'); await carregar(); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
 function vSemanaGrade(){
   const seg = segunda(SEL), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
   const horas = [...new Set([
@@ -647,11 +735,13 @@ function vSemanaGrade(){
         const dentro = horas.filter(x => x >= ini && x < fim);
         if (!dentro.length) return;
         dentro.forEach(x => cobertas.add(x));
-        const als = alunosDa(t).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome));
+        const als = alunosNoDia(t, d).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome));
+        const nPresentes = als.filter(a => !a._rem).length;
+        const nRem = als.filter(a => a._rem).length;
         const l1 = linhaDe(dentro[0]), span = dentro.length;
         h += `<div class="turma-box${passou}" style="grid-column:${colAluno(j)};grid-row:${l1}/span ${span}">
-          <div class="tb-cab"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)}</b><span>${als.length}/${t.limite_sala||18} na sala</span></div>
-          <div class="tb-alunos">${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('') || '<span class="tb-vazio">sem alunos</span>'}</div>
+          <div class="tb-cab"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)}</b><span>${nPresentes}/${t.limite_sala||18} na sala</span>${nRem?`<span class="tg-rem">${nRem} remarcado${nRem>1?'s':''}</span>`:''}</div>
+          <div class="tb-alunos">${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''} ${a._rem?'saiu':''}" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span>${tagRem(a)}</div>`).join('') || '<span class="tb-vazio">sem alunos</span>'}</div>
         </div>`;
       });
       // horas do dia sem turma: célula apagada, só pra manter o desenho
@@ -702,7 +792,8 @@ function vMes(){
   const dias = []; for (let d = ini; d <= addDias(fim, 6 - (dow(fim)||7)); d = addDias(d, 1)) if (dow(d) !== 0) dias.push(d);
   return `<div class="scrollx"><div class="mes">${DIAS3.slice(1).map(n=>`<div class="hd">${n}</div>`).join('')}${dias.map(d => {
     const ts = turmasDo(d);
-    const nAl = ts.reduce((s,t)=>s+alunosDa(t).length,0);
+    const nAl = ts.reduce((s,t)=>s+alunosNoDia(t,d).filter(a=>!a._rem).length,0);
+    const nRem = ts.reduce((s,t)=>s+alunosNoDia(t,d).filter(a=>a._rem).length,0);
     const nEx = EXP.filter(a => a.data === d && ehExp(a) && viva(a)).length;
     const nRe = EXP.filter(a => a.data === d && ehRep(a) && viva(a)).length;
     const semKit = ts.filter(t => { const v = vagasHora(d, hN(t.hora_inicio)); return v && v.n <= 0; }).length;
@@ -712,6 +803,7 @@ function vMes(){
       <div class="n" onclick="irDia('${d}')" style="cursor:pointer" title="abrir o dia">${new Date(d+'T12:00').getDate()}</div>
       <div class="i">
         ${mostra && nAl ? `<div class="lin" onclick="quemNoDia('${d}','alunos')"><b>${nAl}</b> aluno${nAl>1?'s':''}</div>` : ''}
+        ${mostra && nRem ? `<div class="lin rm" onclick="quemNoDia('${d}','alunos')"><b>${nRem}</b> remarcado${nRem>1?'s':''}</div>` : ''}
         ${TIPO !== 'alunos' && nEx ? `<div class="lin e" onclick="quemNoDia('${d}','exp')"><b>${nEx}</b> experimental${nEx>1?'is':''}</div>` : ''}
         ${mostra && nRe ? `<div class="lin r" onclick="quemNoDia('${d}','rep')"><b>${nRe}</b> reposiç${nRe>1?'ões':'ão'}</div>` : ''}
         ${!nAl && !nEx && !nRe ? `<span style="color:var(--faint)">${ts.length ? 'sem ninguém' : 'fechado'}</span>` : ''}
@@ -724,9 +816,9 @@ function quemNoDia(d, tipo){
   let titulo = '', corpo = '';
   if (tipo === 'alunos') {
     titulo = `Alunos em aula · ${DIAS[dow(d)]} ${fmt(d,{day:'2-digit',month:'2-digit'})}`;
-    corpo = ts.map(t => { const als = alunosDa(t); if (!als.length) return '';
+    corpo = ts.map(t => { const als = alunosNoDia(t, d); if (!als.length) return '';
       return `<div style="margin-bottom:12px"><div style="font-size:11.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${hh(t.hora_inicio)}–${hh(t.hora_fim)} · ${als.length}</div>
-        <div class="pills">${als.map(a => `<span class="pill cont" onclick="fecharModal();abrirAluno('${a.id}')">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('')}</div></div>`; }).join('') || '<p>Ninguém neste dia.</p>';
+        <div class="pills">${als.map(a => `<span class="pill cont ${a._rem?'saiu':''}" onclick="fecharModal();abrirAluno('${a.id}')">${esc(a.nome_curto||a.nome)}<small>${a._rem?'remarcado':a._veio?'remarcado ↗':KITCUR(a.kit)}</small></span>`).join('')}</div></div>`; }).join('') || '<p>Ninguém neste dia.</p>';
   } else {
     const lista = EXP.filter(a => a.data === d && viva(a) && (tipo === 'exp' ? ehExp(a) : ehRep(a)))
       .sort((a,b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
@@ -979,6 +1071,9 @@ function desenharAluno(){
     <p>${al.kit ? esc(al.kit) : ''}${t ? ` · ${DIAS[t.dia_semana]} ${hh(t.hora_inicio)}–${hh(t.hora_fim)}` : ' · sem turma'}${al.matricula ? ` · matrícula ${esc(al.matricula)}` : ''}</p>
     ${al.status !== 'ativo' ? `<p style="color:var(--morno);font-weight:700">${esc(al.status)}${al.trancado_ate ? ' até ' + new Date(al.trancado_ate+'T12:00').toLocaleDateString('pt-BR') : ''}</p>` : ''}
     ${!d ? '<p style="margin-top:14px">Carregando faltas…</p>' : `
+      <div class="sec" style="font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px">Aula da semana</div>
+      <div class="falta"><b>${t ? DIAS[t.dia_semana] : 'sem turma'} ${t ? hh(t.hora_inicio)+'–'+hh(t.hora_fim) : ''}</b>
+        ${t ? `<button class="btn g sm" onclick="fecharModal();remarcarAluno('${al.id}','${proximaAulaDo(t)}')">remarcar esta semana</button>` : ''}</div>
       <div class="sec" style="font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px">Faltas recentes</div>
       ${faltas.length ? faltas.slice(0,4).map(f => `<div class="falta"><b>${DIAS3[dow(f.data)]} ${fmt(f.data,{day:'2-digit',month:'2-digit'})}</b><span style="color:var(--muted)">${hh(f.hora_inicio)}</span>
         <button class="btn sm" onclick="escolherReposicao('${f.data}')">repor esta</button></div>`).join('')
