@@ -148,33 +148,6 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .falta b{font-weight:700}.falta button{margin-left:auto}
 .vg.rep{background:#F6F3FF;border-color:#D6CCFF}
 
-/* ---- grade de assentos: azul = matriculado, laranja = experimental ---- */
-.gradeq{display:grid;grid-template-columns:92px repeat(6,1fr);gap:8px;min-width:1040px}
-.gradeq .hd{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:2px 4px;text-align:center}
-.gradeq .hora-lb{font-size:12.5px;font-weight:800;color:var(--muted);display:flex;flex-direction:column;align-items:flex-end;justify-content:center;padding-right:8px;text-align:right;line-height:1.3}
-.cel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 11px;min-height:96px;display:flex;flex-direction:column;gap:7px}
-.cel.vaga{background:transparent;border-style:dashed;align-items:center;justify-content:center;color:var(--faint);font-size:12px;font-weight:600;min-height:56px}
-.cel.temexp{border-color:#F3D3C4}
-.cel .topo{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);font-weight:700}
-.cel .topo b{color:var(--ink);font-size:12.5px}
-.cap{font-size:11px;font-weight:800;color:var(--muted);background:var(--line-2);border-radius:99px;padding:2px 8px;white-space:nowrap}
-.cel .cap{margin-left:auto}
-.cap.alerta{background:var(--morno-bg);color:var(--morno)}
-.cap.cheio{background:var(--quente-bg);color:var(--quente)}
-.assentos{display:flex;flex-wrap:wrap;gap:5px}
-.as{display:inline-flex;align-items:baseline;gap:5px;border-radius:9px;padding:5px 9px;font-size:12.5px;font-weight:700;line-height:1.2;cursor:pointer;border:1px solid transparent;max-width:100%}
-.as small{font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;opacity:.7}
-.as.aluno{background:var(--brand-soft);color:var(--brand);border-color:rgba(46,91,255,.18)}
-.as.aluno:hover{background:rgba(46,91,255,.18)}
-.as.exp{background:var(--exp-bg);color:#B8522F;border-color:#F3D3C4}
-.as.exp:hover{background:#FBE2D5}
-.as.rep{background:#EFEAFF;color:#5B3FBF;border-color:#D9CEFF}
-.as.livre{background:transparent;border:1px dashed var(--line);color:var(--faint);font-weight:600}
-.as.livre:hover{border-color:var(--brand);color:var(--brand)}
-.cel .div{height:1px;background:var(--line-2);width:100%;margin:1px 0}
-.legenda-q{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:14px}
-.legenda-q span{display:flex;align-items:center;gap:7px}
-.legenda-q i{width:12px;height:12px;border-radius:4px;display:inline-block}
 /* ---- dia: matriculados de um lado, visitas do outro ---- */
 .bloco-dia{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
 .bd-cab{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
@@ -187,6 +160,40 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .bd-tit{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;padding-left:9px;border-left:3px solid}
 .bd-tit.azul{color:var(--brand);border-color:var(--brand-2)}
 .bd-tit.laranja{color:#B8522F;border-color:var(--exp)}
+.grade{display:grid;grid-template-columns:80px repeat(6,1fr);gap:8px;min-width:820px}
+.gh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);padding:4px 6px}
+.gb{font-size:12px;font-weight:700;color:var(--muted);padding:10px 6px}
+.cel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;min-height:64px}
+.cel.vazia{background:var(--card);border-style:dashed;display:grid;place-items:center;color:var(--faint);font-size:12px;font-weight:600}
+.cel .t{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--faint);margin-bottom:6px}
+.cel .t b{color:var(--ink)}
+.al{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 4px;border-radius:7px;cursor:pointer}
+.al:hover{background:var(--line-2)}
+.al .k{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.al .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.al.tr{opacity:.55}.al.tr .n{text-decoration:line-through}
+.kits{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.kt{font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:var(--line-2);color:var(--muted)}
+.kt.cheio{background:rgba(224,49,39,.12);color:var(--quente)}
+.kt.alerta{background:rgba(224,147,15,.14);color:var(--morno)}
+.legenda{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0 0;font-size:12px;color:var(--muted)}
+.legenda span{display:inline-flex;align-items:center;gap:5px}
+
+
+/* experimental e reposição dentro da mesma célula */
+.cel .sep{height:1px;background:var(--line-2);margin:7px 0}
+.al.exp{background:var(--exp-bg);color:#B8522F;font-weight:700}
+.al.exp:hover{background:#FBE2D5}
+.al.exp .k{background:var(--exp)}
+.al.rep{background:#EFEAFF;color:#5B3FBF;font-weight:700}
+.al.rep .k{background:#7C5CDB}
+.al .hr{margin-left:auto;font-size:10.5px;font-weight:700;opacity:.7}
+.cel.temexp{border-color:#F3D3C4}
+.al.mais{color:var(--brand);font-weight:700;justify-content:center;border:1px dashed var(--line);margin-top:4px}
+.al.mais:hover{border-color:var(--brand);background:var(--brand-softer)}
+.cel .t .cap{font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:99px;background:var(--line-2);color:var(--muted)}
+.cel .t .cap.alerta{background:var(--morno-bg);color:var(--morno)}
+.cel .t .cap.cheio{background:var(--quente-bg);color:var(--quente)}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -255,6 +262,7 @@ const dow = d => new Date(d + 'T12:00:00').getDay();
 const hh = t => String(t||'').slice(0,5);
 const hN = t => parseInt(String(t||'0').slice(0,2), 10);
 const fmt = (d, o) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', o);
+const corKit = k => (D.kits.find(x => x.kit === k) || {}).cor || '#9AA1B4';
 const KITCUR = k => (k||'').replace('App Developer','APP').replace('Bot','').toUpperCase();
 
 let MODO = 'semana', SEL = hoje, D = { turmas: [], alunos: [], kits: [] }, EXP = [], LEADS = [], VAGAS = [], carregadoDe = null, carregadoAte = null;
@@ -314,33 +322,36 @@ function lado(){
 
 function vDia(d){
   const ts = turmasDo(d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
-  const blocos = ts.map(t => {
-    const als = alunosDa(t);
+  const out = ts.map(t => {
+    const als = alunosDa(t).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome));
     const exps = EXP.filter(a => a.data === d && viva(a) && hh(a.hora_inicio) >= hh(t.hora_inicio) && hh(a.hora_inicio) < hh(t.hora_fim));
     const expV = TIPO === 'alunos' ? exps.filter(ehRep) : TIPO === 'experimental' ? exps.filter(ehExp) : exps;
     if (TIPO === 'experimental' && !expV.length) return '';
+    const porKit = {}; als.forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);
     const v = vagasHora(d, hN(t.hora_inicio));
     const cls = !v ? '' : v.n <= 0 ? 'cheio' : v.n <= 2 ? 'alerta' : '';
-    const porKit = {}; als.forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);
+    const sala = t.limite_sala || 18;
     return `<div class="bloco-dia">
       <div class="bd-cab"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)}</b>
-        <span class="bd-sub">${als.length} matriculado${als.length===1?'':'s'}${expV.length?` · ${expV.length} visita${expV.length>1?'s':''}`:''}</span>
-        ${v ? `<span class="cap ${cls}" title="kits First livres para aula experimental nesta hora">${v.n}${v.cap ? '/' + v.cap : ''} kit${v.n===1?'':'s'} livre${v.n===1?'':'s'}</span>` : ''}</div>
+        <span class="bd-sub"><b style="color:var(--ink)">${als.length + expV.length}</b>/${sala} na sala</span>
+        ${v ? `<span class="cap ${cls}">${v.n}${v.cap?'/'+v.cap:''} kit${v.n===1?'':'s'} livre${v.n===1?'':'s'} p/ experimental</span>` : ''}</div>
       <div class="bd-corpo">
         ${TIPO === 'experimental' ? '' : `<div class="bd-col">
-          <div class="bd-tit azul">Matriculados${Object.keys(porKit).length?` · ${Object.entries(porKit).map(([k,n]) => KITCUR(k)+' '+n).join(' · ')}`:''}</div>
-          <div class="assentos">${als.map(a => `<span class="as aluno" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)}">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('') || '<span class="as livre" style="cursor:default">ninguém</span>'}</div>
+          <div class="bd-tit azul">Matriculados · ${als.length}</div>
+          ${als.map(a => `<div class="al" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('') || '<div class="al" style="cursor:default;color:var(--faint)">ninguém nesta turma</div>'}
+          <div class="kits">${(D.kits||[]).map(k => { const u = porKit[k.kit]||0, liv = k.capacidade - u;
+            return `<span class="kt ${liv<=0?'cheio':liv<=2?'alerta':''}" title="${esc(k.kit)}: ${u} de ${k.capacidade}">${esc(k.kit.replace('App Developer','App').replace('Bot',''))} ${u}/${k.capacidade}</span>`; }).join('')}</div>
         </div>`}
         <div class="bd-col" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hN(t.hora_inicio)})">
-          <div class="bd-tit laranja">Aula experimental e reposição${v && v.n > 0 ? ` · ${v.n} kit${v.n>1?'s':''} livre${v.n>1?'s':''}` : ''}</div>
+          <div class="bd-tit laranja">Aula experimental e reposição · ${expV.length}</div>
           ${expV.filter(ehExp).map(cartao).join('')}
-          ${expV.filter(ehRep).length ? `<div class="assentos" style="margin-top:6px">${expV.filter(ehRep).map(r => { const al = (D.alunos||[]).find(x => x.id === r.aluno_id) || {};
-            return `<span class="as rep" onclick="abrirAluno('${r.aluno_id}')">${esc(r.crianca_nome || al.nome || '')}<small>reposição ${hh(r.hora_inicio)}</small></span>`; }).join('')}</div>` : ''}
-          ${!expV.length ? `<span class="as livre" onclick="novoAgendamento()">+ marcar aula experimental</span>` : ''}
+          ${expV.filter(ehRep).map(r => { const alu = (D.alunos||[]).find(x => x.id === r.aluno_id) || {};
+            return `<div class="al rep" onclick="abrirAluno('${r.aluno_id}')"><span class="k"></span><span class="n">${esc(r.crianca_nome||alu.nome||'')}</span><span class="hr">reposição ${hh(r.hora_inicio)}</span></div>`; }).join('')}
+          ${!expV.length ? `<div class="al mais" onclick="novoAgendamento()">+ marcar aula experimental</div>` : ''}
         </div>
       </div></div>`;
   }).filter(Boolean).join('');
-  return blocos || `<div class="vazio">Nada marcado neste dia.<br><button class="btn" style="margin-top:12px" onclick="novoAgendamento()">+ Novo agendamento</button></div>`;
+  return out || `<div class="vazio">Nada marcado neste dia.<br><button class="btn" style="margin-top:12px" onclick="novoAgendamento()">+ Novo agendamento</button></div>`;
 }
 function expBloco(list, h){
   if (!list.length) return '';
@@ -359,41 +370,43 @@ function expBloco(list, h){
 // cada criança é um "assento": azul = matriculado, laranja = experimental, roxo = reposição.
 function vSemanaGrade(){
   const seg = segunda(SEL), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
-  // blocos existentes na semana (hora_inicio–hora_fim das turmas)
   const blocos = [...new Set((D.turmas||[]).filter(t => t.ativa !== false)
     .map(t => `${hh(t.hora_inicio)}|${hh(t.hora_fim)}`))].sort();
-  const cel = (d, bloco) => {
-    const [ini, fim] = bloco.split('|');
-    const t = (D.turmas||[]).find(x => x.dia_semana === dow(d) && hh(x.hora_inicio) === ini && x.ativa !== false);
-    const exps = EXP.filter(a => a.data === d && viva(a) && hh(a.hora_inicio) >= ini && hh(a.hora_inicio) < fim);
-    const alunos = t ? alunosDa(t) : [];
-    const expV = TIPO === 'alunos' ? exps.filter(ehRep) : TIPO === 'experimental' ? exps.filter(ehExp) : exps;
-    if (!t && !expV.length) return `<div class="cel vaga">—</div>`;
-    const v = t ? vagasHora(d, hN(t.hora_inicio)) : null;
-    const livres = v ? v.n : null;
-    const cls = livres === null ? '' : livres <= 0 ? 'cheio' : livres <= 2 ? 'alerta' : '';
-    return `<div class="cel ${expV.length?'temexp':''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${t?hN(t.hora_inicio):'null'})">
-      <div class="topo"><b>${ini}</b>–${fim}
-        ${livres !== null ? `<span class="cap ${cls}" title="kits First livres para aula experimental nesta hora">${livres}${v.cap ? '/' + v.cap : ''} livre${livres===1?'':'s'}</span>` : ''}</div>
-      <div class="assentos">
-        ${alunos.map(a => `<span class="as aluno" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}">${esc((a.nome_curto||a.nome).split(' ')[0])}<small>${KITCUR(a.kit)}</small></span>`).join('')}
-        ${alunos.length && expV.length ? '<div class="div" style="width:100%"></div>' : ''}
-        ${expV.map(a => { const l = leadDe(a); const al = (D.alunos||[]).find(x => x.id === a.aluno_id) || {};
+  let h = `<div class="scrollx"><div class="grade"><div></div>${dias.map(d => `<div class="gh" style="${d===hoje?'color:var(--brand)':''}">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}</div>`).join('')}`;
+  for (const b of blocos) {
+    const [hi, hf] = b.split('|');
+    h += `<div class="gb">${hi} – ${hf}</div>`;
+    for (const d of dias) {
+      const t = (D.turmas||[]).find(x => x.dia_semana === dow(d) && hh(x.hora_inicio) === hi && x.ativa !== false);
+      const exps = EXP.filter(a => a.data === d && viva(a) && hh(a.hora_inicio) >= hi && hh(a.hora_inicio) < hf);
+      const expV = TIPO === 'alunos' ? exps.filter(ehRep) : TIPO === 'experimental' ? exps.filter(ehExp) : exps;
+      if (!t && !expV.length) { h += `<div class="cel vazia">horário vago</div>`; continue; }
+      const als = t ? alunosDa(t).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome)) : [];
+      const porKit = {}; als.forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);
+      const sala = t ? (t.limite_sala || 18) : 18;
+      const v = t ? vagasHora(d, hN(t.hora_inicio)) : null;
+      const cls = !v ? '' : v.n <= 0 ? 'cheio' : v.n <= 2 ? 'alerta' : '';
+      h += `<div class="cel ${expV.length?'temexp':''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${t?hN(t.hora_inicio):'null'})">
+        <div class="t"><span><b>${als.length + expV.length}</b>/${sala} na sala</span>
+          ${v ? `<span class="cap ${cls}" title="kits ${esc(v.t && v.t.kit_experimental || 'First')} livres para aula experimental">${v.n}${v.cap?'/'+v.cap:''} livre${v.n===1?'':'s'}</span>` : ''}</div>
+        ${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('')}
+        ${als.length && expV.length ? '<div class="sep"></div>' : ''}
+        ${expV.map(a => { const l = leadDe(a); const alu = (D.alunos||[]).find(x => x.id === a.aluno_id) || {};
           return ehRep(a)
-            ? `<span class="as rep" onclick="abrirAluno('${a.aluno_id}')" title="reposição">${esc((a.crianca_nome||al.nome||'').split(' ')[0])}<small>rep</small></span>`
-            : `<span class="as exp" onclick="irDia('${d}')" title="${esc(l.nome||'')} · ${hh(a.hora_inicio)}">${esc((a.crianca_nome||l.nome||'visita').split(' ')[0])}<small>${hh(a.hora_inicio)}</small></span>`; }).join('')}
-        ${livres > 0 && TIPO !== 'alunos' ? `<span class="as livre" onclick="novoAgendamento()" title="marcar aula experimental aqui">+ ${livres}</span>` : ''}
-      </div></div>`;
-  };
-  return `<div class="scrollx"><div class="gradeq">
-    <div class="hd"></div>${dias.map(d => `<div class="hd" style="${d===hoje?'color:var(--brand)':''}">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}</div>`).join('')}
-    ${blocos.map(b => `<div class="hora-lb">${b.split('|')[0]}<br><span style="font-weight:600;color:var(--faint)">${b.split('|')[1]}</span></div>
-      ${dias.map(d => cel(d, b)).join('')}`).join('')}
-  </div></div>
-  <div class="legenda-q"><span><i style="background:var(--brand-soft);border:1px solid rgba(46,91,255,.3)"></i>aluno matriculado</span>
-    <span><i style="background:var(--exp-bg);border:1px solid #F3D3C4"></i>aula experimental (1h)</span>
-    <span><i style="background:#EFEAFF;border:1px solid #D9CEFF"></i>reposição</span>
-    <span><i style="border:1px dashed var(--line)"></i>kit livre para experimental</span></div>`;
+            ? `<div class="al rep" onclick="abrirAluno('${a.aluno_id}')" title="reposição de ${esc(alu.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||alu.nome||'')}</span><span class="hr">rep ${hh(a.hora_inicio)}</span></div>`
+            : `<div class="al exp" onclick="irDia('${d}')" title="aula experimental · ${esc(l.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||l.nome||'visita')}</span><span class="hr">${hh(a.hora_inicio)}</span></div>`; }).join('')}
+        ${v && v.n > 0 && TIPO !== 'alunos' ? `<div class="al mais" onclick="novoAgendamento()">+ marcar experimental</div>` : ''}
+        <div class="kits">${(D.kits||[]).map(k => { const u = porKit[k.kit]||0, liv = k.capacidade - u;
+          return `<span class="kt ${liv<=0?'cheio':liv<=2?'alerta':''}" title="${esc(k.kit)}: ${u} de ${k.capacidade} kits em uso">${esc(k.kit.replace('App Developer','App').replace('Bot',''))} ${u}/${k.capacidade}</span>`; }).join('')}</div>
+      </div>`;
+    }
+  }
+  h += `</div></div>
+  <div class="legenda"><span><span class="k" style="width:9px;height:9px;border-radius:50%;background:var(--brand-2);display:inline-block"></span>aluno matriculado</span>
+    <span><span style="width:9px;height:9px;border-radius:50%;background:var(--exp);display:inline-block"></span>aula experimental (1h)</span>
+    <span><span style="width:9px;height:9px;border-radius:50%;background:#7C5CDB;display:inline-block"></span>reposição</span>
+    <span>kits: em uso / total do bloco — laranja quando restam 2, vermelho quando lota</span></div>`;
+  return h;
 }
 
 function vSemana(){
