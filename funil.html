@@ -149,6 +149,18 @@ body.embed .topbar{display:none}
 .sg-acs button:hover{border-color:var(--brand);color:var(--brand)}
 .sg-acs .sg-ind{background:var(--morno);border-color:var(--morno);color:#fff}
 .sg-acs .sg-ind:hover{color:#fff;opacity:.9}
+
+/* barras do topo presas: só o kanban rola na horizontal */
+.raia-area{position:relative}
+.filtros-bar,.org-topo,.org-aviso{position:sticky;left:0;width:100%;max-width:calc(100vw - 120px);box-sizing:border-box}
+body.embed .filtros-bar,body.embed .org-topo,body.embed .org-aviso{max-width:calc(100vw - 130px)}
+.filtros-bar{top:0;z-index:6;background:var(--bg);padding:10px 0 8px}
+.org-topo{top:52px;z-index:5}
+.org-aviso{top:106px;z-index:4}
+@media(max-width:760px){
+  .filtros-bar,.org-topo,.org-aviso{max-width:100%}
+  .org-topo{top:0}.org-aviso{top:0;position:static}
+}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
