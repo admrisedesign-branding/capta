@@ -556,7 +556,10 @@ async function acaoAgenda(tenant, body, res) {
 
 async function acaoAgendar(tenant, body, res) {
   const { turma_id, data, crianca_nome, crianca_idade } = body;
-  if (!turma_id || !data) return res.status(400).json({ erro: 'Informe turma e data.' });
+  if (!data) return res.status(400).json({ erro: 'Informe a data.' });
+  // A escola aceita aula experimental em qualquer hora aberta, mesmo sem turma
+  // regular no horário — nesse caso vem a hora no lugar da turma.
+  if (!turma_id && body.hora_inicio == null) return res.status(400).json({ erro: 'Informe o horário.' });
 
   let leadId = body.lead_id || null;
 
@@ -572,15 +575,29 @@ async function acaoAgendar(tenant, body, res) {
     leadId = await acharOuCriarLead(tenant.id, body.contato, body.responsavel, crianca_nome);
   }
 
-  const t = await sb(`capta_turmas?id=eq.${turma_id}&tenant_id=eq.${tenant.id}&select=hora_inicio,hora_fim&limit=1`);
-  if (!t?.[0]) return res.status(404).json({ erro: 'Turma não encontrada.' });
+  let hIni, hFim;
+  if (turma_id) {
+    const t = await sb(`capta_turmas?id=eq.${turma_id}&tenant_id=eq.${tenant.id}&select=hora_inicio,hora_fim&limit=1`);
+    if (!t?.[0]) return res.status(404).json({ erro: 'Turma não encontrada.' });
+    hIni = t[0].hora_inicio; hFim = t[0].hora_fim;
+    // hora específica dentro do bloco da turma (a experimental dura 1 hora)
+    if (body.hora_inicio != null) {
+      const n = Number(String(body.hora_inicio).slice(0, 2));
+      hIni = String(n).padStart(2, '0') + ':00:00';
+      hFim = String(n + 1).padStart(2, '0') + ':00:00';
+    }
+  } else {
+    const n = Number(String(body.hora_inicio).slice(0, 2));
+    hIni = String(n).padStart(2, '0') + ':00:00';
+    hFim = String(n + 1).padStart(2, '0') + ':00:00';
+  }
 
   try {
     const criado = await sb('capta_agendamentos', {
       method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
-        tenant_id: tenant.id, lead_id: leadId, turma_id, data,
-        hora_inicio: t[0].hora_inicio, hora_fim: t[0].hora_fim,
+        tenant_id: tenant.id, lead_id: leadId, turma_id: turma_id || null, data,
+        hora_inicio: hIni, hora_fim: hFim,
         crianca_nome: crianca_nome || null,
         crianca_idade: crianca_idade || null,
         status: 'agendado',
@@ -597,8 +614,8 @@ async function acaoAgendar(tenant, body, res) {
         await moverLead(tenant.id, leadId, e[0].id, null);
         await empurrarKommo(tenant.id, leadId, e[0].id, null).catch(() => null);
       }
-      const tt = await sb(`capta_turmas?id=eq.${turma_id}&select=dia_semana&limit=1`).catch(() => []);
-      const campos = { data_aula: `${data}T${String(t[0].hora_inicio).slice(0,5)}:00-04:00`, bloco: blocoKommo(tt?.[0]?.dia_semana, t[0].hora_inicio, t[0].hora_fim), crianca: crianca_nome || null, idade: crianca_idade ? Number(crianca_idade) : null };
+      const tt = turma_id ? await sb(`capta_turmas?id=eq.${turma_id}&select=dia_semana&limit=1`).catch(() => []) : [];
+      const campos = { data_aula: `${data}T${String(hIni).slice(0,5)}:00-04:00`, bloco: blocoKommo(tt?.[0]?.dia_semana ?? new Date(data + 'T12:00:00').getDay(), hIni, hFim), crianca: crianca_nome || null, idade: crianca_idade ? Number(crianca_idade) : null };
       await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos) }).catch(() => null);
       await kommoCampos(tenant.id, leadId, { ...campos, curso: 'First' }).catch(() => null);
     }
