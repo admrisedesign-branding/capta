@@ -45,7 +45,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     let leads;
     try {
-      leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&select=id,nome,contato,origem,temperatura,score,status,criado_em,respostas,tags,etapa_nome,fonte,porta,atendente,kommo_lead_id,ganho_em,perdido_em,valor,data_aula,curso,kommo_criado_em,etapa_em,evento_id,notas&order=criado_em.desc`);
+      leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&select=id,nome,contato,origem,temperatura,score,status,criado_em,respostas,tags,etapa_nome,fonte,porta,atendente,kommo_lead_id,ganho_em,campanha,anuncio_id,perdido_em,valor,data_aula,curso,kommo_criado_em,etapa_em,evento_id,notas&order=criado_em.desc`);
     } catch (e) {
       // banco ainda sem a coluna de notas: segue sem ela
       try {

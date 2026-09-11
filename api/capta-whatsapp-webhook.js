@@ -248,6 +248,37 @@ async function acharOuCriarConversa(tenant, canalId, evento) {
     if (r.ok) leadId = await r.json();
   } catch { /* sem lead: conversa nasce órfã e é vinculada depois */ }
 
+  // Veio de anúncio "clique para conversar"? A Meta manda de qual anúncio.
+  // Sem isso, anúncio pago e Instagram orgânico ficam indistinguíveis.
+  if (evento?.anuncio) {
+    const ad = evento.anuncio;
+    const nome = ad.utm_campanha || ad.titulo || ad.anuncio_id || 'anúncio';
+    const dados = {
+      fonte: ad.origem === 'post' ? 'instagram' : 'anúncio',
+      porta: 'whatsapp-anuncio',
+      campanha: String(nome).slice(0, 120),
+      anuncio_id: ad.anuncio_id ? String(ad.anuncio_id).slice(0, 60) : null
+    };
+    if (leadId) {
+      // só preenche o que estiver vazio: não sobrescreve o que a equipe anotou
+      const at = await sb(`capta_leads?id=eq.${leadId}&select=fonte,porta,campanha`).catch(() => []);
+      const l = at?.[0] || {};
+      const patch = {};
+      if (!l.fonte) patch.fonte = dados.fonte;
+      if (!l.porta) patch.porta = dados.porta;
+      if (!l.campanha) { patch.campanha = dados.campanha; patch.anuncio_id = dados.anuncio_id; }
+      if (Object.keys(patch).length) {
+        await sb(`capta_leads?id=eq.${leadId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) }).catch(() => null);
+      }
+    } else {
+      // ainda não existe lead: cria já marcado como vindo de anúncio
+      const novo = await sb('capta_leads', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+        tenant_id: tenant, nome: evento.nome || null, contato: fone, origem: 'whatsapp',
+        status: 'novo', ...dados }) }).catch(() => null);
+      if (novo?.[0]?.id) leadId = novo[0].id;
+    }
+  }
+
   const criada = await sb('capta_conversas', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
