@@ -147,6 +147,46 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .falta{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-top:6px;font-size:13px}
 .falta b{font-weight:700}.falta button{margin-left:auto}
 .vg.rep{background:#F6F3FF;border-color:#D6CCFF}
+
+/* ---- grade de assentos: azul = matriculado, laranja = experimental ---- */
+.gradeq{display:grid;grid-template-columns:92px repeat(6,1fr);gap:8px;min-width:1040px}
+.gradeq .hd{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:2px 4px;text-align:center}
+.gradeq .hora-lb{font-size:12.5px;font-weight:800;color:var(--muted);display:flex;flex-direction:column;align-items:flex-end;justify-content:center;padding-right:8px;text-align:right;line-height:1.3}
+.cel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 11px;min-height:96px;display:flex;flex-direction:column;gap:7px}
+.cel.vaga{background:transparent;border-style:dashed;align-items:center;justify-content:center;color:var(--faint);font-size:12px;font-weight:600;min-height:56px}
+.cel.temexp{border-color:#F3D3C4}
+.cel .topo{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);font-weight:700}
+.cel .topo b{color:var(--ink);font-size:12.5px}
+.cap{font-size:11px;font-weight:800;color:var(--muted);background:var(--line-2);border-radius:99px;padding:2px 8px;white-space:nowrap}
+.cel .cap{margin-left:auto}
+.cap.alerta{background:var(--morno-bg);color:var(--morno)}
+.cap.cheio{background:var(--quente-bg);color:var(--quente)}
+.assentos{display:flex;flex-wrap:wrap;gap:5px}
+.as{display:inline-flex;align-items:baseline;gap:5px;border-radius:9px;padding:5px 9px;font-size:12.5px;font-weight:700;line-height:1.2;cursor:pointer;border:1px solid transparent;max-width:100%}
+.as small{font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;opacity:.7}
+.as.aluno{background:var(--brand-soft);color:var(--brand);border-color:rgba(46,91,255,.18)}
+.as.aluno:hover{background:rgba(46,91,255,.18)}
+.as.exp{background:var(--exp-bg);color:#B8522F;border-color:#F3D3C4}
+.as.exp:hover{background:#FBE2D5}
+.as.rep{background:#EFEAFF;color:#5B3FBF;border-color:#D9CEFF}
+.as.livre{background:transparent;border:1px dashed var(--line);color:var(--faint);font-weight:600}
+.as.livre:hover{border-color:var(--brand);color:var(--brand)}
+.cel .div{height:1px;background:var(--line-2);width:100%;margin:1px 0}
+.legenda-q{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:14px}
+.legenda-q span{display:flex;align-items:center;gap:7px}
+.legenda-q i{width:12px;height:12px;border-radius:4px;display:inline-block}
+/* ---- dia: matriculados de um lado, visitas do outro ---- */
+.bloco-dia{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+.bd-cab{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.bd-cab b{font-size:16px;font-weight:800}
+.bd-sub{font-size:12.5px;color:var(--muted);font-weight:600}
+.bd-cab .cap{margin-left:auto}
+.bd-corpo{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.bd-corpo{grid-template-columns:1fr}.gradeq{min-width:900px}}
+.bd-col{min-width:0}
+.bd-tit{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;padding-left:9px;border-left:3px solid}
+.bd-tit.azul{color:var(--brand);border-color:var(--brand-2)}
+.bd-tit.laranja{color:#B8522F;border-color:var(--exp)}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -285,7 +325,7 @@ function vDia(d){
     return `<div class="bloco-dia">
       <div class="bd-cab"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)}</b>
         <span class="bd-sub">${als.length} matriculado${als.length===1?'':'s'}${expV.length?` · ${expV.length} visita${expV.length>1?'s':''}`:''}</span>
-        ${v ? `<span class="cap ${cls}" title="kits First livres para aula experimental nesta hora">${v.n}/${v.cap ?? ''} kit${v.n===1?'':'s'} livre${v.n===1?'':'s'}</span>` : ''}</div>
+        ${v ? `<span class="cap ${cls}" title="kits First livres para aula experimental nesta hora">${v.n}${v.cap ? '/' + v.cap : ''} kit${v.n===1?'':'s'} livre${v.n===1?'':'s'}</span>` : ''}</div>
       <div class="bd-corpo">
         ${TIPO === 'experimental' ? '' : `<div class="bd-col">
           <div class="bd-tit azul">Matriculados${Object.keys(porKit).length?` · ${Object.entries(porKit).map(([k,n]) => KITCUR(k)+' '+n).join(' · ')}`:''}</div>
@@ -334,7 +374,7 @@ function vSemanaGrade(){
     const cls = livres === null ? '' : livres <= 0 ? 'cheio' : livres <= 2 ? 'alerta' : '';
     return `<div class="cel ${expV.length?'temexp':''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${t?hN(t.hora_inicio):'null'})">
       <div class="topo"><b>${ini}</b>–${fim}
-        ${livres !== null ? `<span class="cap ${cls}" title="kits First livres para aula experimental">${livres}/${v.cap ?? ''} livre${livres===1?'':'s'}</span>` : ''}</div>
+        ${livres !== null ? `<span class="cap ${cls}" title="kits First livres para aula experimental nesta hora">${livres}${v.cap ? '/' + v.cap : ''} livre${livres===1?'':'s'}</span>` : ''}</div>
       <div class="assentos">
         ${alunos.map(a => `<span class="as aluno" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}">${esc((a.nome_curto||a.nome).split(' ')[0])}<small>${KITCUR(a.kit)}</small></span>`).join('')}
         ${alunos.length && expV.length ? '<div class="div" style="width:100%"></div>' : ''}
