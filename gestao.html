@@ -280,6 +280,32 @@ function render(){
     <div class="kpis">${kpis}</div>
     <div class="grid">
       ${(() => {
+        const g = INVEST.filter(i => !k || i.mes.slice(0,7) === k);
+        const meta = g.filter(i => i.canal === 'meta');
+        if (!meta.length) return '';
+        const som = c => meta.reduce((t, i) => t + Number(i[c] || 0), 0);
+        const gasto = som('valor'), imp = som('impressoes'), cli = som('cliques'), conv = som('conversas');
+        const nf = n => n.toLocaleString('pt-BR');
+        const porConversa = conv ? gasto / conv : null;
+        return `<div class="card full"><h3>O que os anúncios entregaram${ajuda('Números medidos pela própria Meta, direto da conta de anúncios. Não dependem de ninguém marcar nada no CRM — é o que a Meta cobrou e o que ela registrou como resultado.')}</h3>
+          <div class="h">Medido pela Meta, por campanha — independe do preenchimento no Kommo</div>
+          <div class="kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0">
+            <div class="kpi"><small>Investido</small><div class="v">${brl(gasto)}</div></div>
+            <div class="kpi"><small>Pessoas alcançadas</small><div class="v">${nf(imp)}</div><small>impressões</small></div>
+            <div class="kpi"><small>Cliques</small><div class="v">${nf(cli)}</div>${imp?`<small>${(cli/imp*100).toFixed(2)}% de cliques</small>`:''}</div>
+            ${conv ? `<div class="kpi"><small>Conversas iniciadas</small><div class="v" style="color:var(--verde)">${nf(conv)}</div><small>pelo anúncio, no WhatsApp</small></div>
+            <div class="kpi"><small>Custo por conversa</small><div class="v">${brl(porConversa)}</div></div>` : ''}
+          </div>
+          <table><tr><th>Campanha</th><th class="n">Gasto</th><th class="n">Impressões</th><th class="n">Cliques</th><th class="n">Conversas</th><th class="n">Custo/conversa</th></tr>
+          ${meta.sort((a,b)=>Number(b.valor||0)-Number(a.valor||0)).map(i => `<tr><td>${esc(i.campanha||'')}</td><td class="n">${brl(Number(i.valor||0))}</td>
+            <td class="n">${nf(Number(i.impressoes||0))}</td><td class="n">${nf(Number(i.cliques||0))}</td>
+            <td class="n">${i.conversas ? nf(Number(i.conversas)) : '—'}</td>
+            <td class="n">${i.conversas ? brl(Number(i.valor||0)/Number(i.conversas)) : '—'}</td></tr>`).join('')}
+          </table>
+          ${!conv ? '<div class="nota">As conversas iniciadas aparecem aqui quando a campanha usa o objetivo de mensagens no WhatsApp. Clique em “Atualizar agora” em Ajustes para buscar de novo.</div>' : ''}
+        </div>`;
+      })()}
+      ${(() => {
         const comCamp = doMes.filter(l => l.campanha);
         if (!comCamp.length) return '';
         const m = new Map(); comCamp.forEach(l => m.set(l.campanha, (m.get(l.campanha)||0) + 1));
