@@ -2884,7 +2884,6 @@ function montarMenuGestao(){
     ${item('chat','Conversas',go('/inbox.html'))}
     ${item('leads','Leads','data-t="leads"')}
     ${item('cal','Agenda',go('/agendamentos.html'))}
-    ${item('aula','Aula experimental',go('/aula-experimental.html'))}
     ${item('alunos','Alunos',go('/alunos.html'))}
     ${item('evento','Eventos',go('/eventos.html'))}
     ${item('ajustes','Ajustes',go('/ajustes.html'))}`;
@@ -3003,7 +3002,7 @@ window.badgeConversas = function(n){ if (_badge2) _badge2(n);
   ultNaoLidas = n;
 };
 async function avisarDoDia(){
-  const hoje = new Date().toISOString().slice(0,10);
+  const hoje = hojeLocal();
   if (localStorage.getItem('capta_aviso_dia') === hoje) return;
   try {
     const r = await fetch('/api/capta-whatsapp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'experimentais',slug:SLUG,token:TOKEN,de:hoje,ate:hoje})});
@@ -3307,7 +3306,7 @@ function exportLeadsCSV(){
   const csv = '\ufeff' + lines.join('\r\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `leads-${(DATA.tenant&&DATA.tenant.slug)||'capta'}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `leads-${(DATA.tenant&&DATA.tenant.slug)||'capta'}-${hojeLocal()}.csv`;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 

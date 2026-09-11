@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Agendamentos — Capta</title>
+<title>Agenda — Capta</title>
 <link rel="icon" href="/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/capta.css">
@@ -81,6 +81,61 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .vagas3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}.vg{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;cursor:pointer}.vg.on{border-color:var(--brand);background:var(--brand-softer)}.vg b{display:block;font-size:13px}.vg small{color:var(--muted)}
 .pill[draggable]{cursor:grab}
 .vazio{border:1px dashed var(--line);border-radius:var(--r);padding:32px;text-align:center;color:var(--faint);line-height:1.7}
+/* ---- card do dia (rotina da recepção) ---- */
+.cardx{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px;position:relative}
+.cardx.win{border-color:rgba(22,163,74,.4)}.cardx.lost{border-color:rgba(224,49,39,.35)}.cardx.hold{border-color:rgba(224,147,15,.4)}.cardx.gone{opacity:.8}
+.cardx .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cardx .hora{font-weight:800;font-size:15px;color:var(--muted);min-width:52px}
+.cardx .kid{font-weight:800;font-size:15px}.cardx .kid em{font-style:normal;font-weight:600;color:var(--faint);font-size:12.5px;margin-left:4px}
+.cardx .guard{font-size:12.5px;color:var(--muted);margin-top:2px}
+.cardx .sinal{font-size:12.5px;color:var(--ink);background:var(--line-2);border-radius:10px;padding:8px 10px;margin-top:8px;line-height:1.5}
+.cardx .scriptbtn{position:absolute;right:14px;top:12px;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:11.5px;font-weight:700;color:var(--muted);padding:4px 9px}
+.cardx .scriptbtn:hover{color:var(--brand);border-color:var(--brand)}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.acts button{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:7px 12px;font-weight:700;font-size:12.5px;color:var(--muted)}
+.acts button.yes{background:var(--verde);border-color:var(--verde);color:#fff}.acts button.nope{background:rgba(224,49,39,.1);border-color:rgba(224,49,39,.25);color:var(--quente)}
+.menu{margin-top:8px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
+.menu p{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.menu .chips{margin-top:4px}
+.menu textarea,.menu input,.menu select{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--card)}
+.menu .l2{margin-top:8px}
+.menu .save{margin-top:8px}
+.done{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5}
+.done.win{background:var(--verde-bg)}.done.lost{background:rgba(224,49,39,.1)}.done.hold{background:rgba(224,147,15,.14)}.done.neutral{background:var(--line-2)}
+.done .undo{border:0;background:transparent;font-weight:700;color:var(--muted);text-decoration:underline;white-space:nowrap}
+.vagas3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+@media(max-width:760px){.vagas3{grid-template-columns:1fr}}
+.vg{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px}
+.vg b{display:block;font-size:13px}.vg small{color:var(--muted)}
+.vg button{margin-top:6px;width:100%}
+.badge{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;background:var(--line-2);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.badge.q{background:rgba(224,49,39,.12);color:var(--quente)}.badge.m{background:rgba(224,147,15,.14);color:var(--morno)}.badge.f{background:var(--brand-soft);color:var(--brand)}
+.acts.quatro{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.acts.quatro button{padding:14px 12px;font-size:15px;font-weight:700;border-radius:12px}
+.acts.quatro .yes{background:#3C8C5A;border-color:#3C8C5A}
+.acts.quatro .nope{background:#FCF1EF;border-color:#F1CFC9;color:#C5392E}
+.acts.mini{margin-top:6px;gap:12px}.acts.mini button{border:0;background:transparent;padding:2px 0;font-size:12px;color:var(--faint);text-decoration:underline}
+.acts-mini{display:flex;gap:4px;margin-top:6px}
+.acts-mini button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:7px;padding:4px 0;font-weight:800;font-size:11px;color:var(--muted);cursor:pointer}
+.acts-mini .yes{background:var(--verde);border-color:var(--verde);color:#fff}.acts-mini .nope{background:rgba(224,49,39,.1);border-color:rgba(224,49,39,.25);color:var(--quente)}
+.mes{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;min-width:760px}.mes .hd{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:2px 6px}
+.dcell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;min-height:84px;cursor:pointer}.dcell:hover,.dcell.hoje{border-color:var(--brand)}.dcell.fora{opacity:.4}
+.dcell .n{font-weight:800;font-size:13px}.dcell .i{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.5}.dcell .i b{color:var(--ink)}.dcell .i .e{color:var(--verde);font-weight:700}.dcell .i .z{color:var(--quente);font-weight:700}
+.ev[draggable]{cursor:grab}.cardx[draggable]{cursor:grab}.cardx[draggable] button,.cardx[draggable] input,.cardx[draggable] textarea{cursor:pointer}
+
+/* filtro de tipo e reposição */
+.filtro-tipo{display:flex;gap:4px;background:var(--line-2);padding:3px;border-radius:10px}
+.filtro-tipo button{border:0;background:transparent;font-weight:700;font-size:12.5px;color:var(--muted);padding:6px 12px;border-radius:8px;cursor:pointer;font-family:inherit}
+.filtro-tipo button.on{background:var(--card);color:var(--brand);box-shadow:var(--shadow)}
+.filtro-tipo button .q{opacity:.65;margin-left:4px}
+.pill.rep,.mini.rep{background:#EFEAFF!important;border-color:#D6CCFF!important;color:#5B3FBF!important}
+.bloco.rep{border-left-color:#7C5CDB;background:#F6F3FF}
+.et-rep{background:#EFEAFF;color:#5B3FBF}
+.aluno-jan .linha-f{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid var(--line-2)}
+.aluno-jan .linha-f:last-child{border:0}
+.falta{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-top:6px;font-size:13px}
+.falta b{font-weight:700}.falta button{margin-left:auto}
+.vg.rep{background:#F6F3FF;border-color:#D6CCFF}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -123,7 +178,7 @@ window.CaptaUser = (function(){
 <body>
 <div class="topbar">
   <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
-  <h1>Agendamentos</h1>
+  <h1>Agenda</h1>
 
 </div>
 <div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
@@ -165,7 +220,7 @@ async function carregar(){
   try {
     const de = addDias(segunda(SEL), -35), ate = addDias(segunda(SEL), 42);
     const [al, ex] = await Promise.all([api('alunos', {}, 60000), api('experimentais', { de, ate }, 20000)]);
-    D = al; EXP = ex.agendamentos || []; LEADS = ex.leads || []; carregadoDe = de; carregadoAte = ate; desenhar();
+    D = { ...al, agendamentos: ex.agendamentos || [] }; EXP = ex.agendamentos || []; LEADS = ex.leads || []; carregadoDe = de; carregadoAte = ate; desenhar();
     // vagas vêm depois: a grade já aparece, os números de vaga entram em seguida
     api('agenda', { dias: 45 }, 45000).then(ag => { VAGAS = ag.horarios || []; desenhar(); }).catch(() => {});
   } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
@@ -179,8 +234,9 @@ function mover(n){
 }
 function irDia(d){ SEL = d; modo('dia'); }
 const turmasDo = d => D.turmas.filter(t => t.ativa !== false && t.dia_semana === dow(d));
-const alunosDa = t => D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo');
-const expDo = d => EXP.filter(a => a.data === d && !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para);
+const alunosDa = t => (TIPO === 'experimental' || TIPO === 'reposicao') ? [] : D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo');
+const expDo = d => EXP.filter(a => a.data === d && !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para
+  && (TIPO === 'todos' || (TIPO === 'experimental' && ehExp(a)) || (TIPO === 'reposicao' && ehRep(a)) || (TIPO === 'alunos' && false)));
 const leadDe = a => LEADS.find(l => l.id === a.lead_id) || {};
 const vagaDe = (t, d) => VAGAS.find(v => v.turma_id === t.id && v.data === d);
 function vagasHora(d, h){ // turma que cobre a hora h no dia d
@@ -193,9 +249,10 @@ function vagasHora(d, h){ // turma que cobre a hora h no dia d
 
 function tally(dias){
   const emAula = dias.reduce((s, d) => s + turmasDo(d).reduce((x, t) => x + alunosDa(t).length, 0), 0);
-  const exps = dias.reduce((s, d) => s + expDo(d).length, 0);
+  const exps = dias.reduce((s, d) => s + EXP.filter(a => a.data === d && ehExp(a) && !['cancelado','remarcado'].includes(a.status)).length, 0);
   let semVaga = 0; dias.forEach(d => turmasDo(d).forEach(t => { const v = vagasHora(d, hN(t.hora_inicio)); if (v && v.n <= 0) semVaga++; }));
-  return `<div class="tally"><div><b>${emAula}</b><small>alunos ativos em aula</small></div><div><b>${exps}</b><small>aulas experimentais</small></div><div class="bad"><b>${semVaga}</b><small>horários sem vaga${ajuda('Blocos em que todos os kits First já estão ocupados — não dá pra encaixar aula experimental.')}</small></div></div>`;
+  const reps = dias.reduce((s, d) => s + EXP.filter(a => a.data === d && ehRep(a) && !['cancelado','remarcado'].includes(a.status)).length, 0);
+  return `<div class="tally"><div><b>${emAula}</b><small>alunos ativos em aula</small></div><div><b>${exps}</b><small>aulas experimentais</small></div>${reps?`<div><b>${reps}</b><small>reposições</small></div>`:''}<div class="bad"><b>${semVaga}</b><small>horários sem vaga${ajuda('Blocos em que todos os kits First já estão ocupados — não dá pra encaixar aula experimental.')}</small></div></div>`;
 }
 function lado(){
   const kits = D.kits.length ? D.kits : [{kit:'First',capacidade:8},{kit:'OneBot',capacidade:6},{kit:'TechBot',capacidade:5},{kit:'Autobot',capacidade:4},{kit:'App Developer',capacidade:4},{kit:'GameBot',capacidade:2}];
@@ -219,7 +276,7 @@ function vDia(d){
       rows += `<div class="linha" style="min-height:150px">
         <div>${horaCel(h)}${horaCel(h+1)}</div>
         <div class="cel"><div class="bloco"><div class="t">${hh(tIni.hora_inicio)}–${hh(tIni.hora_fim)} · <b>${als.length} em aula</b>${Object.entries(porKit).map(([k,n])=>' · '+KITCUR(k)+' '+n).join('')}</div>
-          <div class="pills">${als.map(a=>`<span class="pill">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('') || '<span class="interv">sem alunos</span>'}</div></div></div>
+          <div class="pills">${als.map(a=>`<span class="pill cont" onclick="abrirAluno('${a.id}')" title="ver ficha e marcar reposição">${esc(a.nome_curto||a.nome)}<small>${KITCUR(a.kit)}</small></span>`).join('') || '<span class="interv">sem alunos</span>'}</div></div></div>
         <div class="cel" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${h})">${expBloco(exH, h)}${expBloco(ex2, h+1)}</div></div>`;
       i += 2; continue;
     }
@@ -230,8 +287,14 @@ function vDia(d){
 }
 function expBloco(list, h){
   if (!list.length) return '';
-  return `<div class="bloco exp" style="margin-bottom:6px"><div class="t"><b>${list.length} em aula</b> · ${String(h).padStart(2,'0')}:00</div>
-    <div class="pills">${list.map(e => { const l = leadDe(e); return `<span class="pill cont" draggable="true" ondragstart="dragExp(event,'${e.id}')" onclick="LeadPainel.abrir('${e.lead_id}','agendar')" title="${esc(l.nome||'')}">${esc(e.crianca_nome||l.nome||'Criança')}${e.crianca_idade?', '+e.crianca_idade:''}<small>${esc(l.nome||'')}</small></span>`; }).join('')}</div></div>`;
+  const rep = list.filter(ehRep), exp = list.filter(ehExp);
+  let out = '';
+  if (exp.length) out += `<div class="bloco exp" style="margin-bottom:8px"><div class="t"><b>${exp.length} experimental${exp.length>1?'is':''}</b> · ${String(h).padStart(2,'0')}:00</div>
+    ${exp.map(cartao).join('')}</div>`;
+  if (rep.length) out += `<div class="bloco rep" style="margin-bottom:8px"><div class="t"><b>${rep.length} reposição${rep.length>1?'ões':''}</b> · ${String(h).padStart(2,'0')}:00</div>
+    <div class="pills">${rep.map(r => { const al = (D.alunos||[]).find(a => a.id === r.aluno_id) || {};
+      return `<span class="pill rep" onclick="abrirAluno('${r.aluno_id}')">${esc(r.crianca_nome || al.nome || 'Aluno')}<small>reposição${al.kit?' · '+esc(al.kit):''}</small></span>`; }).join('')}</div></div>`;
+  return out;
 }
 
 function vSemana(){
@@ -239,7 +302,9 @@ function vSemana(){
   return `<div class="scrollx"><div class="sem">${dias.map(d => {
     const ts = turmasDo(d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
     const itens = [...ts.map(t => ({ h: hN(t.hora_inicio), html: (() => { const als = alunosDa(t), v = vagasHora(d, hN(t.hora_inicio)); return `<div class="mini"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)} · ${als.length} em aula</b>First: <span class="v ${v&&v.n<=0?'z':''}">${v ? (v.n<=0?'sem vaga':v.n+' vaga'+(v.n>1?'s':'')) : '—'}</span></div>`; })() })),
-      ...expDo(d).map(e => ({ h: hN(e.hora_inicio) + 0.5, html: `<div class="mini exp" draggable="true" ondragstart="dragExp(event,'${e.id}')"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||leadDe(e).nome||'')}</b>experimental${e.crianca_idade?' · '+e.crianca_idade+' anos':''}</div>` }))].sort((a,b)=>a.h-b.h);
+      ...expDo(d).map(e => ({ h: hN(e.hora_inicio) + 0.5, html: ehRep(e)
+        ? `<div class="mini rep" onclick="abrirAluno('${e.aluno_id}')"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||'')}</b>reposição</div>`
+        : `<div class="mini exp" draggable="true" ondragstart="dragExp(event,'${e.id}')" onclick="LeadPainel.abrir('${e.lead_id}','agendar')"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||leadDe(e).nome||'')}</b>experimental${e.crianca_idade?' · '+e.crianca_idade+' anos':''}</div>` }))].sort((a,b)=>a.h-b.h);
     return `<div class="col ${d===hoje?'hoje':''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',null)"><h4 style="cursor:pointer" onclick="irDia('${d}')">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}</h4>${itens.map(x=>x.html).join('') || '<div class="interv">sem turmas neste dia</div>'}</div>`; }).join('')}</div></div>`;
 }
 
@@ -257,11 +322,20 @@ function vMes(){
 
 function desenhar(){
   let periodo, dias, corpo;
+  // contadores do filtro, no período visível
+  const diasVis = (() => { if (MODO === 'dia') return [SEL];
+    if (MODO === 'semana') { const s0 = segunda(SEL); return [0,1,2,3,4,5].map(n => addDias(s0, n)); }
+    const x = new Date(SEL+'T12:00:00'); const f = iso(new Date(x.getFullYear(), x.getMonth()+1, 0, 12)); const out = [];
+    for (let d = iso(new Date(x.getFullYear(), x.getMonth(), 1, 12)); d <= f; d = addDias(d,1)) out.push(d); return out; })();
+  const nAlunos = diasVis.reduce((s, d) => s + turmasDo(d).reduce((x, t) => x + alunosDa(t).length, 0), 0);
+  const nExp = EXP.filter(a => diasVis.includes(a.data) && ehExp(a) && !['cancelado','remarcado'].includes(a.status)).length;
+  const nRep = EXP.filter(a => diasVis.includes(a.data) && ehRep(a) && !['cancelado','remarcado'].includes(a.status)).length;
   if (MODO === 'dia') { periodo = fmt(SEL, { weekday:'long', day:'numeric', month:'long' }); dias = [SEL]; corpo = vDia(SEL); }
   else if (MODO === 'semana') { const s = segunda(SEL); dias = [0,1,2,3,4,5].map(n => addDias(s, n)); periodo = `${fmt(dias[0],{day:'numeric',month:'long'})} a ${fmt(dias[5],{day:'numeric',month:'long'})}`; corpo = vSemana(); }
   else { const x = new Date(SEL+'T12:00:00'); periodo = x.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); const f = iso(new Date(x.getFullYear(), x.getMonth()+1, 0, 12)); dias = []; for (let d = iso(new Date(x.getFullYear(), x.getMonth(), 1, 12)); d <= f; d = addDias(d,1)) dias.push(d); corpo = vMes(); }
   document.getElementById('raiz').innerHTML = `
     <div class="barra">${VAGAS.length?'':'<span style="font-size:12px;color:var(--faint)">carregando vagas…</span>'}<button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}<button class="btn" onclick="novoAgendamento()">+ Novo agendamento</button></div>
+    ${barraTipo(nAlunos, nExp, nRep)}
     ${tally(dias)}
     <div class="corpo"><div>${corpo}</div>${lado()}</div>`;
 }
@@ -316,6 +390,156 @@ async function confirmarNA(){
 }
 
 LeadPainel.init({ slug: SLUG, token: TOKEN, getLead: id => LEADS.find(x => x.id === id), getEtapas: () => [], onAgendou: () => carregar() });
+
+// --- constantes e estado que o card usa (vindos da tela de Aula experimental) ---
+const MOTIVOS = ['Orçamento','Horário não bate','Vai pensar','Distância','Criança não se adaptou','Só pesquisando'];
+const PAGTOS = ['Pix','cartão','boleto','recorrente'];
+const KITS = ['First','OneBot','TechBot','Autobot','App Developer','GameBot'];
+let ESC = {}, ABERTO = null, VAGAS3 = null, SEMDATA = [];
+const turmaDe = a => (D.turmas || []).find(t => t.id === a.turma_id) || {};
+const viva = a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para;
+function desfechoDe(a){ const m = /desfecho:\s*(matriculou|nao|andamento|faltou)(?:\s*·\s*(.*))?/i.exec(a.observacao||''); return m ? { t: m[1].toLowerCase(), obs: (m[2]||'').trim() } : null; }
+const ROT = { quente: ['Quer fechar','q'], morno: ['Considerando','m'], frio: ['Só conhecendo','f'] };
+function origemTag(l){
+  const f = (l.fonte||'').toLowerCase(), pt = (l.porta||'').toLowerCase(), o = (l.origem||'').toLowerCase();
+  if (f.includes('anúncio') || f.includes('anuncio') || o.includes('anuncio')) return ['Anúncio' + (pt||o ? (o.includes('insta')||f.includes('insta') ? ' Instagram' : '') : ''), 'o-ads'];
+  if (f.includes('instagram') || o === 'instagram') return ['Instagram orgânico', 'o-org'];
+  if (f.includes('evento') || pt === 'evento') return ['Evento', 'o-evt'];
+  if (f.includes('google')) return ['Google', 'o-site'];
+  if (pt === 'site' || o === 'site') return ['Site', 'o-site'];
+  if (pt.includes('whatsapp') || o.includes('whatsapp')) return ['WhatsApp', 'o-wpp'];
+  if (f.includes('indica')) return ['Indicação', 'o-evt'];
+  return null;
+}
+function remarcacoes(a){ let n = 0, cur = a; const seen = new Set(); while (cur && cur.remarcado_de && !seen.has(cur.id)) { seen.add(cur.id); n++; cur = D.agendamentos.find(x => x.id === cur.remarcado_de); } return n; }
+function cartao(a){
+  const l = leadDe(a), t = turmaDe(a); const D_ = desfechoDe(a); const temp = (l.temperatura||'').toLowerCase();
+  const rot = ROT[temp] ? `<span class="rot ${ROT[temp][1]}">${ROT[temp][0]}</span>` : '';
+  const org = origemTag(l); const rea = remarcacoes(a);
+  const sinal = (!D_ && a.observacao) ? a.observacao : (l.notas || '');
+  let est = '', pe = '';
+  if (a.status === 'faltou' || (D_ && D_.t === 'faltou')) {
+    est = ' gone';
+    const menu = ABERTO && ABERTO.id === a.id && ABERTO.tipo === 'reagendar' ? menuReagendar(a) : '';
+    pe = `<div class="done neutral"><span><b>Faltou.</b> Continua em Aula agendada no Kommo, com a tag <i>reagendar devido falta</i></span>
+      <span><button class="undo alt" onclick="abrirMenu('${a.id}','reagendar')">opções</button> <button class="undo" onclick="desfazer('${a.id}')">desfazer</button></span></div>${menu}`;
+  } else if (D_) {
+    est = D_.t === 'matriculou' ? ' win' : D_.t === 'nao' ? ' lost' : ' hold';
+    const txt = D_.t === 'matriculou' ? `<b>Matriculou${D_.obs?' · '+esc(D_.obs.split(' · ')[0]):''}.</b> Baixa no Kommo como ganho: vai para Aluno ativo com a tag <i>pagamento: ${esc((D_.obs.split(' · ')[0]||'').toLowerCase())}</i>`
+      : D_.t === 'nao' ? `<b>Não fechou${D_.obs?' · '+esc(D_.obs):''}.</b> Vai para Remarketing no Kommo com a tag <i>motivo: ${esc(D_.obs.toLowerCase())}</i>`
+      : `<b>Em andamento.</b> Continua na coluna de Aula agendada, com a tag <i>em andamento</i>. A observação abaixo vai como nota no Kommo. <i>“${esc(D_.obs||'sem observação')}”</i>`;
+    pe = `<div class="done ${D_.t==='matriculou'?'win':D_.t==='nao'?'lost':'hold'}"><span>${txt}</span>${D_.t==='matriculou'?'':`<button class="undo" onclick="desfazer('${a.id}')">desfazer</button>`}</div>`;
+  } else {
+    const menu = ABERTO && ABERTO.id === a.id ? menuDesfecho(a) : '';
+    // as quatro opções sempre visíveis, como no protótipo (a recepção dá baixa no dia; aula futura também pode ser remarcada/cancelada)
+    pe = `<div class="acts quatro">
+        <button class="yes" onclick="abrirMenu('${a.id}','matriculou')">Matriculou</button>
+        <button class="nope" onclick="abrirMenu('${a.id}','nao')">Não matriculou</button>
+        <button onclick="abrirMenu('${a.id}','andamento')">Em andamento</button>
+        <button onclick="registrar('${a.id}','faltou',{})">Faltou</button></div>
+      <div class="acts mini"><button onclick="abrirMenu('${a.id}','reagendar')">reagendar</button><button onclick="cancelar('${a.id}')">cancelar aula</button></div>${menu}`;
+  }
+  return `<div class="cardx${est}" data-id="${a.id}" draggable="true" ondragstart="dragAula(event,'${a.id}')">
+    <button class="scriptbtn" onclick="script('${a.id}')" title="Ver a conversa">script</button>
+    <div class="top"><span class="kid">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade?`<em>${a.crianca_idade} anos</em>`:''}</span>${rot}</div>
+    <div class="guard">com ${esc(l.nome||'responsável')}${l.contato?` · <a href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--brand);font-weight:700;text-decoration:none">${esc(l.contato)}</a>`:''}${l.atendente?' · '+esc(l.atendente):''}</div>
+    <div class="top" style="margin-top:8px">${org?`<span class="org ${org[1]}">${esc(org[0])}</span>`:''}${rea?`<span class="rea">remarcou ${rea}×</span>`:''}${a.status==='confirmado'?'<span class="rea" style="background:var(--verde-bg);color:var(--verde)">confirmou ✓</span>':''}${/pediu para remarcar/i.test(a.observacao||'')?'<span class="rea" style="background:rgba(224,49,39,.1);color:var(--quente)">pediu remarcar</span>':''}</div>
+    ${sinal ? `<div class="sinal">${esc(sinal)}</div>` : ''}
+    ${pe}</div>`;
+}
+function menuDesfecho(a){
+  const tp = ABERTO.tipo;
+  if (tp === 'reagendar') return menuReagendar(a);
+  if (tp === 'andamento') return `<div class="menu"><p>Situação da família</p><textarea id="m-obs" placeholder="Ex.: precisa esperar a fatura do cartão virar, falar com o marido"></textarea>
+    <div class="acts save"><button class="yes" onclick="registrar('${a.id}','andamento',{observacao:document.getElementById('m-obs').value,situacao:document.getElementById('m-obs').value})">Salvar</button><button onclick="fecharMenu()">cancelar</button></div></div>`;
+  if (tp === 'nao') return `<div class="menu"><p>Motivo</p><div class="chips">${MOTIVOS.map(v=>`<button class="chip" onclick="registrar('${a.id}','nao',{motivo:'${v}'})">${v}</button>`).join('')}</div></div>`;
+  if (tp === 'matriculou') return `<div class="menu"><p>Forma de pagamento</p><div class="chips">${PAGTOS.map(v=>`<button class="chip ${ESC.pagamento===v?'on':''}" onclick="ESC.pagamento='${v}';desenhar()">${v}</button>`).join('')}</div>
+    <div class="l2 linha2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><p>Valor (R$)</p><input id="m-valor" type="number" min="0" step="10" placeholder="397" value="${ESC.valor||''}"></div><div><p>Kit</p><select id="m-curso">${KITS.map(k=>`<option ${k===(ESC.curso||'First')?'selected':''}>${k}</option>`).join('')}</select></div></div>
+    <div class="l2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><p>Turma do aluno</p><select id="m-turma">${D.turmas.map(t=>`<option value="${t.id}" ${t.id===a.turma_id?'selected':''}>${esc(t.nome)}</option>`).join('')}</select></div><div><p>Nome completo</p><input id="m-aluno" value="${esc(a.crianca_nome||'')}"></div></div>
+    <div class="acts save"><button class="yes" onclick="confirmarMatricula('${a.id}')">Confirmar matrícula</button><button onclick="fecharMenu()">cancelar</button></div></div>`;
+  return '';
+}
+function menuReagendar(a){
+  if (!VAGAS3) { carregarVagas(); return `<div class="menu"><p>Reagendar</p><div class="aviso-p">Buscando vagas…</div></div>`; }
+  const hs = VAGAS3.filter(h => (h.vagas ?? 1) > 0 && h.data > hoje).sort((x,y)=>(x.data+x.hora_inicio).localeCompare(y.data+y.hora_inicio));
+  const pick = f => hs.find(h => { const w = new Date(h.data+'T12:00').getDay(), hi = parseInt(h.hora_inicio); return f==='sab'?w===6:f==='manha'?(w!==6&&hi<12):(w!==6&&hi>=12); });
+  const vg = (rot, v) => `<div class="vg"><small>${rot}</small>${v?`<b>${DIAS[new Date(v.data+'T12:00').getDay()].slice(0,3)} ${new Date(v.data+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} · ${hh(v.hora_inicio)}</b><small>${v.vagas} First livres</small><button class="btn" onclick="reagendar('${a.id}','${v.turma_id}','${v.data}')">Reagendar</button>`:'<b>—</b><small>sem vaga em 30 dias</small>'}</div>`;
+  return `<div class="menu"><p>Reagendar ${esc(a.crianca_nome||'')} — ofereça duas opções</p><div class="vagas3">${vg('Manhã',pick('manha'))}${vg('Tarde',pick('tarde'))}${vg('Sábado',pick('sab'))}</div><div class="acts save"><button onclick="fecharMenu()">cancelar</button></div></div>`;
+}
+async function carregarVagas(){ try { VAGAS3 = (await api('agenda', { dias: 30 })).horarios || []; } catch(e){ VAGAS3 = []; } desenhar(); }
+function abrirMenu(id, tipo){ ABERTO = { id, tipo }; ESC = {}; desenhar(); }
+function fecharMenu(){ ABERTO = null; desenhar(); }
+async function registrar(id, tipo, extra){
+  try { await api('desfecho', { atendente: (window.CaptaUser&&CaptaUser.nome())||undefined, agendamento_id: id, desfecho: tipo, observacao: `desfecho: ${tipo}${extra.motivo?' · '+extra.motivo:''}${extra.observacao?' · '+extra.observacao:''}`, ...extra }); ABERTO = null; await carregar();
+    const nome = (D.agendamentos.find(x=>x.id===id)||{}).crianca_nome || 'Aula';
+    toast(`<b>${esc(nome)}</b> · ${({matriculou:'matriculou',nao:'não fechou',andamento:'em andamento',faltou:'faltou'})[tipo]} · Kommo atualizado`, tipo==='matriculou'?{tipo:'ok'}:{ acao:'desfazer', onAcao:() => desfazer(id) }); }
+  catch(e){ toast(e.message,{tipo:'erro'}); }
+}
+async function confirmarMatricula(id){
+  const g = x => document.getElementById(x).value;
+  if (!ESC.pagamento) return toast('Escolha a forma de pagamento.',{tipo:'erro'});
+  try { await api('desfecho', { agendamento_id: id, desfecho: 'matriculou', valor: g('m-valor'), curso: g('m-curso'), pagamento: ESC.pagamento, turma_id: g('m-turma'), aluno_nome: g('m-aluno'), observacao: `desfecho: matriculou · ${ESC.pagamento}${g('m-valor')?' · R$ '+g('m-valor'):''}` }); ABERTO = null; await carregar(); }
+  catch(e){ toast(e.message,{tipo:'erro'}); }
+}
+async function cancelar(id){ if (!confirm('Cancelar esta aula?')) return; try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pela recepção' }); toast('Aula cancelada · lead voltou de etapa · Kommo atualizado'); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+async function reagendar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'reagendado pela recepção' }); ABERTO = null; VAGAS3 = null; toast('Aula remarcada · Kommo atualizado', { tipo:'ok' }); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+async function desfazer(id){ try { await api('desfazer', { agendamento_id: id }); toast('Desfeito · aula voltou a agendada'); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+
+
+// ---------------- filtro de tipo ----------------
+let TIPO = 'todos';   // todos | alunos | experimental | reposicao
+const ehRep = a => (a.tipo || 'experimental') === 'reposicao';
+const ehExp = a => (a.tipo || 'experimental') === 'experimental';
+function mudarTipo(t){ TIPO = t; desenhar(); }
+function barraTipo(nAl, nEx, nRe){
+  const b = (k, t, q) => `<button class="${TIPO===k?'on':''}" onclick="mudarTipo('${k}')">${t}${q!=null?`<span class="q">${q}</span>`:''}</button>`;
+  return `<div class="filtro-tipo">${b('todos','Todos')}${b('alunos','Alunos ativos',nAl)}${b('experimental','Experimentais',nEx)}${b('reposicao','Reposições',nRe)}</div>`;
+}
+
+// ---------------- reposição ----------------
+let REP = null;
+async function abrirAluno(alunoId, dataAula){
+  const al = (D.alunos||[]).find(a => a.id === alunoId); if (!al) return;
+  REP = { aluno: al, dados: null, escolhido: null };
+  desenharAluno();
+  try { const [f, v] = await Promise.all([api('faltas_aluno', { aluno_id: alunoId }), api('vagas_kit', { kit: al.kit || 'First', dias: 7 })]);
+    REP.dados = f; REP.vagas = (v.horarios || []).filter(h => (h.vagas ?? 0) > 0); }
+  catch(e){ REP.erro = e.message; }
+  desenharAluno();
+}
+function desenharAluno(){
+  const al = REP.aluno; const d = REP.dados; const t = (D.turmas||[]).find(x => x.id === al.turma_id);
+  const faltas = d?.faltas || []; const reps = d?.reposicoes || [];
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela aluno-jan" style="max-width:540px">
+    <h3>${esc(al.nome_curto || al.nome)}</h3>
+    <p>${al.kit ? esc(al.kit) : ''}${t ? ` · ${DIAS[t.dia_semana]} ${hh(t.hora_inicio)}–${hh(t.hora_fim)}` : ' · sem turma'}${al.matricula ? ` · matrícula ${esc(al.matricula)}` : ''}</p>
+    ${al.status !== 'ativo' ? `<p style="color:var(--morno);font-weight:700">${esc(al.status)}${al.trancado_ate ? ' até ' + new Date(al.trancado_ate+'T12:00').toLocaleDateString('pt-BR') : ''}</p>` : ''}
+    ${!d ? '<p style="margin-top:14px">Carregando faltas…</p>' : `
+      <div class="sec" style="font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px">Faltas recentes</div>
+      ${faltas.length ? faltas.slice(0,4).map(f => `<div class="falta"><b>${DIAS3[dow(f.data)]} ${fmt(f.data,{day:'2-digit',month:'2-digit'})}</b><span style="color:var(--muted)">${hh(f.hora_inicio)}</span>
+        <button class="btn sm" onclick="escolherReposicao('${f.data}')">repor esta</button></div>`).join('')
+        : '<div style="font-size:13px;color:var(--faint)">Sem faltas nos últimos 21 dias 👏</div>'}
+      ${reps.length ? `<div class="sec" style="font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px">Reposições marcadas</div>
+        ${reps.slice(0,4).map(r => `<div class="linha-f"><span>${DIAS3[dow(r.data)]} ${fmt(r.data,{day:'2-digit',month:'2-digit'})} · ${hh(r.hora_inicio)}</span><span style="color:var(--muted)">${esc(r.status)}</span></div>`).join('')}` : ''}
+      ${REP.escolhido !== null ? blocoVagasRep() : `<div style="margin-top:14px"><button class="btn g" onclick="escolherReposicao(null)">Marcar reposição avulsa</button></div>`}
+    `}
+    <div class="fim"><button class="btn g" onclick="fecharModal()">Fechar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
+}
+function escolherReposicao(dataFalta){ REP.escolhido = dataFalta; desenharAluno(); }
+function blocoVagasRep(){
+  const vs = REP.vagas || [];
+  if (!vs.length) return `<div style="margin-top:14px;font-size:13px;color:var(--quente)">Sem vaga no kit ${esc(REP.aluno.kit||'')} nos próximos 7 dias.</div>`;
+  return `<div class="sec" style="font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px">Escolha o horário (até 7 dias, kit ${esc(REP.aluno.kit||'First')})</div>
+    <div class="vagas3" style="grid-template-columns:1fr 1fr">${vs.slice(0,6).map(v => `<div class="vg rep"><small>${DIAS[dow(v.data)]}</small><b>${fmt(v.data,{day:'2-digit',month:'2-digit'})} · ${hh(v.hora_inicio)}</b><small>${v.vagas} livre${v.vagas>1?'s':''}</small>
+      <button class="btn" style="margin-top:6px;width:100%" onclick="confirmarReposicao('${v.turma_id}','${v.data}')">Marcar</button></div>`).join('')}</div>`;
+}
+async function confirmarReposicao(turmaId, data){
+  try { await api('repor', { aluno_id: REP.aluno.id, turma_id: turmaId, data, repoe_data: REP.escolhido || null, atendente: (window.CaptaUser&&CaptaUser.nome())||undefined });
+    fecharModal(); toast(`Reposição marcada para ${fmt(data,{day:'2-digit',month:'2-digit'})}`, { tipo:'ok' }); await carregar(); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
 if (!SLUG || !TOKEN) document.getElementById('raiz').textContent = 'Abra esta página pelo painel do seu negócio.'; else carregar();
 </script>
 </body>
