@@ -237,6 +237,66 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .hora-livre.cheia span{color:var(--quente);font-weight:700}
 .t-pessoa{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;text-transform:none;letter-spacing:0;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .t-pessoa:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+
+/* kits em faixa horizontal, recolhível */
+.corpo.corpo-cheio{display:block}
+.kits-faixa{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+  padding:8px 14px;margin-bottom:12px}
+.kits-faixa.fechada{background:transparent;border:0;box-shadow:none;padding:0 0 8px}
+.kf-linha{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.kf-tit{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em}
+.kf-k{display:flex;align-items:baseline;gap:5px;font-size:12.5px}
+.kf-k i{font-style:normal;color:var(--muted);font-weight:600}
+.kf-k b{font-weight:800}
+.kf-leg{display:flex;gap:12px;flex-wrap:wrap;margin-left:auto;font-size:11.5px;color:var(--muted)}
+.kf-leg span{display:flex;align-items:center;gap:5px}
+.kf-leg i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.kf-btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:4px 10px;font-size:11.5px;
+  font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
+.kf-btn:hover{border-color:var(--brand);color:var(--brand)}
+.kits-faixa.fechada .kf-btn{background:var(--card)}
+
+/* semana: matriculados de um lado, visitas do outro */
+.cel.dupla{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;overflow:hidden}
+.cel.dupla .lad{padding:8px 9px;min-width:0;display:flex;flex-direction:column;gap:3px}
+.cel.dupla .lad.alunos{border-right:1px solid var(--line-2);background:rgba(46,91,255,.02)}
+.cel.dupla .lad.visitas{background:rgba(232,115,74,.03)}
+.cel.dupla .lad.alunos:only-child,.cel.dupla .lad.visitas:only-child{grid-column:1/-1;border-right:0}
+.lad-t{font-size:10.5px;font-weight:700;color:var(--muted);margin-bottom:2px;display:flex;align-items:center;gap:5px}
+.lad-t b{font-size:12px;color:var(--ink);font-weight:800}
+.lad-t.segue,.lad-t .vazio-t{color:var(--faint);font-weight:600}
+.lad-t .vazio-t{font-size:10.5px}
+.cel.dupla .cap{font-size:10px;padding:1px 6px}
+.cel.dupla .al{font-size:12px;padding:3px 6px}
+.cel.dupla .al .n{font-size:12px}
+.cel.dupla .al.mais{font-size:11px;padding:3px 5px;margin-top:3px}
+@media(max-width:900px){.cel.dupla{grid-template-columns:1fr}.cel.dupla .lad.alunos{border-right:0;border-bottom:1px solid var(--line-2)}}
+
+.cardx .hora-card{font-weight:800;font-size:14px;color:var(--exp);background:var(--exp-bg);border-radius:8px;padding:2px 9px}
+/* horas livres em quadrados, lado a lado, rolando */
+.horas-fila{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px;-webkit-overflow-scrolling:touch}
+.hbox{flex:0 0 118px;border:1px dashed var(--brand-2);background:rgba(46,91,255,.05);border-radius:12px;
+  padding:10px 11px;display:flex;flex-direction:column;gap:3px;cursor:pointer;transition:.12s}
+.hbox:hover{border-color:var(--brand);background:var(--brand-soft)}
+.hbox b{font-size:15px;font-weight:800;color:var(--ink)}
+.hbox span{font-size:11.5px;color:var(--muted);font-weight:700}
+.hbox span.ultimo{color:var(--morno)}
+.hbox i{font-style:normal;font-size:10.5px;font-weight:800;color:var(--brand);opacity:.6}
+.hbox:hover i{opacity:1}
+.hbox .cadeiras{display:flex;gap:3px;margin-top:2px}
+.hbox .cadeiras i{width:10px;height:10px;border-radius:3px;background:var(--exp);opacity:.85;display:inline-block;padding:0}
+.hbox .cadeiras i.ocup{background:var(--line);opacity:1}
+.hbox.cheia{border-style:solid;border-color:var(--line);background:transparent;cursor:default;opacity:.65}
+.hbox.cheia i{color:var(--quente);opacity:1}
+
+.sec-rep{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;
+  margin:18px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sec-rep .obs-rep{font-weight:600;text-transform:none;letter-spacing:0;font-size:11.5px;color:var(--faint)}
+.lnk-rep{border:0;background:none;color:var(--brand);font-size:11px;font-weight:800;cursor:pointer;
+  text-transform:none;letter-spacing:0;font-family:inherit;text-decoration:underline}
+.aluno-jan .horas-fila .hbox{flex:0 0 104px;border-color:#D9CEFF;background:#F6F3FF}
+.aluno-jan .horas-fila .hbox:hover{border-color:#7C5CDB;background:#EFEAFF}
+.aluno-jan .horas-fila .hbox i{color:#5B3FBF}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -372,10 +432,17 @@ function tally(dias){
 }
 function lado(){
   const kits = D.kits.length ? D.kits : [{kit:'First',capacidade:8},{kit:'OneBot',capacidade:6},{kit:'TechBot',capacidade:5},{kit:'Autobot',capacidade:4},{kit:'App Developer',capacidade:4},{kit:'GameBot',capacidade:2}];
-  return `<div class="lado"><h5>Kits por hora${ajuda('Quantos kits de cada tipo a escola tem. Duas crianças não usam o mesmo kit na mesma hora — é isso que limita a vaga.')}</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
-    <div class="leg"><span><i style="background:var(--brand-2)"></i>Aluno matriculado — aula de 2 horas</span><span><i style="background:var(--exp)"></i>Aula experimental — 1 hora, kit First</span><span><i style="background:#7C5CDB"></i>Reposição — 1 hora, kit do aluno</span></div></div>`;
+  if (!KITS_ABERTO) return `<div class="kits-faixa fechada"><button class="kf-btn" onclick="KITS_ABERTO=true;try{localStorage.setItem('capta_kits_abertos','1')}catch(e){};desenhar()">
+      Kits e legenda${ajuda('Quantos kits de cada tipo a escola tem e o que cada cor significa.')} <b>↓</b></button></div>`;
+  return `<div class="kits-faixa">
+    <div class="kf-linha">
+      <span class="kf-tit">Kits por hora${ajuda('Quantos kits de cada tipo a escola tem. Duas crianças não usam o mesmo kit na mesma hora — é isso que limita a vaga.')}</span>
+      ${kits.map(k=>`<span class="kf-k"><i>${esc(k.kit)}</i><b>${k.capacidade}</b></span>`).join('')}
+      <span class="kf-k"><i>Lugares na sala</i><b>18</b></span>
+      <span class="kf-leg"><span><i style="background:var(--brand-2)"></i>aluno — 2h</span><span><i style="background:var(--exp)"></i>experimental — 1h, First</span><span><i style="background:#7C5CDB"></i>reposição — 1h, kit do aluno</span></span>
+      <button class="kf-btn" onclick="KITS_ABERTO=false;try{localStorage.setItem('capta_kits_abertos','0')}catch(e){};desenhar()">esconder ↑</button>
+    </div></div>`;
 }
-
 
 // Cada hora do bloco vira um balão com os lugares livres, em cadeirinhas.
 // Clicar abre o agendamento já naquele dia e horário.
@@ -387,13 +454,13 @@ function horasLivres(d, t){
     const v = VAGAS.find(x => x.data === d && hN(x.hora_inicio) === h);
     const total = v ? (v.capacidade ?? 8) : 8;
     const livres = v ? v.vagas : Math.max(0, total - usados);
-    if (livres <= 0) { out.push(`<div class="hora-livre cheia"><b>${String(h).padStart(2,'0')}:00</b><span>${total}/${total} · lotado</span></div>`); continue; }
+    if (livres <= 0) { out.push(`<div class="hbox cheia"><b>${String(h).padStart(2,'0')}:00</b><span>${total}/${total}</span><i>lotado</i></div>`); continue; }
     const cad = Array.from({ length: Math.min(total, 10) }, (_, i) =>
       `<i class="${i < (total - livres) ? 'ocup' : ''}"></i>`).join('');
-    out.push(`<div class="hora-livre" onclick="novoAgendamento('${d}','${t.id}',${h})" title="marcar aula experimental às ${String(h).padStart(2,'0')}:00">
-      <b>${String(h).padStart(2,'0')}:00</b><span class="${livres===1?'ultimo':''}">${livres===1?'último kit':livres+' vagas'}</span><span class="cadeiras">${cad}</span></div>`);
+    out.push(`<div class="hbox" onclick="novoAgendamento('${d}','${t.id}',${h})" title="marcar aula experimental às ${String(h).padStart(2,'0')}:00">
+      <b>${String(h).padStart(2,'0')}:00</b><span class="${livres===1?'ultimo':''}">${livres===1?'último kit':livres+' vagas'}</span><span class="cadeiras">${cad}</span><i>+ marcar</i></div>`);
   }
-  return out.join('');
+  return out.length ? `<div class="horas-fila">${out.join('')}</div>` : '';
 }
 
 function vDia(d){
@@ -434,12 +501,12 @@ function vDia(d){
     .sort((a,b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
   const extra = soltas.length && TIPO !== 'alunos' ? `<div class="bloco-dia">
       <div class="bd-cab"><b>Horas livres</b><span class="bd-sub">a escola está aberta e não há turma — cabe aula experimental</span></div>
-      <div class="assentos-horas">${soltas.map(v => { const usados = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) === hN(v.hora_inicio)).length;
+      <div class="horas-fila">${soltas.map(v => { const usados = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) === hN(v.hora_inicio)).length;
         const total = v.capacidade ?? 8, livres = v.vagas;
         const cad = Array.from({length: Math.min(total,10)}, (_,i) => `<i class="${i < total - livres ? 'ocup':''}"></i>`).join('');
         return livres > 0
-          ? `<div class="hora-livre" onclick="novoAgendamento('${d}','${v.turma_id||''}',${hN(v.hora_inicio)})"><b>${hh(v.hora_inicio)}</b><span class="${livres===1?'ultimo':''}">${livres===1?'último kit':livres+' vagas'}</span><span class="cadeiras">${cad}</span></div>`
-          : `<div class="hora-livre cheia"><b>${hh(v.hora_inicio)}</b><span>${total}/${total} · lotado</span></div>`; }).join('')}</div></div>` : '';
+          ? `<div class="hbox" onclick="novoAgendamento('${d}','${v.turma_id||''}',${hN(v.hora_inicio)})"><b>${hh(v.hora_inicio)}</b><span class="${livres===1?'ultimo':''}">${livres===1?'último kit':livres+' vagas'}</span><span class="cadeiras">${cad}</span><i>+ marcar</i></div>`
+          : `<div class="hbox cheia"><b>${hh(v.hora_inicio)}</b><span>${total}/${total}</span><i>lotado</i></div>`; }).join('')}</div></div>` : '';
   return (out + extra) || `<div class="vazio">A escola não abre neste dia.</div>`;
 }
 function expBloco(list, h){
@@ -491,17 +558,22 @@ function vSemanaGrade(){
       const v = aberta ? { n: aberta.vagas, cap: aberta.capacidade } : null;
       const cls = !v ? '' : v.n <= 0 ? 'cheio' : v.n <= 2 ? 'alerta' : '';
       const naSala = (t ? alunosDa(t).length : 0) + expV.length;
-      h += `<div class="cel ${expV.length?'temexp':''} ${t && !primeira ? 'cont' : ''} ${d < hoje ? 'passou' : ''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hora})" title="${d < hoje ? 'dia que já passou' : ''}">
-        <div class="t">
-          <span>${t ? (primeira ? `<b>${naSala}</b>/${t.limite_sala||18} na sala` : `<span class="segue">${hh(t.hora_inicio)}–${hh(t.hora_fim)} · continua</span>`) : ''}</span>
-          ${v && (v.n <= 0 || TIPO === 'alunos') ? `<span class="cap ${cls}" title="${v.n<=0?'todos os kits First desta hora estão em uso — não cabe outra aula experimental':'kits First livres nesta hora'}">${v.n<=0?`${v.cap||8}/${v.cap||8} · lotado`:v.n+' livre'+(v.n===1?'':'s')}</span>` : ''}</div>
-        ${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('')}
-        ${als.length && expV.length ? '<div class="sep"></div>' : ''}
-        ${expV.map(a => { const l = leadDe(a); const alu = (D.alunos||[]).find(x => x.id === a.aluno_id) || {};
-          return ehRep(a)
-            ? `<div class="al rep" onclick="abrirAluno('${a.aluno_id}')" title="reposição"><span class="k"></span><span class="n">${esc(a.crianca_nome||alu.nome||'')}</span></div>`
-            : `<div class="al exp" onclick="irDia('${d}')" title="aula experimental · ${esc(l.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||l.nome||'visita')}</span></div>`; }).join('')}
-        ${v && v.n > 0 && TIPO !== 'alunos' ? `<div class="al mais ${v.n===1?'ultimo':''}" onclick="novoAgendamento('${d}','${t?t.id:(aberta?aberta.turma_id||'':'')}',${hora})" title="${v.n===1?'último kit First desta hora':''}">${hs} · ${v.n===1?'último kit':v.n+' vagas'}</div>` : ''}
+      const colAluno = TIPO === 'experimental' ? '' : `<div class="lad alunos">
+          ${t ? (primeira
+            ? `<div class="lad-t"><b>${als.length}</b>/${t.limite_sala||18} na sala</div>`
+            : `<div class="lad-t segue">${hh(t.hora_inicio)}–${hh(t.hora_fim)} · continua</div>`) : '<div class="lad-t vazio-t">sem turma</div>'}
+          ${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="event.stopPropagation();abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('')}
+        </div>`;
+      const colExp = TIPO === 'alunos' && !expV.filter(ehRep).length ? '' : `<div class="lad visitas">
+          <div class="lad-t">${v ? (v.n <= 0 ? `<span class="cap cheio">${v.cap||8}/${v.cap||8} lotado</span>` : `<span class="cap ${cls}">${v.n} livre${v.n===1?'':'s'}</span>`) : '1h'}</div>
+          ${expV.map(a => { const l = leadDe(a); const alu = (D.alunos||[]).find(x => x.id === a.aluno_id) || {};
+            return ehRep(a)
+              ? `<div class="al rep" onclick="event.stopPropagation();abrirAluno('${a.aluno_id}')" title="reposição"><span class="k"></span><span class="n">${esc(a.crianca_nome||alu.nome||'')}</span></div>`
+              : `<div class="al exp" onclick="event.stopPropagation();irDia('${d}')" title="aula experimental · ${esc(l.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||l.nome||'visita')}</span></div>`; }).join('')}
+          ${v && v.n > 0 && TIPO !== 'alunos' ? `<div class="al mais ${v.n===1?'ultimo':''}" onclick="event.stopPropagation();novoAgendamento('${d}','${t?t.id:(aberta?aberta.turma_id||'':'')}',${hora})">${v.n===1?'último kit':'+ '+v.n}</div>` : ''}
+        </div>`;
+      h += `<div class="cel dupla ${expV.length?'temexp':''} ${t && !primeira ? 'cont' : ''} ${d < hoje ? 'passou' : ''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hora})" title="${d < hoje ? 'dia que já passou' : ''}">
+        ${colAluno}${colExp}
       </div>`;
     }
   }
@@ -589,7 +661,8 @@ function desenhar(){
     <div class="barra">${VAGAS.length?'':'<span style="font-size:12px;color:var(--faint)">carregando vagas…</span>'}<button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}<button class="btn" onclick="novoAgendamento()">+ Novo agendamento</button></div>
     <div class="filtro-linha">${barraTipo(nAlunos, nExp, nRep)}</div>
     ${tally(dias)}
-    <div class="corpo"><div>${corpo}</div>${lado()}</div>`;
+    ${lado()}
+    <div class="corpo corpo-cheio"><div>${corpo}</div></div>`;
 }
 
 // ---- arrastar experimental pra outro dia/hora (confirma antes) ----
@@ -700,7 +773,7 @@ function cartao(a){
   }
   return `<div class="cardx${est}" data-id="${a.id}" draggable="true" ondragstart="dragAula(event,'${a.id}')">
     <button class="scriptbtn" onclick="script('${a.id}')" title="Ver a conversa">script</button>
-    <div class="top"><span class="kid">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade?`<em>${a.crianca_idade} anos</em>`:''}</span>${rot}</div>
+    <div class="top"><span class="hora-card">${hh(a.hora_inicio)}${a.hora_fim?`–${hh(a.hora_fim)}`:''}</span><span class="kid">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade?`<em>${a.crianca_idade} anos</em>`:''}</span>${rot}</div>
     <div class="guard">com ${esc(l.nome||'responsável')}${l.contato?` · <a href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--brand);font-weight:700;text-decoration:none">${esc(l.contato)}</a>`:''}${l.atendente?' · '+esc(l.atendente):''}</div>
     <div class="top" style="margin-top:8px">${org?`<span class="org ${org[1]}">${esc(org[0])}</span>`:''}${rea?`<span class="rea">remarcou ${rea}×</span>`:''}${a.status==='confirmado'?'<span class="rea" style="background:var(--verde-bg);color:var(--verde)">confirmou ✓</span>':''}${/pediu para remarcar/i.test(a.observacao||'')?'<span class="rea" style="background:rgba(224,49,39,.1);color:var(--quente)">pediu remarcar</span>':''}</div>
     ${sinal ? `<div class="sinal">${esc(sinal)}</div>` : ''}
@@ -748,6 +821,8 @@ async function desfazer(id){ try { await api('desfazer', { agendamento_id: id })
 // ---------------- filtro de tipo ----------------
 // A mesma tela serve a dois trabalhos: quem atende lead (comercial) e quem cuida
 // dos alunos (secretaria). A visão troca o que aparece, sem esconder nada do outro.
+let KITS_ABERTO = false;
+try { KITS_ABERTO = localStorage.getItem('capta_kits_abertos') === '1'; } catch(e){}
 let TIPO = 'todos';   // todos | experimental | alunos
 try { TIPO = localStorage.getItem('capta_visao_agenda') || 'todos'; } catch(e){}
 const ehRep = a => (a.tipo || 'experimental') === 'reposicao';
@@ -811,7 +886,7 @@ function desenharAluno(){
         : '<div style="font-size:13px;color:var(--faint)">Sem faltas nos últimos 21 dias 👏</div>'}
       ${reps.length ? `<div class="sec" style="font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px">Reposições marcadas</div>
         ${reps.slice(0,4).map(r => `<div class="linha-f"><span>${DIAS3[dow(r.data)]} ${fmt(r.data,{day:'2-digit',month:'2-digit'})} · ${hh(r.hora_inicio)}</span><span style="color:var(--muted)">${esc(r.status)}</span></div>`).join('')}` : ''}
-      ${REP.escolhido !== null ? blocoVagasRep() : `<div style="margin-top:14px"><button class="btn g" onclick="escolherReposicao(null)">Marcar reposição avulsa</button></div>`}
+      ${blocoVagasRep()}
     `}
     <div class="fim"><button class="btn g" onclick="fecharModal()">Fechar</button></div></div></div>`;
   document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
@@ -819,10 +894,15 @@ function desenharAluno(){
 function escolherReposicao(dataFalta){ REP.escolhido = dataFalta; desenharAluno(); }
 function blocoVagasRep(){
   const vs = REP.vagas || [];
-  if (!vs.length) return `<div style="margin-top:14px;font-size:13px;color:var(--quente)">Sem vaga no kit ${esc(REP.aluno.kit||'')} nos próximos 7 dias.</div>`;
-  return `<div class="sec" style="font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px">Escolha o horário (até 7 dias, kit ${esc(REP.aluno.kit||'First')})</div>
-    <div class="vagas3" style="grid-template-columns:1fr 1fr">${vs.slice(0,6).map(v => `<div class="vg rep"><small>${DIAS[dow(v.data)]}</small><b>${fmt(v.data,{day:'2-digit',month:'2-digit'})} · ${hh(v.hora_inicio)}</b><small>${v.vagas} livre${v.vagas>1?'s':''}</small>
-      <button class="btn" style="margin-top:6px;width:100%" onclick="confirmarReposicao('${v.turma_id}','${v.data}')">Marcar</button></div>`).join('')}</div>`;
+  const alvo = REP.escolhido ? ` da aula de ${fmt(REP.escolhido,{day:'2-digit',month:'2-digit'})}` : ' avulsa';
+  if (!REP.dados) return '';
+  if (!vs.length) return `<div class="sec-rep">Reposição${alvo}</div>
+    <div style="font-size:13px;color:var(--quente)">Sem vaga no kit ${esc(REP.aluno.kit||'')} nos próximos 7 dias.</div>`;
+  return `<div class="sec-rep">Reposição${alvo} — escolha o horário
+      ${REP.escolhido ? `<button class="lnk-rep" onclick="escolherReposicao(null)">marcar avulsa</button>` : ''}
+      <span class="obs-rep">até 7 dias · kit ${esc(REP.aluno.kit||'First')}</span></div>
+    <div class="horas-fila">${vs.slice(0,10).map(v => `<div class="hbox" onclick="confirmarReposicao('${v.turma_id}','${v.data}')">
+      <b>${fmt(v.data,{day:'2-digit',month:'2-digit'})}</b><span>${DIAS3[dow(v.data)]} · ${hh(v.hora_inicio)}</span><i>${v.vagas} livre${v.vagas>1?'s':''}</i></div>`).join('')}</div>`;
 }
 async function confirmarReposicao(turmaId, data){
   try { await api('repor', { aluno_id: REP.aluno.id, turma_id: turmaId, data, repoe_data: REP.escolhido || null, atendente: (window.CaptaUser&&CaptaUser.nome())||undefined });
