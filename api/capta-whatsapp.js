@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -125,6 +125,7 @@ module.exports = async function handler(req, res) {
         case 'vagas_kit':     return await acaoVagasKit(tenant, body, res);
         case 'repor':         return await acaoRepor(tenant, body, res);
         case 'faltas_aluno':  return await acaoFaltasAluno(tenant, body, res);
+        case 'sugerir':       return await acaoSugerir(tenant, body, res);
         case 'recepcao':      return await acaoRecepcao(tenant, body, res);
         case 'checkin':       return await acaoCheckin(tenant, body, res);
         case 'feedback':      return await acaoFeedback(tenant, body, res);
@@ -1548,6 +1549,75 @@ async function acaoRepor(tenant, body, res) {
     observacao: `reposição${repoe_data ? ' da aula de ' + repoe_data.split('-').reverse().join('/') : ''} · kit ${al.kit || ''}`,
     criado_por: body.atendente || 'painel' }) });
   return res.status(200).json({ ok: true, agendamento: novo?.[0] || null });
+}
+
+
+// ---------------------------------------------------------------------
+// SUGESTÃO DE RESPOSTA — a IA lê a conversa e propõe o que dizer agora
+// ---------------------------------------------------------------------
+async function acaoSugerir(tenant, body, res) {
+  const chave = process.env.ANTHROPIC_API_KEY;
+  if (!chave) return res.status(200).json({ erro: 'Sugestão de resposta ainda não está ativa nesta conta.' });
+  const convId = body.conversa_id, leadId = body.lead_id;
+  if (!convId && !leadId) return res.status(400).json({ erro: 'Informe a conversa.' });
+
+  // 1) conversa, lead e etapa
+  const conv = convId
+    ? (await sb(`capta_conversas?id=eq.${convId}&tenant_id=eq.${tenant.id}&select=id,lead_id&limit=1`))?.[0]
+    : (await sb(`capta_conversas?lead_id=eq.${leadId}&tenant_id=eq.${tenant.id}&select=id,lead_id&limit=1`))?.[0];
+  const idLead = conv?.lead_id || leadId;
+  const [lead] = idLead ? await sb(`capta_leads?id=eq.${idLead}&select=nome,contato,temperatura,crianca,idade,fonte,porta,etapa_id,notas,data_aula&limit=1`) : [];
+  const [etapa] = lead?.etapa_id ? await sb(`capta_etapas?id=eq.${lead.etapa_id}&select=nome&limit=1`) : [];
+  const msgs = conv ? await sb(`capta_mensagens?conversa_id=eq.${conv.id}&select=direcao,autor,texto,transcricao,tipo,criado_em&order=criado_em.desc&limit=25`).catch(() => []) : [];
+  const historico = (msgs || []).reverse()
+    .map(m => `${m.direcao === 'entrada' ? 'CLIENTE' : 'ESCOLA'}: ${(m.texto || m.transcricao || '[' + (m.tipo || 'mídia') + ']').slice(0, 400)}`)
+    .join('\n') || '(ainda sem mensagens)';
+
+  // 2) vagas reais para oferecer
+  const horarios = await rpc('capta_vagas_experimental', { p_tenant: tenant.id, p_dias: 10 }).catch(() => []);
+  const livres = (horarios || []).filter(h => (h.vagas ?? 0) > 0).slice(0, 6)
+    .map(h => `${['domingo','segunda','terça','quarta','quinta','sexta','sábado'][new Date(h.data + 'T12:00:00').getDay()]} ${h.data.split('-').reverse().slice(0,2).join('/')} às ${String(h.hora_inicio).slice(0,5)}`);
+
+  // 3) respostas prontas da escola, pra manter o tom
+  const prontas = await sb(`capta_respostas?tenant_id=eq.${tenant.id}&select=titulo,texto&limit=8`).catch(() => []);
+
+  const contexto = [
+    `Etapa atual: ${etapa?.nome || 'não definida'}`,
+    lead?.temperatura ? `Temperatura: ${lead.temperatura}` : null,
+    lead?.crianca ? `Criança: ${lead.crianca}${lead.idade ? ', ' + lead.idade + ' anos' : ''}` : 'Criança: ainda não sabemos nome e idade',
+    lead?.data_aula ? `Já tem aula marcada para ${new Date(lead.data_aula).toLocaleString('pt-BR')}` : 'Sem aula marcada',
+    lead?.notas ? `Anotações: ${lead.notas}` : null,
+    livres.length ? `Vagas reais para aula experimental: ${livres.join(' · ')}` : 'Sem vaga nos próximos dias',
+  ].filter(Boolean).join('\n');
+
+  const sistema = `Você ajuda a recepção da My Robot Manaus, escola de robótica para crianças em Manaus, a responder pais no WhatsApp.
+Objetivo da conversa: entender a criança (nome e idade), despertar interesse e marcar a AULA EXPERIMENTAL gratuita de 1 hora. O valor da mensalidade só é apresentado pessoalmente, depois da aula.
+Regras: escreva como uma pessoa de Manaus escreve no WhatsApp — curto, caloroso, no máximo 3 linhas, no máximo 1 emoji, sem formalidade de e-mail, sem "prezado". Nunca invente preço, endereço, horário ou vaga: use apenas os horários listados no contexto. Ofereça no máximo duas opções de horário. Se ainda não souber nome e idade da criança, pergunte isso antes de oferecer horário.
+Devolva SOMENTE um JSON no formato {"sugestoes":[{"titulo":"...","texto":"..."}]} com 3 opções de resposta diferentes entre si (por exemplo: uma direta, uma que pergunta algo, uma que contorna objeção). O "titulo" tem no máximo 4 palavras.`;
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': chave, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 900, system: sistema,
+        messages: [{ role: 'user', content:
+          `CONTEXTO DO LEAD\n${contexto}\n\n` +
+          (prontas?.length ? `TOM DA ESCOLA (respostas que ela já usa)\n${prontas.map(p => '- ' + p.texto).join('\n')}\n\n` : '') +
+          `CONVERSA (mais antiga primeiro)\n${historico}\n\nO que a escola deve responder agora?` }]
+      })
+    });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error.message || 'A IA recusou o pedido.');
+    const txt = (j.content || []).filter(x => x.type === 'text').map(x => x.text).join('').trim();
+    let sug = [];
+    try { sug = JSON.parse(txt.replace(/```json|```/g, '').trim()).sugestoes || []; }
+    catch { sug = [{ titulo: 'Sugestão', texto: txt.slice(0, 600) }]; }
+    return res.status(200).json({ sugestoes: sug.slice(0, 3), vagas: livres });
+  } catch (e) {
+    await registrarFalha(tenant.id, 'sugestao', e.message).catch(() => null);
+    return res.status(200).json({ erro: e.message });
+  }
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
