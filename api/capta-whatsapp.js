@@ -36,6 +36,9 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://oaezsozoriqnkurxncjs.s
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SITE         = process.env.SITE_URL || 'https://capta.riseagencia.com';
 
+// data de hoje no fuso de Manaus (o servidor roda em UTC)
+const hojeManaus = () => new Date(Date.now() - 4*3600*1000).toISOString().slice(0, 10);
+
 async function sb(path, opts = {}) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...opts,
@@ -1251,7 +1254,7 @@ async function acaoSaude(tenant, body, res) {
 // RECEPÇÃO — tablet de check-in/out e monitor da sala
 // ---------------------------------------------------------------------
 async function acaoRecepcao(tenant, body, res) {
-  const dia = body.data || new Date().toISOString().slice(0, 10);
+  const dia = body.data || hojeManaus();
   const dow = new Date(dia + 'T12:00:00').getDay();
   const [turmas, alunos, ags, presencas] = await Promise.all([
     sb(`capta_turmas?tenant_id=eq.${tenant.id}&ativa=is.true&dia_semana=eq.${dow}&select=id,nome,hora_inicio,hora_fim,limite_sala&order=hora_inicio`).catch(() => []),
@@ -1266,7 +1269,7 @@ async function acaoRecepcao(tenant, body, res) {
 
 // check-in / check-out — aluno ativo (aluno_id) ou aula experimental (agendamento_id)
 async function acaoCheckin(tenant, body, res) {
-  const dia = body.data || new Date().toISOString().slice(0, 10);
+  const dia = body.data || hojeManaus();
   const { aluno_id, agendamento_id, saida } = body;
   if (!aluno_id && !agendamento_id) return res.status(400).json({ erro: 'Informe o aluno ou a aula.' });
   const filtro = aluno_id ? `aluno_id=eq.${aluno_id}` : `agendamento_id=eq.${agendamento_id}`;
@@ -1290,7 +1293,7 @@ async function acaoCheckin(tenant, body, res) {
 async function acaoFeedback(tenant, body, res) {
   const { agendamento_id, nota, paga_hoje, motivo, comentario, pagamento, valor } = body;
   if (!agendamento_id) return res.status(400).json({ erro: 'Informe a aula.' });
-  const dia = body.data || new Date().toISOString().slice(0, 10);
+  const dia = body.data || hojeManaus();
   const p = (await sb(`capta_presencas?tenant_id=eq.${tenant.id}&data=eq.${dia}&agendamento_id=eq.${agendamento_id}&select=id&limit=1`).catch(() => []))?.[0];
   const dados = { feedback: nota ?? null, paga_hoje: paga_hoje ?? null, motivo: motivo || null, comentario: comentario || null, saida_em: new Date().toISOString() };
   if (p) await sb(`capta_presencas?id=eq.${p.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
@@ -1307,7 +1310,7 @@ async function acaoVisitaAvulsa(tenant, body, res) {
   const fone = String(body.telefone || '').replace(/\D/g, '');
   const crianca = String(body.crianca || '').trim();
   if (!crianca || fone.length < 10) return res.status(400).json({ erro: 'Informe o nome da criança e o WhatsApp.' });
-  const dia = new Date().toISOString().slice(0, 10), dow = new Date(dia + 'T12:00:00').getDay();
+  const dia = hojeManaus(), dow = new Date(dia + 'T12:00:00').getDay();
   const agoraMin = new Date().getHours() * 60 + new Date().getMinutes();
   const turmas = await sb(`capta_turmas?tenant_id=eq.${tenant.id}&ativa=is.true&dia_semana=eq.${dow}&select=id,hora_inicio,hora_fim&order=hora_inicio`).catch(() => []);
   const turma = (turmas || []).find(t => { const ini = Number(String(t.hora_inicio).slice(0,2)) * 60 + Number(String(t.hora_inicio).slice(3,5)); const fim = Number(String(t.hora_fim).slice(0,2)) * 60 + Number(String(t.hora_fim).slice(3,5)); return agoraMin >= ini - 30 && agoraMin <= fim; }) || (turmas || [])[0];
@@ -1350,7 +1353,7 @@ async function acaoResumoConfig(tenant, body, res) {
 
 function plural(n, um, muitos) { return `${n} ${n === 1 ? um : muitos}`; }
 async function montarResumo(tenantId) {
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeManaus();
   const ontem = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
   const mes = hoje.slice(0, 7);
   const [tenant] = await sb(`capta_tenants?id=eq.${tenantId}&select=nome&limit=1`);

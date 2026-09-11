@@ -25,7 +25,9 @@ async function sb(caminho, opts = {}) {
   if (!txt) return null;                       // resposta vazia (Prefer: return=minimal)
   try { return JSON.parse(txt); } catch { return null; }
 }
-const mesDe = d => String(d || new Date().toISOString().slice(0, 10)).slice(0, 7) + '-01';
+// data de hoje no fuso de Manaus (o servidor roda em UTC)
+const hojeManaus = () => new Date(Date.now() - 4*3600*1000).toISOString().slice(0, 10);
+const mesDe = d => String(d || hojeManaus()).slice(0, 7) + '-01';
 
 // ---------------------------------------------------------------------
 async function integracoes(tenant) {
@@ -56,7 +58,7 @@ async function metaGasto(token, contaId, desde, ate) {
 async function sincronizarMeta(tenant, meses = 3) {
   const [conf] = await sb(`capta_integracoes?tenant_id=eq.${tenant.id}&servico=eq.meta_ads&ativo=is.true&select=id,conta_id,token&limit=1`).catch(() => []);
   if (!conf) return { erro: 'Meta Ads não está conectada.' };
-  const ate = new Date().toISOString().slice(0, 10);
+  const ate = hojeManaus();
   const d = new Date(); d.setMonth(d.getMonth() - (meses - 1), 1);
   const desde = d.toISOString().slice(0, 10);
   try {
