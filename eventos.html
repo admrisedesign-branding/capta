@@ -42,6 +42,10 @@ td{padding:9px 12px;border-bottom:1px solid var(--line-2)}tr:hover td{background
 .l2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .fim{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
 .dica{font-size:12.5px;color:var(--muted);background:var(--line-2);border-radius:10px;padding:10px 12px;line-height:1.55;margin-top:12px}
+
+.ev .q.local{font-weight:700;color:var(--ink);margin-top:2px}
+.ev .q.periodo{color:var(--muted);margin-top:1px}
+.dia-tag{font-size:10.5px;font-weight:800;background:var(--line-2);color:var(--muted);border-radius:99px;padding:2px 7px;white-space:nowrap}
 </style>
 <style>body.embed .voltar,body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -115,12 +119,37 @@ function desenhar(){
     <div class="tally"><div><b>${EV.length}</b><small>eventos</small></div><div><b>${t.leads}</b><small>leads captados</small></div><div class="hot"><b>${t.aulas}</b><small>aulas marcadas</small></div><div class="ok"><b>${t.mat}</b><small>matrículas</small></div><div><b>${brl(t.rec)}</b><small>receita</small></div></div>
     ${EV.length ? `<div class="cards">${EV.map(cardEvento).join('')}</div>` : `<div class="vazio">Nenhum evento cadastrado.<br>Cadastre o evento e ligue os leads que vieram dele — aí dá pra comparar shopping, feira e escola pelo que cada um traz de matrícula.<br><button class="btn" style="margin-top:12px" onclick="editar(null)">+ Novo evento</button></div>`}`;
 }
+
+// O nome costuma vir com local e data grudados ("Robô Humanoide — Plaza (19/08)").
+// No card, o nome fica só com o nome; local e período têm linha própria.
+function nomeLimpo(nome){
+  return String(nome || '')
+    .replace(/\s*\([^)]*\)\s*$/, '')          // tira "(19/08)"
+    .replace(/\s*[—–-]\s*[^—–-]+$/, '')        // tira "— Plaza"
+    .trim() || String(nome || '');
+}
+const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function periodoTexto(e){
+  if (!e.data_inicio) return 'sem data';
+  const a = new Date(e.data_inicio + 'T12:00:00');
+  const b = e.data_fim ? new Date(e.data_fim + 'T12:00:00') : a;
+  const mesmoMes = a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+  if (+a === +b) return `${a.getDate()} de ${MESES[a.getMonth()]}`;
+  const dif = Math.round((b - a) / 864e5);
+  if (mesmoMes && dif === 1) return `${a.getDate()} e ${b.getDate()} de ${MESES[a.getMonth()]}`;
+  if (mesmoMes) return `${a.getDate()} a ${b.getDate()} de ${MESES[a.getMonth()]}`;
+  return `${a.getDate()} de ${MESES[a.getMonth()]} a ${b.getDate()} de ${MESES[b.getMonth()]}`;
+}
+
+const DIAS3E = ['dom','seg','ter','qua','qui','sex','sáb'];
+function diaCurto(d){ const x = new Date(d); return `${DIAS3E[x.getDay()]} ${String(x.getDate()).padStart(2,'0')}/${String(x.getMonth()+1).padStart(2,'0')}`; }
 function cardEvento(e){
   const n = NUM[e.id] || { leads:0, aulas:0, matriculas:0, receita:0 };
   const conv = n.leads ? Math.round(n.matriculas / n.leads * 100) : 0;
   return `<div class="ev ${e.ativo===false?'off':''}" onclick="abrirEvento('${e.id}')">
-    <h3>${esc(e.nome)}${e.tipo?`<span class="tp">${esc(e.tipo)}</span>`:''}</h3>
-    <div class="q">${esc(e.local||'')}${e.local&&e.data_inicio?' · ':''}${dataBR(e.data_inicio)}${e.data_fim&&e.data_fim!==e.data_inicio?' a '+dataBR(e.data_fim):''}${e.isca?' · isca: '+esc(e.isca):''}</div>
+    <h3>${esc(nomeLimpo(e.nome))}${e.tipo?`<span class="tp">${esc(e.tipo)}</span>`:''}</h3>
+    <div class="q local">${esc(e.local || '—')}</div>
+    <div class="q periodo">${periodoTexto(e)}</div>
     <div class="nums"><div><b>${n.leads}</b><small>leads</small></div><div><b>${n.aulas}</b><small>aulas</small></div><div><b>${n.matriculas}</b><small>matrículas</small></div><div><b>${brl(n.receita)}</b><small>receita</small></div></div>
     <div class="barra-conv"><i style="width:${conv}%"></i></div>
     <div class="q" style="margin-top:6px">${conv}% dos leads viraram matrícula</div></div>`;
@@ -133,13 +162,15 @@ async function abrirEvento(id){
   const etapa = l => (ETAPAS.find(e => e.id === l.etapa_id) || {}).nome || '—';
   document.getElementById('raiz').innerHTML = `
     <div class="barra"><button class="btn g" onclick="voltar()">← Eventos</button><h2>${esc(ABERTO.nome)}</h2>
-      <span style="color:var(--muted);font-size:13px">${esc(ABERTO.local||'')} ${dataBR(ABERTO.data_inicio)}</span>
+      <span style="color:var(--muted);font-size:13px">${esc(ABERTO.local||'')} · ${periodoTexto(ABERTO)}</span>
       <span style="margin-left:auto;display:flex;gap:8px"><button class="btn g" onclick="vincular()">Ligar leads a este evento</button><button class="btn g" onclick="editar('${id}')">Editar</button></span></div>
     <div class="tally"><div><b>${LEADS.length}</b><small>leads</small></div><div class="hot"><b>${n.aulas||0}</b><small>aulas marcadas</small></div><div class="ok"><b>${n.matriculas||0}</b><small>matrículas</small></div><div><b>${brl(n.receita||0)}</b><small>receita</small></div><div><b>${n.quentes||0}</b><small>quentes</small></div></div>
-    ${LEADS.length ? `<table><tr><th>Lead</th><th>Etapa</th><th>Temperatura</th><th>Aula</th><th>Atendente</th></tr>
-      ${LEADS.map(l => `<tr onclick="LeadPainel.abrir('${l.id}','conversa')"><td><b>${esc(l.nome||'Sem nome')}</b><br><span style="color:var(--faint);font-size:12px">${esc(l.contato||'')}</span></td>
+    ${LEADS.length ? `<table><tr><th>Lead</th><th>Captado em</th><th>Etapa</th><th>Temperatura</th><th>Aula</th><th>Atendente</th></tr>
+      ${LEADS.map(l => { const dt = l.kommo_criado_em || l.criado_em;
+        return `<tr onclick="LeadPainel.abrir('${l.id}','conversa')"><td><b>${esc(l.nome||'Sem nome')}</b><br><span style="color:var(--faint);font-size:12px">${esc(l.contato||'')}</span></td>
+        <td>${dt ? `<span class="dia-tag">${diaCurto(dt)}</span>` : '—'}</td>
         <td>${esc(etapa(l))}</td><td>${l.temperatura?`<span class="tag t-${esc(l.temperatura)}">${esc(l.temperatura)}</span>`:'—'}</td>
-        <td>${l.data_aula ? new Date(l.data_aula).toLocaleDateString('pt-BR') : '—'}</td><td>${esc(l.atendente||'—')}</td></tr>`).join('')}</table>`
+        <td>${l.data_aula ? new Date(l.data_aula).toLocaleDateString('pt-BR') : '—'}</td><td>${esc(l.atendente||'—')}</td></tr>`; }).join('')}</table>`
       : `<div class="vazio">Nenhum lead ligado a este evento ainda.<br>Use <b>Ligar leads a este evento</b> pra marcar os que já estão no Capta (por tag ou período), ou capte pelo formulário do evento.</div>`}`;
 }
 function voltar(){ ABERTO = null; carregar(); }

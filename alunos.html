@@ -200,13 +200,13 @@ function desenhar(){
   const kpis = `<div class="tally"><div><b>${nAt}</b><small>alunos ativos</small></div><div class="hot"><b>${nTr}</b><small>trancados</small></div><div><b>${D.turmas.filter(t=>t.ativa!==false).length}</b><small>turmas</small></div><div class="bad"><b>${lotados}</b><small>turmas lotadas</small></div></div>`;
   // mesma faixa horizontal da Agenda, recolhível
   const lado = !KITS_ABERTO
-    ? `<div class="kits-faixa fechada"><button class="kf-btn" onclick="KITS_ABERTO=true;salvarKits();desenhar()">Kits e legenda${ajuda('Quantos kits de cada tipo existem para um mesmo horário e o que cada cor significa.')} <b>↓</b></button></div>`
+    ? `<div class="kits-faixa fechada"><button class="kf-btn" onclick="KITS_ABERTO=true;salvarKits();desenhar()">Total de kits utilizados${ajuda('Quantos kits de cada tipo existem para um mesmo horário e o que cada cor significa.')} <b>↓</b></button></div>`
     : `<div class="kits-faixa"><div class="kf-linha">
-        <span class="kf-tit">Kits por bloco${ajuda('Quantos kits de cada tipo existem para um mesmo horário. É o que limita quantas crianças cabem: dois alunos não usam o mesmo kit ao mesmo tempo.')}</span>
+        <span class="kf-tit">Total de kits utilizados${ajuda('Quantos alunos matriculados estudam em cada kit, somando a escola inteira. Não é limite de vaga — o limite é por horário, e aparece na Agenda.')}</span>
         ${D.kits.map(k => { const u = ativos.filter(a=>a.kit===k.kit&&a.status==='ativo').length;
-          return `<span class="kf-k"><i><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${k.cor};margin-right:5px"></span>${esc(k.kit)}</i><b>${u}<span style="color:var(--faint);font-weight:600">/${k.capacidade}</span></b></span>`; }).join('')}
+          return `<span class="kf-k"><i><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${k.cor};margin-right:5px"></span>${esc(k.kit)}</i><b>${u}</b></span>`; }).join('')}
         <span class="kf-k"><i>Lugares na sala</i><b>18</b></span>
-        <span class="kf-leg"><span><i style="background:var(--brand-2)"></i>alunos no kit / kits do bloco</span><span><i style="background:var(--morno)"></i>restam 2 ou menos</span><span><i style="background:var(--quente)"></i>kit lotado no bloco</span></span>
+        <span style="margin-left:auto"></span>
         <button class="kf-btn" onclick="KITS_ABERTO=false;salvarKits();desenhar()">esconder ↑</button>
       </div></div>`;
   if (!D.alunos.length) { document.getElementById('raiz').innerHTML = kpis + `<div class="aviso">Nenhum aluno cadastrado ainda.<br>Os alunos entram por aqui ou automaticamente quando uma aula experimental vira matrícula.<br><button class="btn" style="margin-top:12px" onclick="editar(null)">+ Cadastrar aluno</button></div>`; return; }
@@ -227,7 +227,7 @@ function grade(filtro){
       const porKit = {}; D.alunos.filter(a => a.turma_id === t.id && a.status === 'ativo').forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);
       const sala = t.limite_sala || t.capacidade || 18;
       h += `<div class="cel"><div class="t"><span><b>${total}</b>/${sala} na sala</span><span>${als.length ? '' : ''}</span></div>
-        ${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="abrirFicha('${a.id}')" title="${esc(a.nome)}${a.observacao?' · '+esc(a.observacao):''}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('')}
+        ${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="abrirFicha('${a.id}')" title="${esc(a.nome)}${a.kit?' · '+esc(a.kit):''}${a.observacao?' · '+esc(a.observacao):''}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('')}
         <div class="kits">${D.kits.map(k => { const u = porKit[k.kit]||0, liv = k.capacidade - u; return `<span class="kt ${liv<=0?'cheio':liv<=2?'alerta':''}" title="${esc(k.kit)}: ${u} de ${k.capacidade} kits">${esc(k.kit.replace('App Developer','App').replace('Bot',''))} ${u}/${k.capacidade}</span>`; }).join('')}</div>
       </div>`;
     }

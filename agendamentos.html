@@ -305,7 +305,7 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .gh2-sub{font-size:9.5px;font-weight:700;opacity:.7;letter-spacing:.04em}
 .gb2{font-size:12px;font-weight:800;color:var(--muted);display:flex;align-items:flex-start;justify-content:flex-end;padding:8px 6px 0 0}
 .turma-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:9px 11px;
-  display:flex;flex-direction:column;gap:5px;overflow:hidden}
+  display:flex;flex-direction:column;gap:5px;overflow:hidden;min-height:0}
 .tb-cab{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;border-bottom:1px solid var(--line-2);padding-bottom:5px}
 .tb-cab b{font-size:12.5px;font-weight:800}
 .tb-cab span{font-size:11px;color:var(--muted);font-weight:600}
@@ -325,6 +325,34 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .turma-box.passou,.vis.passou,.semturma.passou{opacity:.4}
 .grade2 .al{font-size:12px;padding:3px 7px}
 .grade2 .al .n{font-size:12px}
+
+/* visão dia: colunas de 1 hora, largas */
+.bd-corpo{grid-template-columns:minmax(220px,.85fr) minmax(0,1.6fr)}
+.bd-col.larga{min-width:0}
+.hcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.hcol{border:1px dashed var(--brand-2);background:rgba(46,91,255,.04);border-radius:14px;padding:10px 11px;
+  display:flex;flex-direction:column;gap:7px;min-width:0}
+.hcol-t{display:flex;align-items:baseline;gap:4px}
+.hcol-t b{font-size:15px;font-weight:800}
+.hcol-t span{font-size:12px;color:var(--muted);font-weight:600}
+.hcol-t .cap{margin-left:auto}
+.hcol-mais{border:1px dashed var(--brand-2);border-radius:11px;padding:9px 10px;text-align:center;cursor:pointer;background:var(--card)}
+.hcol-mais:hover{border-color:var(--brand);background:var(--brand-soft)}
+.hcol-mais b{display:block;font-size:12.5px;font-weight:800;color:var(--brand)}
+.hcol-mais span{font-size:11px;color:var(--muted);font-weight:600}
+.hcol-mais.cheia{border-style:solid;border-color:var(--line);background:transparent;cursor:default;opacity:.7}
+.hcol-mais.cheia b{color:var(--quente)}
+.minix{background:var(--exp-bg);border:1px solid #F3D3C4;border-radius:11px;padding:8px 10px;cursor:pointer;
+  display:flex;flex-direction:column;gap:1px;transition:.12s}
+.minix:hover{background:#FBE2D5;border-color:var(--exp)}
+.minix b{font-size:13.5px;font-weight:800;color:#8C3D1F}
+.minix b em{font-style:normal;font-weight:600;font-size:11.5px;color:#B8522F;margin-left:5px}
+.minix span{font-size:11.5px;color:#B8522F;opacity:.85}
+.minix .mx-res{font-style:normal;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
+.minix.win{background:var(--verde-bg);border-color:rgba(22,163,74,.35)}.minix.win b,.minix.win span{color:#14713a}
+.minix.lost{background:var(--quente-bg);border-color:rgba(224,49,39,.3)}.minix.lost b,.minix.lost span{color:#9d2d24}
+.minix.hold{background:var(--morno-bg);border-color:rgba(224,147,15,.35)}.minix.hold b,.minix.hold span{color:#8a5a06}
+.minix.gone{opacity:.7}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -465,9 +493,9 @@ function lado(){
   return `<div class="kits-faixa">
     <div class="kf-linha">
       <span class="kf-tit">Kits por hora${ajuda('Quantos kits de cada tipo a escola tem. Duas crianças não usam o mesmo kit na mesma hora — é isso que limita a vaga.')}</span>
-      ${kits.map(k=>`<span class="kf-k"><i>${esc(k.kit)}</i><b>${k.capacidade}</b></span>`).join('')}
+      ${kits.map(k=>`<span class="kf-k"><i><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${k.cor||corKit(k.kit)};margin-right:5px"></span>${esc(k.kit)}</i><b>${k.capacidade}</b></span>`).join('')}
       <span class="kf-k"><i>Lugares na sala</i><b>18</b></span>
-      <span class="kf-leg"><span><i style="background:var(--brand-2)"></i>aluno — 2h</span><span><i style="background:var(--exp)"></i>experimental — 1h, First</span><span><i style="background:#7C5CDB"></i>reposição — 1h, kit do aluno</span></span>
+      <span style="margin-left:auto"></span>
       <button class="kf-btn" onclick="KITS_ABERTO=false;try{localStorage.setItem('capta_kits_abertos','0')}catch(e){};desenhar()">esconder ↑</button>
     </div></div>`;
 }
@@ -495,48 +523,82 @@ function vDia(d){
   const ts = turmasDo(d).sort((a,b)=>String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
   const out = ts.map(t => {
     const als = alunosDa(t).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome));
-    const exps = EXP.filter(a => a.data === d && viva(a) && hh(a.hora_inicio) >= hh(t.hora_inicio) && hh(a.hora_inicio) < hh(t.hora_fim));
-    const expV = TIPO === 'alunos' ? exps.filter(ehRep) : TIPO === 'experimental' ? exps.filter(ehExp) : exps;
-    if (TIPO === 'experimental' && !expV.length) return '';
+    const ini = hN(t.hora_inicio), fim = hN(t.hora_fim);
+    const horas = []; for (let x = ini; x < fim; x++) horas.push(x);
+    const expDoBloco = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) >= ini && hN(a.hora_inicio) < fim);
+    if (TIPO === 'experimental' && !expDoBloco.length) return '';
     const porKit = {}; als.forEach(a => porKit[a.kit] = (porKit[a.kit]||0)+1);
-    const v = vagasHora(d, hN(t.hora_inicio));
-    const cls = !v ? '' : v.n <= 0 ? 'cheio' : v.n <= 2 ? 'alerta' : '';
     const sala = t.limite_sala || 18;
+
+    // uma coluna por hora, larga, aproveitando o espaço
+    const colunas = horas.map(h => {
+      const doHorario = expDoBloco.filter(a => hN(a.hora_inicio) === h && ehExp(a));
+      const v = (VAGAS||[]).find(x => x.data === d && hN(x.hora_inicio) === h);
+      const total = v ? (v.capacidade ?? 8) : 8, livres = v ? v.vagas : 0;
+      return `<div class="hcol" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${h})">
+        <div class="hcol-t"><b>${String(h).padStart(2,'0')}:00</b><span>–${String(h+1).padStart(2,'0')}:00</span>
+          <span class="cap ${livres<=0?'cheio':livres<=2?'alerta':''}">${livres}/${total}</span></div>
+        ${doHorario.map(mini).join('')}
+        ${livres > 0
+          ? `<div class="hcol-mais" onclick="novoAgendamento('${d}','${t.id}',${h})">
+               <b>+ Marcar aula experimental</b><span>vagas restantes: ${livres}/${total}</span></div>`
+          : `<div class="hcol-mais cheia"><b>Sem kit livre</b><span>${total}/${total} ocupados</span></div>`}
+      </div>`;
+    }).join('');
+
     return `<div class="bloco-dia">
       <div class="bd-cab"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)}</b>
-        <span class="bd-sub"><b style="color:var(--ink)">${als.length + expV.length}</b>/${sala} na sala</span>
-        ${v ? `<span class="cap ${cls}">${v.n}${v.cap?'/'+v.cap:''} kit${v.n===1?'':'s'} livre${v.n===1?'':'s'} p/ experimental</span>` : ''}</div>
+        <span class="bd-sub"><b style="color:var(--ink)">${als.length + expDoBloco.length}</b>/${sala} na sala</span></div>
       <div class="bd-corpo">
         ${TIPO === 'experimental' ? '' : `<div class="bd-col">
           <div class="bd-tit azul">Matriculados · ${als.length}</div>
-          ${als.map(a => `<div class="al" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('') || '<div class="al" style="cursor:default;color:var(--faint)">ninguém nesta turma</div>'}
+          ${als.map(a => `<div class="al" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)}${a.kit?' · '+esc(a.kit):''}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('') || '<div class="al" style="cursor:default;color:var(--faint)">ninguém nesta turma</div>'}
           <div class="kits">${(D.kits||[]).map(k => { const u = porKit[k.kit]||0, liv = k.capacidade - u;
             return `<span class="kt ${liv<=0?'cheio':liv<=2?'alerta':''}" title="${esc(k.kit)}: ${u} de ${k.capacidade}">${esc(k.kit.replace('App Developer','App').replace('Bot',''))} ${u}/${k.capacidade}</span>`; }).join('')}</div>
         </div>`}
-        <div class="bd-col" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hN(t.hora_inicio)})">
-          <div class="bd-tit laranja">Aula experimental e reposição · ${expV.length}</div>
-          ${expV.filter(ehExp).map(cartao).join('')}
-          ${expV.filter(ehRep).map(r => { const alu = (D.alunos||[]).find(x => x.id === r.aluno_id) || {};
-            return `<div class="al rep" onclick="abrirAluno('${r.aluno_id}')"><span class="k"></span><span class="n">${esc(r.crianca_nome||alu.nome||'')}</span><span class="hr">reposição ${hh(r.hora_inicio)}</span></div>`; }).join('')}
-          ${horasLivres(d, t)}
-        </div>
+        ${TIPO === 'alunos' ? '' : `<div class="bd-col larga">
+          <div class="bd-tit laranja">Aulas experimentais</div>
+          <div class="hcols">${colunas}</div>
+        </div>`}
       </div></div>`;
   }).filter(Boolean).join('');
-  // horas em que a escola abre mas não há turma: também dá para marcar experimental
+
+  // horas abertas sem turma
   const horasTurma = new Set();
   ts.forEach(t => { for (let x = hN(t.hora_inicio); x < hN(t.hora_fim); x++) horasTurma.add(x); });
   const soltas = (VAGAS||[]).filter(v => v.data === d && !horasTurma.has(hN(v.hora_inicio)))
     .sort((a,b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
   const extra = soltas.length && TIPO !== 'alunos' ? `<div class="bloco-dia">
-      <div class="bd-cab"><b>Horas livres</b><span class="bd-sub">a escola está aberta e não há turma — cabe aula experimental</span></div>
-      <div class="horas-fila">${soltas.map(v => { const usados = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) === hN(v.hora_inicio)).length;
-        const total = v.capacidade ?? 8, livres = v.vagas;
-        const cad = Array.from({length: Math.min(total,10)}, (_,i) => `<i class="${i < total - livres ? 'ocup':''}"></i>`).join('');
-        return livres > 0
-          ? `<div class="hbox" onclick="novoAgendamento('${d}','${v.turma_id||''}',${hN(v.hora_inicio)})"><b>${hh(v.hora_inicio)}</b><span class="${livres===1?'ultimo':''}">${livres===1?'último kit':livres+' vagas'}</span><span class="cadeiras">${cad}</span><i>+ marcar</i></div>`
-          : `<div class="hbox cheia"><b>${hh(v.hora_inicio)}</b><span>${total}/${total}</span><i>lotado</i></div>`; }).join('')}</div></div>` : '';
+      <div class="bd-cab"><b>Horas livres</b><span class="bd-sub">a escola está aberta e não há turma</span></div>
+      <div class="hcols">${soltas.map(v => { const h = hN(v.hora_inicio); const total = v.capacidade ?? 8, livres = v.vagas;
+        const doH = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) === h && ehExp(a));
+        return `<div class="hcol" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${h})">
+          <div class="hcol-t"><b>${hh(v.hora_inicio)}</b><span>–${String(h+1).padStart(2,'0')}:00</span>
+            <span class="cap ${livres<=0?'cheio':livres<=2?'alerta':''}">${livres}/${total}</span></div>
+          ${doH.map(mini).join('')}
+          ${livres > 0 ? `<div class="hcol-mais" onclick="novoAgendamento('${d}','${v.turma_id||''}',${h})"><b>+ Marcar aula experimental</b><span>vagas restantes: ${livres}/${total}</span></div>`
+            : `<div class="hcol-mais cheia"><b>Sem kit livre</b><span>${total}/${total} ocupados</span></div>`}
+        </div>`; }).join('')}</div></div>` : '';
+
   return (out + extra) || `<div class="vazio">A escola não abre neste dia.</div>`;
 }
+
+// card reduzido da aula experimental: clicar abre o card inteiro
+function mini(a){
+  const l = leadDe(a); const D_ = desfechoDe(a);
+  const cor = D_ ? (D_.t === 'matriculou' ? 'win' : D_.t === 'nao' ? 'lost' : D_.t === 'andamento' ? 'hold' : 'gone') : '';
+  return `<div class="minix ${cor}" onclick="abrirAula('${a.id}')" title="ver e dar baixa">
+    <b>${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade ? `<em>${a.crianca_idade} anos</em>` : ''}</b>
+    <span>${esc(l.nome || 'sem responsável')}</span>
+    ${D_ ? `<i class="mx-res">${D_.t === 'matriculou' ? 'matriculou' : D_.t === 'nao' ? 'não fechou' : D_.t === 'andamento' ? 'em andamento' : 'faltou'}</i>` : ''}</div>`;
+}
+function abrirAula(id){
+  const a = EXP.find(x => x.id === id); if (!a) return;
+  document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela" style="max-width:560px;padding:18px">
+    ${cartao(a)}<div class="fim"><button class="btn g" onclick="fecharModal()">Fechar</button></div></div></div>`;
+  document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
+}
+
 function expBloco(list, h){
   if (!list.length) return '';
   const rep = list.filter(ehRep), exp = list.filter(ehExp);
@@ -564,7 +626,7 @@ function vSemanaGrade(){
   // cada dia ocupa 2 subcolunas: matriculados | visitas
   const colAluno = j => 2 + j * 2, colVisita = j => 3 + j * 2;
 
-  let h = `<div class="scrollx"><div class="grade2" style="grid-template-rows:auto repeat(${horas.length}, minmax(58px,auto))">`;
+  let h = `<div class="scrollx"><div class="grade2" style="grid-template-rows:auto repeat(${horas.length}, 92px)">`;
   h += `<div class="gh2 canto"></div>`;
   dias.forEach((d, j) => {
     h += `<div class="gh2" style="grid-column:${colAluno(j)}/span 2;${d===hoje?'color:var(--brand)':''}${d<hoje?'opacity:.5':''}">
