@@ -109,6 +109,10 @@
   async function mudarEtapa(etapaId) {
     const l = S.lead; if (!l || l.etapa_id === etapaId) return;
     const et = await etapas(); const e = et.find(x => x.id === etapaId); let motivo = null;
+    // "Aula agendada" não é só um rótulo: leva direto ao agendamento, senão o lead
+    // fica na coluna sem dia nem hora (foi assim que nasceram os 37 sem data)
+    if (e && /aula agendada/i.test(e.nome)) { S.aba = 'agendar'; desenhar(); carregarAgenda();
+      say('Escolha o dia e o horário para concluir', { ms: 3000 }); return; }
     if (e && e.tipo === 'perdida') { motivo = prompt('Motivo da perda (opcional):') || null; }
     const antes = l.etapa_id; l.etapa_id = etapaId; l.etapa_em = new Date().toISOString(); desenhar();
     try { if (cfg.onMover) await cfg.onMover(l, etapaId, motivo); else await api('mover', { lead_id: l.id, etapa_id: etapaId, motivo });
@@ -254,14 +258,45 @@
   function vAgendar(l) {
     const ag = (S.info && S.info.agendamentos || []).filter(a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para);
     return `<div class="corpo">
-      ${ag.length ? `<div class="sec">Aulas deste lead</div>${ag.map(a => `<div class="ag-item"><span>${nomeDia(a.data)} ${dataBR(a.data)} · ${hhmm(a.hora_inicio)}${a.crianca_nome?' · '+esc(a.crianca_nome):''}</span><span class="st">${esc(a.status)}${['agendado','confirmado'].includes(a.status)?` <a class="lnk" style="color:var(--quente,#E03127);margin-left:6px" onclick="LeadPainel.cancelarAula('${a.id}')">cancelar</a>`:''}</span></div>`).join('')}` : ''}
+      ${ag.length ? `<div class="sec">Aulas deste lead ${ag.some(a=>['agendado','confirmado'].includes(a.status)) ? '<span style="font-weight:600;color:var(--faint);text-transform:none;letter-spacing:0">— já tem aula marcada; agendar de novo cria uma segunda</span>' : ''}</div>${ag.map(a => `<div class="ag-item"><span>${nomeDia(a.data)} ${dataBR(a.data)} · ${hhmm(a.hora_inicio)}${a.crianca_nome?' · '+esc(a.crianca_nome):''}</span><span class="st">${esc(a.status)}${['agendado','confirmado'].includes(a.status)?` <a class="lnk" style="color:var(--quente,#E03127);margin-left:6px" onclick="LeadPainel.cancelarAula('${a.id}')">cancelar</a>`:''}</span></div>`).join('')}` : ''}
       <div class="sec">1 · Criança</div>
       <div class="l2"><div class="campo"><label>Nome</label><input id="lp-a-cri" value="${esc(l.crianca||'')}" placeholder="Nome da criança"></div><div class="campo"><label>Idade</label><input id="lp-a-id" type="number" min="3" max="17" value="${l.idade||''}"></div></div>
       <div class="sec">2 · Kit</div><div class="chips"><span class="chip on">First</span><span class="chip" style="border:0;color:var(--faint)">a experimental é sempre no First; o nivelamento é no dia</span></div>
       <div class="sec">3 · Ofereça duas opções</div>
       ${!S.agenda ? `<div class="aviso-p">Buscando vagas…</div>` : S.agenda.erro ? `<div class="aviso-p">${esc(S.agenda.erro)}</div>` : cardVaga('manha','Manhã') + cardVaga('tarde','Tarde') + cardVaga('sab','Sábado')}
+      <div class="sec">Outro dia e horário</div>
+      <div class="vaga" style="background:var(--card)">
+        <div class="l2"><div class="campo"><label>Dia</label><input id="lp-a-data" type="date" min="${new Date().toISOString().slice(0,10)}" value="${S.escolhido?.data || ''}" onchange="LeadPainel.verHorarios(this.value)" max="${new Date(Date.now()+120*864e5).toISOString().slice(0,10)}"></div>
+          <div class="campo"><label>Horário</label><select id="lp-a-hora" ${S.horarios ? '' : 'disabled'}>${
+            !S.horarios ? '<option>escolha o dia</option>' :
+            !S.horarios.length ? '<option>sem turma nesse dia</option>' :
+            S.horarios.map(h => `<option value="${h.turma_id}" ${h.vagas <= 0 ? 'disabled' : ''}>${hhmm(h.hora_inicio)}–${hhmm(h.hora_fim)} · ${h.vagas > 0 ? h.vagas + ' livre' + (h.vagas > 1 ? 's' : '') : 'sem vaga'}</option>`).join('')
+          }</select></div></div>
+        <div class="acs"><button class="btn" onclick="LeadPainel.agendarManual()" ${S.horarios && S.horarios.some(h => h.vagas > 0) ? '' : 'disabled'}>Agendar nesse horário</button></div>
+        <div class="liv" style="margin-top:6px">Use quando a família pedir um dia específico. Só aparecem horários com vaga real.</div>
+      </div>
       <div class="aviso-p" style="margin-top:10px;border:0;padding:6px 0;text-align:left">Estoque atualiza sozinho a cada minuto e a cada aula marcada.</div>
       ${historico(l)}</div>`;
+  }
+  async function verHorarios(data) {
+    S.escolhido = { data };
+    // se a data escolhida está além do que já carregamos, busca mais dias
+    const ultimo = (S.agenda && S.agenda.horarios || []).map(h => h.data).sort().pop();
+    if (!ultimo || data > ultimo) {
+      const dias = Math.min(120, Math.ceil((new Date(data + 'T12:00') - Date.now()) / 864e5) + 7);
+      try { S.agenda = await api('agenda', { dias }); } catch (e) {}
+    }
+    const todos = (S.agenda && S.agenda.horarios || []).filter(h => h.data === data)
+      .sort((a, b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+    S.horarios = todos; desenhar();
+    // mantém a data escolhida visível depois de redesenhar
+    const el = document.getElementById('lp-a-data'); if (el) el.value = data;
+  }
+  async function agendarManual() {
+    const data = (document.getElementById('lp-a-data') || {}).value;
+    const turma = (document.getElementById('lp-a-hora') || {}).value;
+    if (!data || !turma) return say('Escolha o dia e o horário.', { tipo:'erro' });
+    return confirmarAgenda(turma, data);
   }
   async function confirmarAgenda(turmaId, data) {
     const l = S.lead; const crianca = document.getElementById('lp-a-cri').value.trim(), idade = document.getElementById('lp-a-id').value;
@@ -287,5 +322,5 @@
       S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
-  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, mudarEtapa, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
+  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, mudarEtapa, verHorarios, agendarManual, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
 })();
