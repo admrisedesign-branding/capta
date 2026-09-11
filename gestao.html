@@ -189,6 +189,9 @@ function montarMeses(){
   sel.onchange = render;
 }
 
+
+// ícone de ajuda: <span class="ajuda">i<span class="balao">…</span></span>
+const ajuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
 const dias = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 864e5));
 const META_K = 'capta_meta_' + SLUG;
 function metas(){ try { return JSON.parse(localStorage.getItem(META_K) || '{}'); } catch(e){ return {}; } }
@@ -223,16 +226,17 @@ function render(){
   // canais: fonte × porta
   const porFonte = conta(doMes, l => l.fonte || (l.origem && l.origem !== 'kommo' ? l.origem : null) || 'não informado');
   const porPorta = conta(doMes, l => l.porta || 'não informado');
-  const tabela = (m, titulo, sub) => {
+  const tabela = (m, titulo, sub, dica) => {
     const linhas = [...m.entries()].sort((a,b) => b[1]-a[1]);
     const max = Math.max(1, ...linhas.map(x => x[1]));
-    return `<div class="card"><h3>${titulo}</h3><div class="h">${sub}</div>
+    return `<div class="card"><h3>${titulo}${dica ? ajuda(dica) : ''}</h3><div class="h">${sub}</div>
       ${linhas.length ? `<table><tr><th>${titulo}</th><th>Leads</th><th class="n">Matr.</th></tr>
       ${linhas.map(([nome,q]) => {
         const mq = doMes.filter(l => ((titulo==='Por onde veio' ? (l.fonte || (l.origem && l.origem!=='kommo' ? l.origem : null) || 'não informado') : (l.porta || 'não informado')) === nome) && ganhou(l)).length;
         const antQ = ant ? ant.filter(l => ((titulo==='Por onde veio' ? (l.fonte || (l.origem && l.origem!=='kommo' ? l.origem : null) || 'não informado') : (l.porta || 'não informado')) === nome)).length : null;
         const d = antQ === null ? '' : q - antQ ? `<span class="delta ${q>antQ?'up':'down'}">${q>antQ?'+':''}${q-antQ}</span>` : '';
-        return `<tr><td>${esc(nome)}${d}</td><td><div style="display:flex;align-items:center"><div class="bar" style="flex:1"><i style="width:${q/max*100}%"></i></div><span class="pct">${q}</span></div></td><td class="n">${mq}</td></tr>`;
+        const semDado = nome === 'não informado' ? ajuda('Esses leads chegaram sem o campo preenchido no Kommo. Preencher em cada lead novo é o que faz esta tabela — e o custo por canal — ficar confiável.') : '';
+        return `<tr><td>${esc(nome)}${semDado}${d}</td><td><div style="display:flex;align-items:center"><div class="bar" style="flex:1"><i style="width:${q/max*100}%"></i></div><span class="pct">${q}</span></div></td><td class="n">${mq}</td></tr>`;
       }).join('')}
       <tr class="tot"><td>Total</td><td class="n">${leads}</td><td class="n">${mat}</td></tr></table>` : `<div class="vazio">Sem leads neste período.</div>`}
     </div>`;
@@ -274,8 +278,8 @@ function render(){
     <div class="cab"><div><h2>${esc(TENANT.nome||'')}</h2><div class="sub">${k ? rotulo(k) : 'Todo o período'} · gerado ${new Date().toLocaleDateString('pt-BR')}</div></div></div>
     <div class="kpis">${kpis}</div>
     <div class="grid">
-      ${tabela(porFonte,'Por onde veio','Anúncio, Instagram, Google, evento, indicação…')}
-      ${tabela(porPorta,'Como chegou','Site, WhatsApp pelo bot, WhatsApp direto, evento…')}
+      ${tabela(porFonte,'Por onde veio','Anúncio, Instagram, Google, evento, indicação…','<b>Onde a pessoa viu a My Robot</b> — vem do campo <b>Fonte</b> do Kommo.<br><br><b>“não informado”</b> = o campo ficou em branco naquele lead. Não é um canal: é dado que faltou preencher. Quanto mais preenchido, mais confiável fica o custo por canal aqui embaixo.')}
+      ${tabela(porPorta,'Como chegou','Site, WhatsApp pelo bot, WhatsApp direto, evento…','<b>Por onde a conversa começou</b> — vem do campo <b>Porta</b> do Kommo.<br><br>Hoje quase tudo aparece como <b>“não informado”</b> porque o bot grava a informação como <i>tag</i> e não neste campo. O Capta passou a deduzir pela tag quando o campo está vazio.')}
       ${(() => { const g = INVEST.filter(i => !k || i.mes.slice(0,7) === k); if (!g.length) return '';
         const porCanal = {}; g.forEach(i => porCanal[i.canal] = (porCanal[i.canal]||0) + Number(i.valor||0));
         const NOME = { meta:'Meta Ads', google:'Google', evento:'Evento', material:'Material', outro:'Outro' };
@@ -283,7 +287,7 @@ function render(){
           if (canal === 'meta') return f.includes('anúncio') || f.includes('anuncio') || f.includes('instagram');
           if (canal === 'google') return f.includes('google');
           if (canal === 'evento') return f.includes('evento') || p === 'evento'; return false; }).length;
-        return `<div class="card"><h3>Investimento por canal</h3><div class="h">Quanto custou cada lead e cada matrícula</div>
+        return `<div class="card"><h3>Investimento por canal${ajuda('Gasto do mês dividido pelos leads e pelas matrículas de cada canal. O gasto do Meta vem automático da conta de anúncios; evento e material são lançados à mão em Ajustes → Integrações.')}</h3><div class="h">Quanto custou cada lead e cada matrícula</div>
           <table><tr><th>Canal</th><th class="n">Gasto</th><th class="n">Leads</th><th class="n">Custo/lead</th><th class="n">Matr.</th><th class="n">Custo/matr.</th></tr>
           ${Object.entries(porCanal).sort((a,b)=>b[1]-a[1]).map(([c,v]) => { const nl = leadsDe(c);
             const nm = doMes.filter(l => { const f=(l.fonte||l.origem||'').toLowerCase(), p=(l.porta||'').toLowerCase();
@@ -302,7 +306,7 @@ function render(){
           ['Aula marcada', doMes.filter(passouAula).length, doMes.filter(passouQualif).length],
           ['Matriculou', doMes.filter(passouMat).length, doMes.filter(passouAula).length]];
         const max = doMes.length || 1;
-        return `<div class="card full"><h3>Do primeiro contato à matrícula</h3><div class="h">Quantos leads chegam em cada estágio — e quanto se perde no caminho</div>
+        return `<div class="card full"><h3>Do primeiro contato à matrícula${ajuda('Quantos leads do mês chegaram a cada estágio. <b>% do anterior</b> mostra quanto avançou de um passo para o outro — o menor número é onde mais se perde gente.')}</h3><div class="h">Quantos leads chegam em cada estágio — e quanto se perde no caminho</div>
           <div class="conv">${etapasFunil.map(([nome, n, base]) => `<div class="cv ${base && n/base < .4 ? 'perde' : ''}">
             <span class="nm">${nome}</span><div class="bar"><i style="width:${Math.max(n/max*100, n?6:0)}%"></i><b>${n}</b></div>
             <span class="taxa">${base ? `<b>${Math.round(n/base*100)}%</b> do anterior · ${Math.round(n/max*100)}% do total` : '100%'}</span></div>`).join('')}</div>
@@ -321,7 +325,7 @@ function render(){
         const tMat = med(comMat.map(l => dias(dataLead(l), l.ganho_em)));
         const parados = doMes.filter(l => !ganhou(l) && l.etapa_em && dias(l.etapa_em, new Date()) >= 7).length;
         if (tContato === null && tAula === null && tMat === null) return '';
-        return `<div class="card"><h3>Quanto tempo leva</h3><div class="h">Da entrada do lead até cada passo</div>
+        return `<div class="card"><h3>Quanto tempo leva${ajuda('Média de dias entre a entrada do lead e cada passo. Conta só quem chegou lá: quem nunca teve aula não entra na média da aula.')}</h3><div class="h">Da entrada do lead até cada passo</div>
           <div class="tempo">
             ${tContato !== null ? `<div><b>${tContato}d</b><small>até o primeiro contato</small></div>` : ''}
             ${tAula !== null ? `<div><b>${tAula}d</b><small>até a aula</small></div>` : ''}
@@ -336,7 +340,7 @@ function render(){
         const cls = p => p >= 80 ? '' : p >= 50 ? 'baixo' : 'critico';
         const diaDoMes = new Date().getDate(), diasMes = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate();
         const ritmo = alvoM ? Math.round(alvoM * diaDoMes / diasMes) : 0;
-        return `<div class="card"><h3>Meta do mês</h3><div class="h">Defina o alvo e acompanhe o ritmo${k ? '' : ' — escolha um mês no topo'}</div>
+        return `<div class="card"><h3>Meta do mês${ajuda('A meta é definida aqui e fica salva neste navegador. <b>Ritmo</b> = onde você deveria estar hoje se as matrículas se distribuíssem por igual no mês.')}</h3><div class="h">Defina o alvo e acompanhe o ritmo${k ? '' : ' — escolha um mês no topo'}</div>
           <div class="meta">
             <div class="mt"><div class="lb">Matrículas <input type="number" min="0" value="${alvoM||''}" placeholder="meta" onchange="salvarMeta('matriculas', this.value)"></div>
               <div class="vl">${mat}${alvoM?` <span style="font-size:15px;color:var(--faint)">de ${alvoM}</span>`:''}</div>

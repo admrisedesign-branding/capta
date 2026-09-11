@@ -205,6 +205,7 @@ window.CaptaUser = (function(){
 const p = new URLSearchParams(location.search);
 const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
 document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+const ajuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
 const hh = t => String(t||'').slice(0,5);
@@ -317,7 +318,7 @@ function desenhar(){
   }
   document.getElementById('raiz').innerHTML = `
     <div class="barra"><button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="irHoje()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}</div>
-    <div class="tally"><div><b>${base.length}</b><small>agendadas</small></div><div class="bad"><b>${quentes}</b><small>chega querendo fechar</small></div><div><b>${matric}</b><small>matriculadas</small></div><div class="hot"><b>${D.agendamentos.filter(pendente).length}</b><small>sem desfecho</small></div></div>
+    <div class="tally"><div><b>${base.length}</b><small>agendadas</small></div><div class="bad"><b>${quentes}</b><small>chega querendo fechar${ajuda('Visitantes cujo lead está marcado como Quente. Vale preparar a proposta antes da aula.')}</small></div><div><b>${matric}</b><small>matriculadas</small></div><div class="hot"><b>${D.agendamentos.filter(pendente).length}</b><small>sem desfecho${ajuda('Aulas que já aconteceram e ninguém registrou o que houve (matriculou, não fechou, faltou).')}</small></div></div>
     ${SEMDATA.length ? `<div class="tally" style="display:block;background:#FDF8EC;border-color:#EAD7A5">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:16px;margin:0">${SEMDATA.length} leads em “Aula agendada” sem data</b>
       <small style="font-weight:600">vieram do Kommo sem dia e hora — marque a aula de verdade ou dê a baixa</small>

@@ -103,6 +103,7 @@ window.CaptaUser = (function(){
 const p = new URLSearchParams(location.search);
 const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
 document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+const ajuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'], DIAS3 = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const hoje = new Date().toISOString().slice(0,10);
@@ -169,20 +170,20 @@ function desenhar(){
       <div>
         <div class="bloco" id="sec-aulas"><h3>Aulas de hoje <span class="n">${aulas.length}</span><span class="link" onclick="irPara('/aula-experimental.html')">ver a semana →</span></h3>
           ${aulas.length ? aulas.map(cardAula).join('') : `<div class="vazio">Nenhuma aula experimental hoje.<br><button class="btn sm" style="margin-top:8px" onclick="irPara('/agendamentos.html')">Marcar uma aula</button></div>`}</div>
-        <div class="bloco" id="sec-resp"><h3>Responder agora <span class="n">${semResp.length}</span><span class="link" onclick="irPara('/inbox.html')">abrir conversas →</span></h3>
+        <div class="bloco" id="sec-resp"><h3>Responder agora${ajuda('Conversas com mensagem do cliente ainda não respondida. Some quando alguém responde pelo Capta ou pelo celular.')} <span class="n">${semResp.length}</span><span class="link" onclick="irPara('/inbox.html')">abrir conversas →</span></h3>
           ${semResp.length ? semResp.slice(0,8).map(c => { const l = D.leads.find(x => x.id === (c.lead && c.lead.id)) || c.lead || {}; return `<div class="li"><div class="av">${ini(l.nome||c.nome||c.telefone)}</div><div class="t"><b>${esc(l.nome||c.nome||c.telefone||'')}</b><small>${c.nao_lidas} nova${c.nao_lidas>1?'s':''}${c.ultima_mensagem_em?' · '+new Date(c.ultima_mensagem_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}${l.temperatura?' · '+esc(l.temperatura):''}</small></div><div class="acs">${l.id?`<button class="btn sm" onclick="irLead('${l.id}','conversa')">responder</button>`:`<button class="btn sm g" onclick="irPara('/inbox.html')">abrir</button>`}</div></div>`; }).join('') : `<div class="vazio">Tudo respondido. ${D.conversas.length ? '' : 'As mensagens aparecem aqui quando o WhatsApp da unidade estiver conectado.'}</div>`}</div>
       </div>
       <div>
-        <div class="bloco"><h3>Próximas vagas <span class="link" onclick="irPara('/agendamentos.html')">ver agenda →</span></h3>
+        <div class="bloco"><h3>Próximas vagas${ajuda('Primeira vaga livre de cada período, já descontando alunos e experimentais marcadas. O kit da aula experimental é sempre o First.')} <span class="link" onclick="irPara('/agendamentos.html')">ver agenda →</span></h3>
           <div class="vagas3">${vg('Manhã', vm)}${vg('Tarde', vt)}${vg('Sábado', vs)}</div>
           ${script.length ? `<div class="script"><b>Script:</b> "Temos aula experimental ${script.join(' ou ')} — qual fica melhor pra vocês?"</div>` : ''}</div>
-        <div class="bloco" id="sec-quentes"><h3>Querem fechar, sem aula marcada <span class="n">${quentes.length}</span></h3>
+        <div class="bloco" id="sec-quentes"><h3>Querem fechar, sem aula marcada${ajuda('Leads marcados como <b>Quente</b> no Kommo (pontuação alta ou disseram que querem matricular) e que ainda não têm aula experimental agendada.')} <span class="n">${quentes.length}</span></h3>
           ${quentes.length ? quentes.slice(0,8).map(l => `<div class="li"><div class="av">${ini(l.nome)}</div><div class="t"><b>${esc(l.nome||'Sem nome')}</b><small>${esc(l.contato||'')} · ${esc(etapaNome(l.etapa_id)||'sem etapa')}${l.atendente?' · '+esc(l.atendente):''}</small></div><div class="acs"><button class="btn sm" onclick="irLead('${l.id}','agendar')">marcar aula</button></div></div>`).join('') : '<div class="vazio">Nenhum lead quente esperando aula.</div>'}</div>
-        <div class="bloco" id="sec-evento"><h3>Leads de evento sem contato <span class="n">${(D.evParados||[]).length}</span><span class="link" onclick="irPara('/eventos.html')">ver eventos →</span></h3>
+        <div class="bloco" id="sec-evento"><h3>Leads de evento sem contato${ajuda('Quem deixou o contato num evento e continua parado em “Novo lead”. O voucher da aula experimental foi entregue e ninguém retomou.')} <span class="n">${(D.evParados||[]).length}</span><span class="link" onclick="irPara('/eventos.html')">ver eventos →</span></h3>
           ${(D.evParados||[]).length ? `${(D.evParados||[]).slice(0,8).map(l => { const ev = (D.eventos||[]).find(e => e.id === l.evento_id) || {}; return `<div class="li"><div class="av">${ini(l.nome)}</div><div class="t"><b>${esc(l.nome||'Sem nome')}</b><small>${esc(ev.nome||'evento')} · captado há ${dias(l.criado_em)} dias${l.temperatura?' · '+esc(l.temperatura):''}</small></div><div class="acs"><button class="btn sm" onclick="irLead('${l.id}','conversa')">retomar</button></div></div>`; }).join('')}
             ${(D.evParados||[]).length > 8 ? `<div class="vazio" style="padding:8px 0">e mais ${(D.evParados||[]).length - 8} — a lista completa está em Eventos.</div>` : ''}
             <div class="script"><b>Script de retomada:</b> "Oi! Vocês pegaram o voucher da aula experimental no evento — ainda quero garantir a vaga da criança. Tenho ${script.length ? script.join(' ou ') : 'horários essa semana'}, qual fica melhor?"</div>` : '<div class="vazio">Todos os leads de evento já foram contatados. 👏</div>'}</div>
-        <div class="bloco" id="sec-parados"><h3>Parados há 3+ dias <span class="n">${parados.length}</span><span class="link" onclick="irPara('/funil.html')">ver pipeline →</span></h3>
+        <div class="bloco" id="sec-parados"><h3>Parados há 3+ dias${ajuda('Leads em “Em contato” ou “Qualificado” sem mudar de etapa há três dias ou mais.')} <span class="n">${parados.length}</span><span class="link" onclick="irPara('/funil.html')">ver pipeline →</span></h3>
           ${parados.length ? parados.slice(0,8).map(l => `<div class="li"><div class="av">${ini(l.nome)}</div><div class="t"><b>${esc(l.nome||'Sem nome')}</b><small>${esc(etapaNome(l.etapa_id))} há ${dias(l.etapa_em||l.criado_em)} dias${l.temperatura?' · '+esc(l.temperatura):''}</small></div><div class="acs"><button class="btn sm g" onclick="irLead('${l.id}','conversa')">abrir</button></div></div>`).join('') : '<div class="vazio">Ninguém parado.</div>'}</div>
       </div>
     </div>`;

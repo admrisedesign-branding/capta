@@ -158,6 +158,7 @@ window.CaptaUser = (function(){
 const p = new URLSearchParams(location.search);
 const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
 document.getElementById('voltar').href = `/dashboard.html?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}`;
+const ajuda = txt => `<span class="ajuda" tabindex="0" aria-label="Ajuda">i<span class="balao">${txt}</span></span>`;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const DIAS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const hh = t => String(t||'').slice(0,2).replace(/^0/,'') + 'h';
@@ -179,7 +180,7 @@ function desenhar(){
   const nAt = ativos.filter(a=>a.status==='ativo').length, nTr = ativos.filter(a=>a.status==='trancado').length;
   const lotados = D.turmas.filter(t => { const n = D.alunos.filter(a=>a.turma_id===t.id&&a.status==='ativo').length; return n >= (t.limite_sala||t.capacidade||18); }).length;
   const kpis = `<div class="tally"><div><b>${nAt}</b><small>alunos ativos</small></div><div class="hot"><b>${nTr}</b><small>trancados</small></div><div><b>${D.turmas.filter(t=>t.ativa!==false).length}</b><small>turmas</small></div><div class="bad"><b>${lotados}</b><small>turmas lotadas</small></div></div>`;
-  const lado = `<div class="lado"><h5>Kits por bloco</h5>${D.kits.map(k=>`<div class="k"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${k.cor};margin-right:6px"></i>${esc(k.kit)}</span><b>${ativos.filter(a=>a.kit===k.kit&&a.status==='ativo').length} <span style="color:var(--faint);font-weight:600">/ ${k.capacidade}</span></b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
+  const lado = `<div class="lado"><h5>Kits por bloco${ajuda('Quantos kits de cada tipo existem para um mesmo horário. É o que limita quantas crianças cabem: dois alunos não usam o mesmo kit ao mesmo tempo.')}</h5>${D.kits.map(k=>`<div class="k"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${k.cor};margin-right:6px"></i>${esc(k.kit)}</span><b>${ativos.filter(a=>a.kit===k.kit&&a.status==='ativo').length} <span style="color:var(--faint);font-weight:600">/ ${k.capacidade}</span></b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
     <div class="leg"><span><i style="background:var(--brand-2)"></i>alunos no kit / kits do bloco</span><span><i style="background:var(--morno)"></i>laranja = restam 2 ou menos</span><span><i style="background:var(--quente)"></i>vermelho = kit lotado no bloco</span></div></div>`;
   if (!D.alunos.length) { document.getElementById('raiz').innerHTML = kpis + `<div class="aviso">Nenhum aluno cadastrado ainda.<br>Os alunos entram por aqui ou automaticamente quando uma aula experimental vira matrícula.<br><button class="btn" style="margin-top:12px" onclick="editar(null)">+ Cadastrar aluno</button></div>`; return; }
   document.getElementById('raiz').innerHTML = kpis + `<div class="corpo"><div>${MODO === 'grade' ? grade(filtro) : lista(filtro)}</div>${lado}</div>`;
