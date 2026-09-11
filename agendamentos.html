@@ -297,6 +297,34 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .aluno-jan .horas-fila .hbox{flex:0 0 104px;border-color:#D9CEFF;background:#F6F3FF}
 .aluno-jan .horas-fila .hbox:hover{border-color:#7C5CDB;background:#EFEAFF}
 .aluno-jan .horas-fila .hbox i{color:#5B3FBF}
+
+/* grade da semana: turma em bloco alto, visitas ao lado */
+.grade2{display:grid;grid-template-columns:64px repeat(6, minmax(150px,1fr) minmax(96px,.62fr));gap:6px;min-width:1180px}
+.gh2{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;
+  text-align:center;padding:2px 4px;display:flex;flex-direction:column;gap:1px}
+.gh2-sub{font-size:9.5px;font-weight:700;opacity:.7;letter-spacing:.04em}
+.gb2{font-size:12px;font-weight:800;color:var(--muted);display:flex;align-items:flex-start;justify-content:flex-end;padding:8px 6px 0 0}
+.turma-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:9px 11px;
+  display:flex;flex-direction:column;gap:5px;overflow:hidden}
+.tb-cab{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;border-bottom:1px solid var(--line-2);padding-bottom:5px}
+.tb-cab b{font-size:12.5px;font-weight:800}
+.tb-cab span{font-size:11px;color:var(--muted);font-weight:600}
+.tb-alunos{display:flex;flex-direction:column;gap:3px;overflow-y:auto}
+.tb-vazio{font-size:11.5px;color:var(--faint)}
+.semturma{border:1px dashed var(--line-2);border-radius:12px;display:grid;place-items:center;
+  font-size:11px;color:var(--faint);opacity:.6}
+.vis{border:1px dashed var(--brand-2);background:rgba(46,91,255,.045);border-radius:12px;padding:7px 8px;
+  display:flex;flex-direction:column;gap:4px;justify-content:center}
+.vis.vazia{border-color:var(--line-2);background:transparent}
+.vis.cheia{border-style:solid;border-color:var(--line);background:transparent}
+.vis .lotado{font-size:10.5px;font-weight:800;color:var(--quente);text-align:center}
+.vaga-btn{border:1px dashed var(--brand-2);border-radius:9px;padding:4px 6px;text-align:center;
+  font-size:11.5px;font-weight:800;color:var(--brand);cursor:pointer;background:var(--card)}
+.vaga-btn:hover{border-color:var(--brand);background:var(--brand-soft)}
+.vaga-btn.ultimo{border-color:var(--morno);color:var(--morno)}
+.turma-box.passou,.vis.passou,.semturma.passou{opacity:.4}
+.grade2 .al{font-size:12px;padding:3px 7px}
+.grade2 .al .n{font-size:12px}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -526,63 +554,72 @@ function expBloco(list, h){
 // cada criança é um "assento": azul = matriculado, laranja = experimental, roxo = reposição.
 function vSemanaGrade(){
   const seg = segunda(SEL), dias = [0,1,2,3,4,5].map(n => addDias(seg, n));
-  // uma linha por HORA (8h, 9h, 10h…). A turma de 2h ocupa as duas linhas dela.
   const horas = [...new Set([
     ...(VAGAS||[]).filter(v => dias.includes(v.data)).map(v => hN(v.hora_inicio)),
-    ...(D.turmas||[]).filter(t => t.ativa !== false).flatMap(t => {
-      const out = []; for (let x = hN(t.hora_inicio); x < hN(t.hora_fim); x++) out.push(x); return out; }),
+    ...(D.turmas||[]).filter(t => t.ativa !== false).flatMap(t => { const o=[]; for (let x=hN(t.hora_inicio); x<hN(t.hora_fim); x++) o.push(x); return o; }),
     ...EXP.filter(a => dias.includes(a.data) && viva(a)).map(a => hN(a.hora_inicio)),
   ])].sort((a,b) => a-b);
+  const linhaDe = h => horas.indexOf(h) + 2;          // 1 = cabeçalho
+  const soExp = TIPO === 'experimental', soAlu = TIPO === 'alunos';
+  // cada dia ocupa 2 subcolunas: matriculados | visitas
+  const colAluno = j => 2 + j * 2, colVisita = j => 3 + j * 2;
 
-  let h = `<div class="scrollx"><div class="grade"><div></div>${dias.map(d => `<div class="gh ${d < hoje ? 'passou' : ''}" style="${d===hoje?'color:var(--brand)':''}">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}${d===hoje?' · hoje':''}</div>`).join('')}`;
-  for (const hora of horas) {
-    const hs = String(hora).padStart(2,'0') + ':00';
-    h += `<div class="gb">${hs}</div>`;
-    for (const d of dias) {
-      const t = (D.turmas||[]).find(x => x.dia_semana === dow(d) && x.ativa !== false
-        && hN(x.hora_inicio) <= hora && hora < hN(x.hora_fim));
-      const exps = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) === hora);
-      const expV = TIPO === 'alunos' ? exps.filter(ehRep) : TIPO === 'experimental' ? exps.filter(ehExp) : exps;
-      const aberta = (VAGAS||[]).find(v => v.data === d && hN(v.hora_inicio) === hora);
+  let h = `<div class="scrollx"><div class="grade2" style="grid-template-rows:auto repeat(${horas.length}, minmax(58px,auto))">`;
+  h += `<div class="gh2 canto"></div>`;
+  dias.forEach((d, j) => {
+    h += `<div class="gh2" style="grid-column:${colAluno(j)}/span 2;${d===hoje?'color:var(--brand)':''}${d<hoje?'opacity:.5':''}">
+      ${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}${d===hoje?' · hoje':''}
+      <span class="gh2-sub">${soExp?'':'turma'}${soExp||soAlu?'':' · '}${soAlu?'':'1h'}</span></div>`;
+  });
+  // coluna das horas
+  horas.forEach(hora => { h += `<div class="gb2" style="grid-row:${linhaDe(hora)}">${String(hora).padStart(2,'0')}:00</div>`; });
 
-      if (!t && !expV.length) {
-        h += aberta
-          ? `<div class="cel livre" onclick="novoAgendamento('${d}','${aberta.turma_id||''}',${hora})" title="a escola abre nesta hora — clique para marcar aula experimental">
-               <span class="lv-h">${hs}</span><span class="lv2 ${aberta.vagas===1?'ultimo':''}">${aberta.vagas===1?'último kit':aberta.vagas+' vagas'}</span>
-               <span class="lv-cta">+ marcar</span></div>`
-          : `<div class="cel vazia ${d < hoje ? 'passou' : ''}">${d < hoje ? '' : 'fechado'}</div>`;
-        continue;
-      }
-      const primeira = t ? hN(t.hora_inicio) === hora : true;     // só a 1ª hora da turma lista os alunos
-      const als = (t && primeira) ? alunosDa(t).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome)) : [];
-      const v = aberta ? { n: aberta.vagas, cap: aberta.capacidade } : null;
-      const cls = !v ? '' : v.n <= 0 ? 'cheio' : v.n <= 2 ? 'alerta' : '';
-      const naSala = (t ? alunosDa(t).length : 0) + expV.length;
-      const colAluno = TIPO === 'experimental' ? '' : `<div class="lad alunos">
-          ${t ? (primeira
-            ? `<div class="lad-t"><b>${als.length}</b>/${t.limite_sala||18} na sala</div>`
-            : `<div class="lad-t segue">${hh(t.hora_inicio)}–${hh(t.hora_fim)} · continua</div>`) : '<div class="lad-t vazio-t">sem turma</div>'}
-          ${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="event.stopPropagation();abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('')}
+  dias.forEach((d, j) => {
+    const passou = d < hoje ? ' passou' : '';
+    // --- bloco único por turma, atravessando as horas dela ---
+    if (!soExp) {
+      const ts = (D.turmas||[]).filter(t => t.dia_semana === dow(d) && t.ativa !== false);
+      const cobertas = new Set();
+      ts.forEach(t => {
+        const ini = hN(t.hora_inicio), fim = hN(t.hora_fim);
+        const dentro = horas.filter(x => x >= ini && x < fim);
+        if (!dentro.length) return;
+        dentro.forEach(x => cobertas.add(x));
+        const als = alunosDa(t).sort((a,b) => (a.kit||'').localeCompare(b.kit||'') || (a.nome_curto||a.nome).localeCompare(b.nome_curto||b.nome));
+        const l1 = linhaDe(dentro[0]), span = dentro.length;
+        h += `<div class="turma-box${passou}" style="grid-column:${colAluno(j)};grid-row:${l1}/span ${span}">
+          <div class="tb-cab"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)}</b><span>${als.length}/${t.limite_sala||18} na sala</span></div>
+          <div class="tb-alunos">${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('') || '<span class="tb-vazio">sem alunos</span>'}</div>
         </div>`;
-      const colExp = TIPO === 'alunos' && !expV.filter(ehRep).length ? '' : `<div class="lad visitas">
-          <div class="lad-t">${v ? (v.n <= 0 ? `<span class="cap cheio">${v.cap||8}/${v.cap||8} lotado</span>` : `<span class="cap ${cls}">${v.n} livre${v.n===1?'':'s'}</span>`) : '1h'}</div>
+      });
+      // horas do dia sem turma: célula apagada, só pra manter o desenho
+      horas.forEach(hora => { if (cobertas.has(hora)) return;
+        const aberta = (VAGAS||[]).find(v => v.data === d && hN(v.hora_inicio) === hora);
+        h += `<div class="semturma${passou}" style="grid-column:${colAluno(j)};grid-row:${linhaDe(hora)}">${d<hoje?'':(aberta?'':'fechado')}</div>`;
+      });
+    }
+    // --- coluna das visitas, uma célula por hora ---
+    if (!soAlu) {
+      horas.forEach(hora => {
+        const exps = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) === hora);
+        const expV = soExp ? exps.filter(ehExp) : exps;
+        const aberta = (VAGAS||[]).find(v => v.data === d && hN(v.hora_inicio) === hora);
+        const col = soExp ? `${colAluno(j)}/span 2` : `${colVisita(j)}`;
+        if (!aberta && !expV.length) { h += `<div class="vis vazia${passou}" style="grid-column:${col};grid-row:${linhaDe(hora)}"></div>`; return; }
+        const n = aberta ? aberta.vagas : 0;
+        h += `<div class="vis${passou} ${n<=0?'cheia':''}" style="grid-column:${col};grid-row:${linhaDe(hora)}"
+              ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hora})">
           ${expV.map(a => { const l = leadDe(a); const alu = (D.alunos||[]).find(x => x.id === a.aluno_id) || {};
             return ehRep(a)
-              ? `<div class="al rep" onclick="event.stopPropagation();abrirAluno('${a.aluno_id}')" title="reposição"><span class="k"></span><span class="n">${esc(a.crianca_nome||alu.nome||'')}</span></div>`
-              : `<div class="al exp" onclick="event.stopPropagation();irDia('${d}')" title="aula experimental · ${esc(l.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||l.nome||'visita')}</span></div>`; }).join('')}
-          ${v && v.n > 0 && TIPO !== 'alunos' ? `<div class="al mais ${v.n===1?'ultimo':''}" onclick="event.stopPropagation();novoAgendamento('${d}','${t?t.id:(aberta?aberta.turma_id||'':'')}',${hora})">${v.n===1?'último kit':'+ '+v.n}</div>` : ''}
+              ? `<div class="al rep" onclick="abrirAluno('${a.aluno_id}')" title="reposição"><span class="k"></span><span class="n">${esc(a.crianca_nome||alu.nome||'')}</span></div>`
+              : `<div class="al exp" onclick="irDia('${d}')" title="aula experimental · ${esc(l.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||l.nome||'visita')}</span></div>`; }).join('')}
+          ${aberta && n > 0 ? `<div class="vaga-btn ${n===1?'ultimo':''}" onclick="novoAgendamento('${d}','${aberta.turma_id||''}',${hora})" title="marcar aula experimental às ${String(hora).padStart(2,'0')}:00">+ ${n===1?'último':n}</div>`
+            : (aberta ? `<span class="lotado">lotado</span>` : '')}
         </div>`;
-      h += `<div class="cel dupla ${expV.length?'temexp':''} ${t && !primeira ? 'cont' : ''} ${d < hoje ? 'passou' : ''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hora})" title="${d < hoje ? 'dia que já passou' : ''}">
-        ${colAluno}${colExp}
-      </div>`;
+      });
     }
-  }
-  h += `</div></div>
-  <div class="legenda"><span><span style="width:9px;height:9px;border-radius:50%;background:var(--brand-2);display:inline-block"></span>aluno matriculado</span>
-    <span><span style="width:9px;height:9px;border-radius:50%;background:var(--exp);display:inline-block"></span>aula experimental (1h)</span>
-    <span><span style="width:9px;height:9px;border-radius:50%;background:#7C5CDB;display:inline-block"></span>reposição</span>
-    <span><i style="width:11px;height:11px;border:1px dashed var(--line);border-radius:3px;display:inline-block"></i>livre — a escola abre e há kit</span>
-    <span>fechado = a unidade não abre nessa hora</span></div>`;
+  });
+  h += `</div></div>`;
   return h;
 }
 
