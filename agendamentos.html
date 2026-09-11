@@ -231,6 +231,10 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .cel.passou{opacity:.45}
 .cel.passou .al{cursor:default}
 .grade .gh.passou{opacity:.5}
+.al.mais.ultimo{border-color:var(--morno);color:var(--morno);background:var(--morno-bg)}
+.cel.livre .lv2.ultimo{color:var(--morno);font-weight:800}
+.hora-livre span.ultimo{color:var(--morno);font-weight:800}
+.hora-livre.cheia span{color:var(--quente);font-weight:700}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -368,11 +372,11 @@ function horasLivres(d, t){
     const v = VAGAS.find(x => x.data === d && hN(x.hora_inicio) === h);
     const total = v ? (v.capacidade ?? 8) : 8;
     const livres = v ? v.vagas : Math.max(0, total - usados);
-    if (livres <= 0) { out.push(`<div class="hora-livre cheia"><b>${String(h).padStart(2,'0')}:00</b><span>sem kit livre</span></div>`); continue; }
+    if (livres <= 0) { out.push(`<div class="hora-livre cheia"><b>${String(h).padStart(2,'0')}:00</b><span>${total}/${total} · lotado</span></div>`); continue; }
     const cad = Array.from({ length: Math.min(total, 10) }, (_, i) =>
       `<i class="${i < (total - livres) ? 'ocup' : ''}"></i>`).join('');
     out.push(`<div class="hora-livre" onclick="novoAgendamento('${d}','${t.id}',${h})" title="marcar aula experimental às ${String(h).padStart(2,'0')}:00">
-      <b>${String(h).padStart(2,'0')}:00</b><span>${livres} vaga${livres>1?'s':''}</span><span class="cadeiras">${cad}</span></div>`);
+      <b>${String(h).padStart(2,'0')}:00</b><span class="${livres===1?'ultimo':''}">${livres===1?'último kit':livres+' vagas'}</span><span class="cadeiras">${cad}</span></div>`);
   }
   return out.join('');
 }
@@ -419,8 +423,8 @@ function vDia(d){
         const total = v.capacidade ?? 8, livres = v.vagas;
         const cad = Array.from({length: Math.min(total,10)}, (_,i) => `<i class="${i < total - livres ? 'ocup':''}"></i>`).join('');
         return livres > 0
-          ? `<div class="hora-livre" onclick="novoAgendamento('${d}','${v.turma_id||''}',${hN(v.hora_inicio)})"><b>${hh(v.hora_inicio)}</b><span>${livres} vaga${livres>1?'s':''}</span><span class="cadeiras">${cad}</span></div>`
-          : `<div class="hora-livre cheia"><b>${hh(v.hora_inicio)}</b><span>sem kit livre</span></div>`; }).join('')}</div></div>` : '';
+          ? `<div class="hora-livre" onclick="novoAgendamento('${d}','${v.turma_id||''}',${hN(v.hora_inicio)})"><b>${hh(v.hora_inicio)}</b><span class="${livres===1?'ultimo':''}">${livres===1?'último kit':livres+' vagas'}</span><span class="cadeiras">${cad}</span></div>`
+          : `<div class="hora-livre cheia"><b>${hh(v.hora_inicio)}</b><span>${total}/${total} · lotado</span></div>`; }).join('')}</div></div>` : '';
   return (out + extra) || `<div class="vazio">A escola não abre neste dia.</div>`;
 }
 function expBloco(list, h){
@@ -462,7 +466,7 @@ function vSemanaGrade(){
       if (!t && !expV.length) {
         h += aberta
           ? `<div class="cel livre" onclick="novoAgendamento('${d}','${aberta.turma_id||''}',${hora})" title="a escola abre nesta hora — clique para marcar aula experimental">
-               <span class="lv-h">${hs}</span><span class="lv2">${aberta.vagas} vaga${aberta.vagas>1?'s':''}</span>
+               <span class="lv-h">${hs}</span><span class="lv2 ${aberta.vagas===1?'ultimo':''}">${aberta.vagas===1?'último kit':aberta.vagas+' vagas'}</span>
                <span class="lv-cta">+ marcar</span></div>`
           : `<div class="cel vazia ${d < hoje ? 'passou' : ''}">${d < hoje ? '' : 'fechado'}</div>`;
         continue;
@@ -475,14 +479,14 @@ function vSemanaGrade(){
       h += `<div class="cel ${expV.length?'temexp':''} ${t && !primeira ? 'cont' : ''} ${d < hoje ? 'passou' : ''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${hora})" title="${d < hoje ? 'dia que já passou' : ''}">
         <div class="t">
           <span>${t ? (primeira ? `<b>${naSala}</b>/${t.limite_sala||18} na sala` : `<span class="segue">${hh(t.hora_inicio)}–${hh(t.hora_fim)} · continua</span>`) : ''}</span>
-          ${v && (v.n <= 0 || TIPO === 'alunos') ? `<span class="cap ${cls}" title="kits First livres nesta hora">${v.n<=0?'sem kit livre':v.n+' livre'+(v.n===1?'':'s')}</span>` : ''}</div>
+          ${v && (v.n <= 0 || TIPO === 'alunos') ? `<span class="cap ${cls}" title="${v.n<=0?'todos os kits First desta hora estão em uso — não cabe outra aula experimental':'kits First livres nesta hora'}">${v.n<=0?`${v.cap||8}/${v.cap||8} · lotado`:v.n+' livre'+(v.n===1?'':'s')}</span>` : ''}</div>
         ${als.map(a => `<div class="al ${a.status==='trancado'?'tr':''}" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)} · ${esc(a.kit||'')}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span></div>`).join('')}
         ${als.length && expV.length ? '<div class="sep"></div>' : ''}
         ${expV.map(a => { const l = leadDe(a); const alu = (D.alunos||[]).find(x => x.id === a.aluno_id) || {};
           return ehRep(a)
             ? `<div class="al rep" onclick="abrirAluno('${a.aluno_id}')" title="reposição"><span class="k"></span><span class="n">${esc(a.crianca_nome||alu.nome||'')}</span></div>`
             : `<div class="al exp" onclick="irDia('${d}')" title="aula experimental · ${esc(l.nome||'')}"><span class="k"></span><span class="n">${esc(a.crianca_nome||l.nome||'visita')}</span></div>`; }).join('')}
-        ${v && v.n > 0 && TIPO !== 'alunos' ? `<div class="al mais" onclick="novoAgendamento('${d}','${t?t.id:(aberta?aberta.turma_id||'':'')}',${hora})">${hs} · ${v.n} vaga${v.n>1?'s':''}</div>` : ''}
+        ${v && v.n > 0 && TIPO !== 'alunos' ? `<div class="al mais ${v.n===1?'ultimo':''}" onclick="novoAgendamento('${d}','${t?t.id:(aberta?aberta.turma_id||'':'')}',${hora})" title="${v.n===1?'último kit First desta hora':''}">${hs} · ${v.n===1?'último kit':v.n+' vagas'}</div>` : ''}
       </div>`;
     }
   }
@@ -578,6 +582,9 @@ let DRAG = null;
 function dragExp(ev, id){ DRAG = id; ev.dataTransfer.effectAllowed = 'move'; }
 function dropExp(ev, data, hora){
   ev.preventDefault(); const id = DRAG; DRAG = null; if (!id) return;
+  // hora lotada: não deixa soltar
+  const lv = hora != null ? (VAGAS||[]).find(v => v.data === data && hN(v.hora_inicio) === Number(hora)) : null;
+  if (lv && lv.vagas <= 0) return toast('Essa hora está lotada: todos os kits First já estão em uso.', { tipo:'erro' });
   const a = EXP.find(x => x.id === id); if (!a) return;
   const h = hora != null ? hora : hN(a.hora_inicio);
   const ts = turmasDo(data).sort((x,y)=>Math.abs(hN(x.hora_inicio)-h)-Math.abs(hN(y.hora_inicio)-h)); const turma = ts[0];
