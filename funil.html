@@ -22,7 +22,7 @@ button{font-family:inherit;cursor:pointer}
 .dica{margin-left:auto;color:var(--faint);font-size:12.5px}
 @media(max-width:760px){.dica{display:none}}
 
-.raia-area{padding:20px 26px 40px;overflow-x:auto}
+.raia-area{padding:20px 26px 40px}
 .raias{display:flex;gap:14px;align-items:flex-start}
 body.embed 
 
@@ -168,9 +168,11 @@ body.embed .filtros-bar,body.embed .org-topo,body.embed .org-aviso{max-width:cal
 
 
 /* ---- kanban: a página rola, a coluna é um card que cresce com os leads ---- */
-.raia-area{padding:0 26px 40px;overflow-x:auto;overflow-y:visible}
-.filtros-bar{position:sticky;top:0;z-index:30;background:var(--bg);padding:12px 0 10px;
-  box-shadow:0 8px 14px -10px rgba(20,26,46,.3)}
+.raia-area{padding:0 26px 40px}
+.filtros-bar{position:sticky;top:0;left:0;z-index:30;background:var(--bg);padding:12px 0 10px;
+  box-shadow:0 8px 14px -10px rgba(20,26,46,.3);width:calc(100vw - 120px);max-width:100%}
+body.embed .filtros-bar{width:calc(100vw - 130px)}
+@media(max-width:760px){.filtros-bar{width:100%}}
 .raias{display:flex;gap:14px;align-items:flex-start;min-height:0}
 .raia{flex:1 1 260px;min-width:260px;align-self:flex-start;background:var(--card);
   border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);
