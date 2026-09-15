@@ -1738,14 +1738,16 @@ Classifique em UMA etapa, seguindo exatamente estes critérios:
 - "Matrícula em andamento": já fez a aula experimental e falou em fechar/pagar.
 - "Remarketing": disse que não pode agora, vai pensar, achou caro, horário não bate — mas pode voltar.
 - "Perdido": sem interesse, idade fora da faixa, pediu para não receber mais, ou sumiu há muito tempo depois de várias tentativas.
-Na dúvida entre duas, escolha a MENOS avançada. Responda SOMENTE com JSON:
-{"etapa":"<nome exato>","motivo":"<até 15 palavras citando o que na conversa indica isso>","confianca":"alta|media|baixa","crianca":"<nome ou null>","idade":<número ou null>}`;
+Na dúvida entre duas, escolha a MENOS avançada.
+Se na conversa a família COMBINOU um dia e hora para a aula experimental, extraia: "aula_data" (AAAA-MM-DD) e "aula_hora" (HH:MM). Use a data de hoje informada para resolver "sábado", "amanhã", "dia 20". Se a aula combinada JÁ PASSOU, a etapa não pode ser "Aula agendada": use "Matrícula em andamento" se a família demonstrou querer fechar, ou "Remarketing" se sumiu depois da aula.
+Responda SOMENTE com JSON:
+{"etapa":"<nome exato>","motivo":"<até 15 palavras citando o que na conversa indica isso>","confianca":"alta|media|baixa","crianca":"<nome ou null>","idade":<número ou null>,"aula_data":"<AAAA-MM-DD ou null>","aula_hora":"<HH:MM ou null>"}`;
 
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST', headers: { 'x-api-key': chave, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, system: sistema,
-          messages: [{ role: 'user', content: `Etapa atual: ${etapaAtual?.nome || 'nenhuma'}\nCriança conhecida: ${lead.crianca || 'não'}${lead.idade ? ', ' + lead.idade + ' anos' : ''}\n\nCONVERSA\n${hist}` }] })
+          messages: [{ role: 'user', content: `Hoje é ${hojeManaus()} (${['domingo','segunda','terça','quarta','quinta','sexta','sábado'][new Date(hojeManaus()+'T12:00:00').getDay()]}).\nEtapa atual: ${etapaAtual?.nome || 'nenhuma'}\nCriança conhecida: ${lead.crianca || 'não'}${lead.idade ? ', ' + lead.idade + ' anos' : ''}\n\nCONVERSA\n${hist}` }] })
       });
       const j = await r.json();
       if (j.error) throw new Error(j.error.message);
@@ -1759,6 +1761,9 @@ Na dúvida entre duas, escolha a MENOS avançada. Responda SOMENTE com JSON:
         etapa_nova: destino.nome, etapa_nova_id: destino.id,
         motivo: p.motivo || '', confianca: p.confianca || 'media',
         crianca: p.crianca || null, idade: p.idade || null,
+        aula_data: /^\d{4}-\d{2}-\d{2}$/.test(String(p.aula_data||'')) ? p.aula_data : null,
+        aula_hora: /^\d{2}:\d{2}$/.test(String(p.aula_hora||'')) ? p.aula_hora : null,
+        aula_passou: /^\d{4}-\d{2}-\d{2}$/.test(String(p.aula_data||'')) ? p.aula_data < hojeManaus() : null,
         avisa_meta: ETAPAS_META.includes(destino.nome.toLowerCase().trim()),
         conversa_id: c.id
       });
@@ -1780,8 +1785,27 @@ async function acaoTriagemAplicar(tenant, body, res) {
       falhas.push({ lead_id: it.lead_id, erro: 'esta etapa precisa ser confirmada uma a uma' }); continue;
     }
     try {
+      // aula combinada na conversa vira agendamento de verdade, com criança, dia e hora
+      let agendado = null;
+      if (/aula agendada/i.test(destino.nome) && it.aula_data && it.aula_data >= hojeManaus()) {
+        const hora = it.aula_hora || '09:00';
+        const h = Number(hora.slice(0, 2));
+        const [turma] = await sb(`capta_turmas?tenant_id=eq.${tenant.id}&ativa=eq.true&dia_semana=eq.${new Date(it.aula_data + 'T12:00:00').getDay()}&hora_inicio=lte.${hora}:00&hora_fim=gt.${hora}:00&select=id&limit=1`).catch(() => []);
+        const ja = await sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&lead_id=eq.${it.lead_id}&data=eq.${it.aula_data}&status=in.(agendado,confirmado)&select=id&limit=1`).catch(() => []);
+        if (!ja?.length) {
+          const novo = await sb('capta_agendamentos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+            tenant_id: tenant.id, lead_id: it.lead_id, turma_id: turma?.id || null, data: it.aula_data,
+            hora_inicio: String(h).padStart(2,'0') + ':00:00', hora_fim: String(h+1).padStart(2,'0') + ':00:00',
+            crianca_nome: it.crianca || null, crianca_idade: it.idade || null, status: 'agendado', tipo: 'experimental',
+            observacao: 'marcada pela triagem: combinado na conversa', criado_por: 'triagem' }) }).catch(() => null);
+          agendado = novo?.[0] || null;
+          if (agendado) await sb(`capta_leads?id=eq.${it.lead_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ data_aula: `${it.aula_data}T${hora}:00-04:00` }) }).catch(() => null);
+        }
+      }
       await moverLead(tenant.id, it.lead_id, destino.id, it.motivo || 'triagem');
       await empurrarKommo(tenant.id, it.lead_id, destino.id, it.motivo || null).catch(() => null);
+      if (agendado) await kommoCampos(tenant.id, it.lead_id, { data_aula: `${it.aula_data}T${it.aula_hora || '09:00'}:00-04:00`, curso: 'First' }).catch(() => null);
       if (it.crianca || it.idade) {
         await sb(`capta_leads?id=eq.${it.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
           body: JSON.stringify({ ...(it.crianca ? { crianca: it.crianca } : {}), ...(it.idade ? { idade: it.idade } : {}) }) }).catch(() => null);
