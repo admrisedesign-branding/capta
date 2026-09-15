@@ -181,8 +181,9 @@ function normalizarWebhook(payload) {
     telefone: comDDI(payload.phone),
     numero_conectado: payload.connectedPhone || null,
     de_mim: payload.fromMe === true,           // enviada pelo celular, fora do Capta
-    nome: payload.senderName || payload.chatName || null,
-    foto: payload.senderPhoto || payload.photo || null,
+    // quem enviou pode ser a própria escola (fromMe): o nome do CONTATO é o do chat
+    nome: (payload.fromMe ? (payload.chatName || null) : (payload.chatName || payload.senderName || null)),
+    foto: (payload.fromMe ? (payload.photo || null) : (payload.senderPhoto || payload.photo || null)),
     lid: String(payload.chatLid || payload.senderLid || '').replace('@lid', '') || null,
     // "phone" pode vir como @lid em vez de número: quando isso acontece, não é telefone
     telefone_e_lid: /@lid$/.test(String(payload.phone || '')) || String(payload.phone || '').replace(/\D/g, '').length > 13,
