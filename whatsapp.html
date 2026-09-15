@@ -84,6 +84,8 @@ h2{font-size:16px;font-weight:700}
   font-size:13px;color:#A81E17;line-height:1.6;margin-top:14px}
 .empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--r);padding:40px 20px;
   text-align:center;color:var(--faint);font-size:13.5px;line-height:1.7}
+.aviso-fora{background:var(--morno-bg);color:var(--morno);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.55;margin-bottom:14px}
+.aviso-fora a{color:var(--morno);font-weight:700}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -152,6 +154,7 @@ function desenhar(estado) {
 
   raiz.className = '';
   raiz.innerHTML = `
+    ${estado.provedor_fora ? `<div class="aviso-fora"><b>O provedor do WhatsApp (Z-API) não está respondendo.</b> O que você vê abaixo é o último estado conhecido. As mensagens já recebidas continuam aqui; as novas chegam quando o provedor voltar. <a href="https://status.z-api.io" target="_blank" rel="noopener">ver status da Z-API ↗</a></div>` : ''}
     <div class="grid">
       <div class="card">
         <div class="estado"><span class="ponto ${r.cls}"></span>${r.txt}</div>
