@@ -99,6 +99,7 @@ button{font-family:inherit;cursor:pointer}
   border:1px solid var(--line);box-shadow:0 3px 12px rgba(20,26,46,.14);display:none;place-items:center;cursor:pointer;z-index:4;font-size:15px;color:var(--muted)}
 .desce.on{display:grid}.desce b{position:absolute;top:-6px;right:-4px;background:var(--brand);color:#fff;font-size:10px;border-radius:99px;padding:1px 5px}
 .respondendo{display:flex;align-items:center;gap:10px;padding:8px 18px;background:var(--line-2);border-top:1px solid var(--line);font-size:12.5px}
+.conv-kid{font-weight:500;font-size:11px;color:var(--muted);margin-left:4px}
 .respondendo .txt{flex:1;min-width:0;border-left:3px solid var(--brand);padding-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
 .respondendo .txt b{display:block;color:var(--brand);font-size:11.5px}
 .respondendo button{border:0;background:none;color:var(--faint);font-size:16px;cursor:pointer}
@@ -283,7 +284,7 @@ window.CaptaUser = (function(){
 <div class="wrap">
   <div class="lista">
     <div class="lista-topo" id="contagem">Carregando…</div>
-    <div class="lista-ferr"><input id="busca" placeholder="Buscar nome ou telefone" oninput="FI.q=this.value;desenharLista()">
+    <div class="lista-ferr"><input id="busca" placeholder="Buscar nome, telefone ou #id do Kommo" oninput="FI.q=this.value;desenharLista()">
       <div class="filtros" id="filtros"></div></div>
     <div class="lista-rolagem" id="convs"></div>
   </div>
@@ -348,11 +349,13 @@ const FI = { q: '', f: 'abertas', eu: '' };
 FI.eu = (window.CaptaUser && CaptaUser.nome()) || ''; try { FI.eu = FI.eu || localStorage.getItem('capta_atendente') || ''; } catch(e){}
 const ATEND = [...new Set(['Rafael','Bento','RISE', (window.CaptaUser&&CaptaUser.nome())||''].filter(Boolean))];
 let CONVS = [], RAPIDAS = null;
+// nome vindo do WhatsApp que na verdade é um @lid ou só dígitos não serve como nome
+function nomeLimpo(n){ n = String(n || '').trim(); return (!n || /@lid$/i.test(n) || /^\+?[\d\s()-]{10,}$/.test(n)) ? '' : n; }
 function desenharLista(){
   const q = FI.q.trim().toLowerCase();
   let lista = CONVS.filter(c => {
-    const nome = (c.lead?.nome || '') + ' ' + (c.telefone || '');
-    if (q && !nome.toLowerCase().includes(q)) return false;
+    const nome = (c.lead?.nome || '') + ' ' + (nomeLimpo(c.nome) || '') + ' ' + (c.telefone || '') + ' ' + (c.lead?.contato || '') + ' #' + (c.lead?.kommo_lead_id || '');
+    if (q && !nome.toLowerCase().includes(q.replace(/^#/, '#'))) return false;
     if (FI.f === 'nao_lidas') return (c.nao_lidas||0) > 0;
     if (FI.f === 'minhas') return FI.eu && c.atendente === FI.eu;
     if (FI.f === 'quentes') return (c.lead?.temperatura||'').toLowerCase() === 'quente' && !c.resolvida_em;
@@ -375,12 +378,12 @@ function desenharLista(){
   lista = [...lista].sort((a, b) => new Date(b.ultima_mensagem_em||0) - new Date(a.ultima_mensagem_em||0));
   elConvs.innerHTML = lista.map(c => {
     const ehLid = String(c.telefone||'').replace(/\D/g,'').length > 13;
-    const nome = c.lead?.nome || c.nome || (ehLid ? 'Contato sem número' : fone(c.telefone)); const temp = c.lead?.temperatura; const at = c.atendente || c.lead?.atendente;
+    const nome = c.lead?.nome || nomeLimpo(c.nome) || (ehLid ? 'Contato sem número' : fone(c.telefone)); const temp = c.lead?.temperatura; const at = c.atendente || c.lead?.atendente;
     const e = (ETAPAS||[]).find(x => x.id === (c.lead && c.lead.etapa_id));
     const nv = window.CaptaAlerta ? CaptaAlerta.nivel(c) : '';
     return `<button class="conv ${c.resolvida_em?'res':''} ${nv}" data-id="${c.id}" aria-current="${c.id === atual}" style="${e && e.cor ? `border-left:4px solid ${e.cor}` : ''}">
       <span class="conv-av">${c.foto_url ? `<img src="${esc(c.foto_url)}" alt="" onerror="this.remove()">` : esc(iniciais(nome))}</span>
-      <span class="conv-mid"><span class="conv-nome">${esc(nome)}</span><span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span>
+      <span class="conv-mid"><span class="conv-nome">${esc(nome)}${c.lead?.kommo_lead_id?` <span class="conv-kid">#${c.lead.kommo_lead_id}</span>`:''}</span><span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span>
         <span class="conv-tags">${window.CaptaAlerta ? CaptaAlerta.etiqueta(c) : ''}${tagEtapa(c.lead && c.lead.etapa_id)}${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?tagPessoa(at, 'atendendo: ' + at):'<span class="mini-tag sem">sem dono</span>'}${c.resolvida_em?'<span class="mini-tag mt-enc">encerrada</span>':''}</span></span>
       <span class="conv-dir"><span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>` : ''}</span></button>`;
   }).join('');
@@ -438,7 +441,7 @@ async function abrir(id) {
   try {
     const { conversa, mensagens } = await api('mensagens', { conversa_id: id });
     const ehLidC = String(conversa.telefone||'').replace(/\D/g,'').length > 13;
-  const nome = conversa.lead?.nome || conversa.nome || (ehLidC ? 'Contato sem número' : fone(conversa.telefone));
+  const nome = conversa.lead?.nome || nomeLimpo(conversa.nome) || (ehLidC ? 'Contato sem número' : fone(conversa.telefone));
 
     elPain.innerHTML = `
       <div class="painel-topo">
@@ -446,7 +449,7 @@ async function abrir(id) {
           <button class="voltar-lista" id="volta">←</button>
           <div style="min-width:0">
             <div class="painel-nome">${esc(nome)}</div>
-            <div class="painel-fone">${fone(conversa.telefone)}</div>
+            <div class="painel-fone">${ehLidC ? 'número oculto pelo WhatsApp' : fone(conversa.telefone)}${conversa.lead?.kommo_lead_id ? ` · <a href="https://roboticanorte.kommo.com/leads/detail/${conversa.lead.kommo_lead_id}" target="_blank" rel="noopener" style="color:inherit">Kommo #${conversa.lead.kommo_lead_id}</a>` : ''}</div>
           </div>
         </div>
         <button class="voltar-chat" onclick="document.body.classList.remove('chat-aberto')">← conversas</button>

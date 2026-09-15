@@ -233,7 +233,36 @@ const hoje = hojeLocal();
 const MOTIVOS = ['Orçamento','Horário não bate','Vai pensar','Distância','Criança não se adaptou','Só pesquisando'];
 const PAGTOS = ['Pix','cartão','boleto','recorrente'];
 const KITS = ['First','OneBot','TechBot','Autobot','App Developer','GameBot'];
-let SEMDATA = [], MOSTRA_SD = false;
+let SEMDATA = [], MOSTRA_SD = false, MAPA = {}, MAPEANDO = '';
+// Lê Kommo + conversa de cada lead sem data (em lotes de 6) e monta a proposta.
+async function mapearAulas(){
+  if (MAPEANDO || !SEMDATA.length) return;
+  MOSTRA_SD = true; const ids = SEMDATA.map(l => l.id); let feitos = 0;
+  try {
+    for (let i = 0; i < ids.length; i += 6) {
+      MAPEANDO = `lendo ${Math.min(i + 6, ids.length)} de ${ids.length}…`; desenhar();
+      const r = await api('mapear_aulas', { lead_ids: ids.slice(i, i + 6) });
+      for (const m of r.leads || []) { MAPA[m.lead_id] = { ...m, ok: !!(m.data && m.hora && ['alta','media'].includes(m.confianca)) }; feitos++; }
+    }
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+  MAPEANDO = ''; desenhar();
+  const n = Object.values(MAPA).filter(m => m.ok).length;
+  toast(`${feitos} leads lidos · ${n} com dia e hora encontrados — confira e clique em “agendar marcadas”`, { tipo:'ok', ms: 6000 });
+}
+async function agendarMapeadas(){
+  const alvo = SEMDATA.filter(l => MAPA[l.id] && MAPA[l.id].ok && MAPA[l.id].data && MAPA[l.id].hora);
+  if (!alvo.length) return toast('Nenhuma marcada com dia e hora.', { tipo:'erro' });
+  if (!confirm(`Agendar ${alvo.length} aula${alvo.length>1?'s':''} experimental na agenda?`)) return;
+  let ok = 0, falhas = [];
+  for (const l of alvo) {
+    const m = MAPA[l.id];
+    try { await api('agendar', { lead_id: l.id, data: m.data, hora_inicio: m.hora, crianca_nome: l.crianca || m.crianca || undefined, crianca_idade: l.idade || m.idade || undefined }); ok++; delete MAPA[l.id]; }
+    catch(e){ falhas.push(`${l.nome||'?'}: ${e.message}`); }
+  }
+  toast(`${ok} aula${ok!==1?'s':''} agendada${ok!==1?'s':''}${falhas.length?` · ${falhas.length} falharam`:''}`, { tipo: falhas.length?'erro':'ok', ms: 6000 });
+  if (falhas.length) console.warn(falhas);
+  carregar();
+}
 let D = { agendamentos: [], turmas: [], leads: [] }, MODO = 'semana', SEL = null, SELDIA = hoje, VAGAS = null, KITS_T = [];
 const addDias = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0,10); };
 const segunda = d => { const x = new Date(d + 'T12:00:00'); const w = x.getDay(); x.setDate(x.getDate() - (w === 0 ? 6 : w - 1)); return x.toISOString().slice(0,10); };
@@ -342,10 +371,18 @@ function desenhar(){
     ${SEMDATA.length ? `<div class="tally" style="display:block;background:#FDF8EC;border-color:#EAD7A5">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:16px;margin:0">${SEMDATA.length} leads em “Aula agendada” sem data</b>
       <small style="font-weight:600">vieram do Kommo sem dia e hora — marque a aula de verdade ou dê a baixa</small>
-      <button class="nav" style="margin-left:auto" onclick="MOSTRA_SD=!MOSTRA_SD;desenhar()">${MOSTRA_SD?'esconder':'ver lista'}</button></div>
-      ${MOSTRA_SD ? `<div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">${SEMDATA.map(l => `<div class="cardx" style="margin:0"><div class="top"><span class="kid">${esc(l.crianca||l.nome||'Sem nome')}</span>${l.temperatura?`<span class="rot ${ROT[(l.temperatura||'').toLowerCase()]?ROT[(l.temperatura||'').toLowerCase()][1]:'f'}">${esc(l.temperatura)}</span>`:''}</div>
-        <div class="guard">${esc(l.nome||'')}${l.contato?' · '+esc(l.contato):''} · parado há ${Math.floor((Date.now()-new Date(l.etapa_em||l.criado_em))/864e5)} dias</div>
-        <div class="acts mini" style="margin-top:8px"><button onclick="LeadPainel.abrir('${l.id}','agendar')">marcar aula</button><button onclick="LeadPainel.abrir('${l.id}','conversa')">conversa</button></div></div>`).join('')}</div>` : ''}
+      <button class="nav" style="margin-left:auto" onclick="MOSTRA_SD=!MOSTRA_SD;desenhar()">${MOSTRA_SD?'esconder':'ver lista'}</button>
+      <button class="nav" id="bt-mapear" onclick="mapearAulas()" title="Lê o campo do Kommo e a conversa de cada lead e propõe dia e hora">${MAPEANDO ? MAPEANDO : '🔎 descobrir dia e hora'}</button>
+      ${Object.keys(MAPA).length ? `<button class="nav" style="background:var(--brand,#2E5BFF);color:#fff;border-color:transparent" onclick="agendarMapeadas()">✓ agendar marcadas (${SEMDATA.filter(l => MAPA[l.id] && MAPA[l.id].ok).length})</button>` : ''}</div>
+      ${MOSTRA_SD ? `<div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">${SEMDATA.map(l => { const m = MAPA[l.id]; return `<div class="cardx" style="margin:0;${m && m.ok ? 'border-color:#2E5BFF' : ''}"><div class="top"><span class="kid">${esc(l.crianca||(m&&m.crianca)||l.nome||'Sem nome')}</span>${l.temperatura?`<span class="rot ${ROT[(l.temperatura||'').toLowerCase()]?ROT[(l.temperatura||'').toLowerCase()][1]:'f'}">${esc(l.temperatura)}</span>`:''}</div>
+        <div class="guard">${esc(l.nome||'')}${l.contato?' · '+esc(l.contato):''}${l.kommo_lead_id?` · #${l.kommo_lead_id}`:''} · parado há ${Math.floor((Date.now()-new Date(l.etapa_em||l.criado_em))/864e5)} dias</div>
+        ${m ? `<div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px">
+          <label style="display:flex;gap:4px;align-items:center;font-weight:700"><input type="checkbox" ${m.ok?'checked':''} onchange="MAPA['${l.id}'].ok=this.checked;desenhar()"> agendar</label>
+          <input type="date" value="${m.data||''}" onchange="MAPA['${l.id}'].data=this.value;MAPA['${l.id}'].ok=!!(this.value&&MAPA['${l.id}'].hora)" style="font:inherit;padding:3px 5px;border:1px solid #E9ECF3;border-radius:7px">
+          <input type="time" value="${m.hora||''}" step="3600" onchange="MAPA['${l.id}'].hora=this.value;MAPA['${l.id}'].ok=!!(this.value&&MAPA['${l.id}'].data)" style="font:inherit;padding:3px 5px;border:1px solid #E9ECF3;border-radius:7px">
+          <span class="rot ${m.confianca==='alta'?'q':m.confianca==='media'?'m':'f'}" title="${esc(m.fonte||'')}">${esc(m.confianca)}</span></div>
+          ${m.trecho ? `<div class="guard" style="margin-top:4px;font-style:italic">“${esc(m.trecho)}”</div>` : m.confianca==='nenhuma' ? `<div class="guard" style="margin-top:4px">${esc(m.fonte||'nada encontrado')}</div>` : ''}` : ''}
+        <div class="acts mini" style="margin-top:8px"><button onclick="LeadPainel.abrir('${l.id}','agendar')">marcar aula</button><button onclick="LeadPainel.abrir('${l.id}','conversa')">conversa</button></div></div>`; }).join('')}</div>` : ''}
     </div>` : ''}
     <div class="corpo"><div>${grade}</div>
       <div class="lado"><h5>Kits disponíveis</h5>${kits.map(k=>`<div class="k"><span>${esc(k.kit)}</span><b>${k.capacidade}</b></div>`).join('')}<div class="k"><span>Lugares na sala</span><b>18</b></div>
