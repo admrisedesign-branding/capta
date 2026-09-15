@@ -96,6 +96,7 @@ window.CaptaUser = (function(){
 <style>@media(max-width:760px){body.embed .wrap{padding-bottom:80px}.grade,.corpo{grid-template-columns:1fr!important}.tally{gap:14px;padding:10px 12px}.tally b{font-size:19px}}</style>
 <link rel="stylesheet" href="/mobile.css">
 <script src="/capta-ui.js"></script>
+<script src="/capta-alerta.js"></script>
 </head>
 <body>
 <div class="topbar"><a class="voltar" id="voltar" href="/dashboard.html">← Painel</a><h1>Atendimento</h1></div>
@@ -181,7 +182,7 @@ function desenhar(){
     <div class="tally">
       <div onclick="document.getElementById('sec-aulas').scrollIntoView({behavior:'smooth'})"><b>${aulas.length}</b><small>aulas hoje</small></div>
       <div class="hot" onclick="document.getElementById('sec-aulas').scrollIntoView({behavior:'smooth'})"><b>${pend.length}</b><small>sem desfecho</small></div>
-      <div class="bad" onclick="document.getElementById('sec-resp').scrollIntoView({behavior:'smooth'})"><b>${semResp.length}</b><small>mensagens sem resposta</small></div>
+      <div class="bad" onclick="document.getElementById('sec-resp').scrollIntoView({behavior:'smooth'})"><b>${semResp.length}</b><small>${urgentes?`<span class="al-tag urgente" style="margin-right:6px">${urgentes} há +1h30</span>`:''}mensagens sem resposta</small></div>
       <div class="bad" onclick="document.getElementById('sec-quentes').scrollIntoView({behavior:'smooth'})"><b>${quentes.length}</b><small>querem fechar sem aula</small></div>
       <div class="hot" onclick="irPara('/retomar.html')" title="abrir a fila de retomada" style="cursor:pointer"><b>${(D.evParados||[]).length}</b><small>leads de evento sem contato</small></div>
       <div onclick="document.getElementById('sec-parados').scrollIntoView({behavior:'smooth'})"><b>${parados.length}</b><small>parados há 3+ dias</small></div>
@@ -191,7 +192,7 @@ function desenhar(){
         <div class="bloco" id="sec-aulas"><h3>Aulas de hoje <span class="n">${aulas.length}</span><span class="link" onclick="irPara('/aula-experimental.html')">ver a semana →</span></h3>
           ${aulas.length ? aulas.map(cardAula).join('') : `<div class="vazio">Nenhuma aula experimental hoje.<br><button class="btn sm" style="margin-top:8px" onclick="irPara('/agendamentos.html')">Marcar uma aula</button></div>`}</div>
         <div class="bloco" id="sec-resp"><h3>Responder agora${ajuda('Conversas com mensagem do cliente ainda não respondida. Some quando alguém responde pelo Capta ou pelo celular.')} <span class="n">${semResp.length}</span><span class="link" onclick="irPara('/inbox.html')">abrir conversas →</span></h3>
-          ${semResp.length ? semResp.slice(0,8).map(c => { const l = D.leads.find(x => x.id === (c.lead && c.lead.id)) || c.lead || {}; return `<div class="li"><div class="av">${ini(l.nome||c.nome||c.telefone)}</div><div class="t"><b>${esc(l.nome||c.nome||c.telefone||'')}</b><small>${c.nao_lidas} nova${c.nao_lidas>1?'s':''}${c.ultima_mensagem_em?' · '+new Date(c.ultima_mensagem_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}${l.temperatura?' · '+esc(l.temperatura):''}</small></div><div class="acs">${l.id?`<button class="btn sm" onclick="irLead('${l.id}','conversa')">responder</button>`:`<button class="btn sm g" onclick="irPara('/inbox.html')">abrir</button>`}</div></div>`; }).join('') : `<div class="vazio">Tudo respondido. ${D.conversas.length ? '' : 'As mensagens aparecem aqui quando o WhatsApp da unidade estiver conectado.'}</div>`}</div>
+          ${semResp.length ? semResp.slice(0,8).map(c => { const l = D.leads.find(x => x.id === (c.lead && c.lead.id)) || c.lead || {}; return `<div class="li"><div class="av">${ini(l.nome||c.nome||c.telefone)}</div><div class="t"><b>${esc(l.nome||c.nome||c.telefone||'')}</b><small>${window.CaptaAlerta ? CaptaAlerta.etiqueta(c) + ' ' : ''}${c.nao_lidas} nova${c.nao_lidas>1?'s':''}${c.ultima_mensagem_em?' · '+new Date(c.ultima_mensagem_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}${l.temperatura?' · '+esc(l.temperatura):''}</small></div><div class="acs">${l.id?`<button class="btn sm" onclick="irLead('${l.id}','conversa')">responder</button>`:`<button class="btn sm g" onclick="irPara('/inbox.html')">abrir</button>`}</div></div>`; }).join('') : `<div class="vazio">Tudo respondido. ${D.conversas.length ? '' : 'As mensagens aparecem aqui quando o WhatsApp da unidade estiver conectado.'}</div>`}</div>
       </div>
       <div>
         <div class="bloco"><h3>Próximas vagas${ajuda('Primeira vaga livre de cada período, já descontando alunos e experimentais marcadas. O kit da aula experimental é sempre o First.')} <span class="link" onclick="irPara('/agendamentos.html')">ver agenda →</span></h3>

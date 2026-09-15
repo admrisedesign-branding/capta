@@ -415,6 +415,7 @@ window.CaptaUser = (function(){
 <script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
 <link rel="stylesheet" href="/mobile.css">
 <script src="/capta-ui.js"></script>
+<script src="/capta-alerta.js"></script>
 </head>
 <body>
 <div class="layout">
@@ -4147,6 +4148,24 @@ window.addEventListener('message', e => {
     const f = document.querySelector('#tela iframe'); if (f && f.contentWindow) f.contentWindow.postMessage(e.data, '*');
   }
 });
+
+// vigia do atendimento: a cada 30 s olha as conversas e toca/avisa, em qualquer tela do painel
+(function(){
+  const q = new URLSearchParams(location.search); const slug = q.get('t'), tok = q.get('k'); if (!slug || !tok) return;
+  document.addEventListener('click', () => { if (window.CaptaAlerta) CaptaAlerta.pedirPermissao(); }, { once: true });
+  async function olhar(){
+    try {
+      const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao:'conversas', slug, token: tok }) });
+      const d = await r.json(); const cs = d.conversas || [];
+      if (window.CaptaAlerta) CaptaAlerta.processar(cs);
+      // badge do menu: urgentes contam em vermelho
+      const urg = cs.filter(c => CaptaAlerta.nivel(c) === 'urgente').length;
+      const b = document.querySelector('.nav-item[data-page="/inbox.html"] .badge'); if (b && urg) b.title = `${urg} esperando há muito tempo`;
+      document.title = (urg ? `(${urg}) ` : '') + document.title.replace(/^\(\d+\) /, '');
+    } catch(e){}
+  }
+  setTimeout(olhar, 3000); setInterval(olhar, 30000);
+})();
 </script>
 </body>
 </html>

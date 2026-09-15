@@ -272,6 +272,7 @@ window.CaptaUser = (function(){
 <style>@media(max-width:760px){body.embed .wrap{padding-bottom:80px}.grade,.corpo{grid-template-columns:1fr!important}.tally{gap:14px;padding:10px 12px}.tally b{font-size:19px}}</style>
 <link rel="stylesheet" href="/mobile.css">
 <script src="/capta-ui.js"></script>
+<script src="/capta-alerta.js"></script>
 </head>
 <body>
 <div class="topbar">
@@ -349,7 +350,7 @@ const ATEND = [...new Set(['Rafael','Bento','RISE', (window.CaptaUser&&CaptaUser
 let CONVS = [], RAPIDAS = null;
 function desenharLista(){
   const q = FI.q.trim().toLowerCase();
-  const lista = CONVS.filter(c => {
+  let lista = CONVS.filter(c => {
     const nome = (c.lead?.nome || '') + ' ' + (c.telefone || '');
     if (q && !nome.toLowerCase().includes(q)) return false;
     if (FI.f === 'nao_lidas') return (c.nao_lidas||0) > 0;
@@ -367,14 +368,16 @@ function desenharLista(){
     + (orfas ? `<button style="border-color:var(--brand);color:var(--brand)" onclick="casarLid()" title="Conversas sem lead: descobre o número pelos leads do Kommo (via @lid) e liga">ligar ${orfas} sem nome</button>` : '');
   elCont.textContent = lista.length ? `${lista.length} conversa${lista.length > 1 ? 's' : ''}` : 'Nenhuma conversa';
   if (!lista.length) { elConvs.innerHTML = `<div class="vazio">${CONVS.length ? 'Nada com esse filtro.' : 'Nada por aqui ainda.<br>As mensagens aparecem assim que alguém escrever para o seu WhatsApp.'}</div>`; return; }
+  if (window.CaptaAlerta && FI.f !== 'resolvidas') lista = [...lista].sort((a, b) => CaptaAlerta.peso(b) - CaptaAlerta.peso(a) || new Date(b.ultima_mensagem_em||0) - new Date(a.ultima_mensagem_em||0));
   elConvs.innerHTML = lista.map(c => {
     const ehLid = String(c.telefone||'').replace(/\D/g,'').length > 13;
     const nome = c.lead?.nome || c.nome || (ehLid ? 'Contato sem número' : fone(c.telefone)); const temp = c.lead?.temperatura; const at = c.atendente || c.lead?.atendente;
     const e = (ETAPAS||[]).find(x => x.id === (c.lead && c.lead.etapa_id));
-    return `<button class="conv ${c.resolvida_em?'res':''}" data-id="${c.id}" aria-current="${c.id === atual}" style="${e && e.cor ? `border-left:4px solid ${e.cor}` : ''}">
+    const nv = window.CaptaAlerta ? CaptaAlerta.nivel(c) : '';
+    return `<button class="conv ${c.resolvida_em?'res':''} ${nv}" data-id="${c.id}" aria-current="${c.id === atual}" style="${e && e.cor ? `border-left:4px solid ${e.cor}` : ''}">
       <span class="conv-av">${c.foto_url ? `<img src="${esc(c.foto_url)}" alt="" onerror="this.remove()">` : esc(iniciais(nome))}</span>
       <span class="conv-mid"><span class="conv-nome">${esc(nome)}</span><span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span>
-        <span class="conv-tags">${tagEtapa(c.lead && c.lead.etapa_id)}${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?tagPessoa(at, 'atendendo: ' + at):'<span class="mini-tag sem">sem dono</span>'}${c.resolvida_em?'<span class="mini-tag mt-enc">encerrada</span>':''}</span></span>
+        <span class="conv-tags">${window.CaptaAlerta ? CaptaAlerta.etiqueta(c) : ''}${tagEtapa(c.lead && c.lead.etapa_id)}${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?tagPessoa(at, 'atendendo: ' + at):'<span class="mini-tag sem">sem dono</span>'}${c.resolvida_em?'<span class="mini-tag mt-enc">encerrada</span>':''}</span></span>
       <span class="conv-dir"><span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>` : ''}</span></button>`;
   }).join('');
   elConvs.querySelectorAll('.conv').forEach(b => { b.onclick = () => abrir(b.dataset.id); });
@@ -746,6 +749,7 @@ if (!SLUG || !TOKEN) {
   elConvs.innerHTML = '<div class="vazio">Abra esta página pelo painel do seu negócio.</div>';
 } else {
   carregarEtapas().then(() => carregarLista());
+  document.addEventListener('click', () => { if (window.CaptaAlerta) CaptaAlerta.pedirPermissao(); }, { once: true });
   timer = setInterval(() => { carregarLista(); if (atual) abrir(atual); }, 10000);
   document.addEventListener('visibilitychange', () => {
     clearInterval(timer);
