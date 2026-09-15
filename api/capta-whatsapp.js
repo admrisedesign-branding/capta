@@ -172,6 +172,7 @@ module.exports = async function handler(req, res) {
       case 'desconectar': return await acaoDesconectar(canal, res);
       case 'webhooks':    return await acaoWebhooks(canal, res);
       case 'enviar':      return await acaoEnviar(tenant, canal, body, res);
+      case 'casar_lid':   return await acaoCasarLid(tenant, canal, body, res);
       case 'enviar_midia': return await acaoEnviarMidia(tenant, canal, body, res);
       case 'conversas':   return await acaoConversas(tenant, res);
       case 'mensagens':   return await acaoMensagens(tenant, body, res);
@@ -378,7 +379,7 @@ async function acaoEnviar(tenant, canal, body, res) {
 async function acaoConversas(tenant, res) {
   const rows = await sb(
     `capta_conversas?tenant_id=eq.${tenant.id}` +
-    `&select=id,telefone,agente_ativo,status,nao_lidas,ultima_mensagem,ultima_mensagem_em,atendente,resolvida_em,` +
+    `&select=id,telefone,agente_ativo,status,nao_lidas,ultima_mensagem,ultima_mensagem_em,atendente,resolvida_em,nome,foto_url,lid,` +
     `lead:lead_id(id,nome,temperatura,status,etapa_id,atendente,notas,contato,crianca,idade,kommo_lead_id)` +
     `&order=ultima_mensagem_em.desc.nullslast&limit=100`
   );
@@ -394,7 +395,7 @@ async function acaoMensagens(tenant, body, res) {
 
   const conv = await sb(
     `capta_conversas?id=eq.${id}&tenant_id=eq.${tenant.id}` +
-    `&select=id,telefone,agente_ativo,nao_lidas,atendente,resolvida_em,lead:lead_id(id,nome,temperatura,etapa_id,atendente,notas,contato,crianca,idade,kommo_lead_id)&limit=1`
+    `&select=id,telefone,agente_ativo,nao_lidas,atendente,resolvida_em,nome,foto_url,lid,lead:lead_id(id,nome,temperatura,etapa_id,atendente,notas,contato,crianca,idade,kommo_lead_id)&limit=1`
   );
   if (!conv?.[0]) return res.status(404).json({ erro: 'Conversa não encontrada.' });
 
@@ -405,7 +406,8 @@ async function acaoMensagens(tenant, body, res) {
     `&order=criado_em.asc&limit=200`
   );
 
-  if (conv[0].nao_lidas > 0) {
+  // abrir não conta como atendido: as não lidas só zeram quando alguém responde
+  if (false && conv[0].nao_lidas > 0) {
     await sb(`capta_conversas?id=eq.${id}`, {
       method: 'PATCH', headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ nao_lidas: 0 })
@@ -1983,6 +1985,45 @@ async function acaoDesfazerRemarcacao(tenant, body, res) {
   else if (aluno_id && data_original) await sb(`capta_remarcacoes?tenant_id=eq.${tenant.id}&aluno_id=eq.${aluno_id}&data_original=eq.${data_original}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
   else return res.status(400).json({ erro: 'Informe a remarcação.' });
   return res.status(200).json({ ok: true });
+}
+
+
+// ---------------------------------------------------------------------
+// CASAR POR @lid — conversas que chegaram sem número de verdade.
+// Para cada lead com telefone, pergunta o @lid à Z-API e liga à conversa.
+// Roda em lotes (a Z-API limita), guardando o @lid no lead para não repetir.
+// ---------------------------------------------------------------------
+async function acaoCasarLid(tenant, canal, body, res) {
+  if (!canal) return res.status(400).json({ erro: 'Sem canal de WhatsApp.' });
+  const limite = Math.min(Number(body.limite) || 40, 80);
+  const convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=is.null&select=id,telefone,lid,nome&limit=300`).catch(() => []);
+  const pend = (convs || []).filter(c => c.lid || String(c.telefone || '').replace(/\D/g, '').length > 13);
+  if (!pend.length) return res.status(200).json({ ok: true, ligadas: 0, restantes: 0, aviso: 'Nenhuma conversa com @lid pendente.' });
+  const lids = new Map(); pend.forEach(c => { const l = (c.lid || String(c.telefone).replace(/\D/g, '')); lids.set(l, c); });
+
+  // leads ainda sem @lid conhecido
+  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&contato=not.is.null&lid=is.null&select=id,nome,contato&order=criado_em.desc&limit=${limite}`).catch(() => []);
+  let ligadas = 0, consultados = 0;
+  for (const l of leads || []) {
+    const lid = await prov.lidDoTelefone(canal, l.contato).catch(() => null);
+    consultados++;
+    await sb(`capta_leads?id=eq.${l.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lid: lid || 'sem' }) }).catch(() => null);
+    if (!lid) continue;
+    const c = lids.get(lid);
+    if (c) {
+      await sb(`capta_conversas?id=eq.${c.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ lead_id: l.id, telefone: prov.comDDI(l.contato) || c.telefone, lid }) }).catch(() => null);
+      // mensagens da conversa passam a contar para o lead
+      ligadas++; lids.delete(lid);
+    }
+  }
+  // também tenta pelo @lid já conhecido dos leads
+  const comLid = await sb(`capta_leads?tenant_id=eq.${tenant.id}&lid=not.is.null&lid=neq.sem&select=id,lid,contato`).catch(() => []);
+  for (const l of comLid || []) { const c = lids.get(l.lid); if (c) {
+    await sb(`capta_conversas?id=eq.${c.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lead_id: l.id, telefone: prov.comDDI(l.contato) || c.telefone }) }).catch(() => null);
+    ligadas++; lids.delete(l.lid); } }
+  const faltamLeads = (await sb(`capta_leads?tenant_id=eq.${tenant.id}&contato=not.is.null&lid=is.null&select=id&limit=1000`).catch(() => [])).length;
+  return res.status(200).json({ ok: true, ligadas, consultados, conversas_pendentes: lids.size, leads_por_consultar: faltamLeads });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela

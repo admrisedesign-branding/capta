@@ -123,7 +123,7 @@ async function processar(canalId, payload) {
         conversa_id: conversa.id,
         tenant_id: tenant,
         direcao,
-        autor,
+        autor: evento.de_mim ? (ehTextoDoBot(evento.texto) ? 'bot' : autor) : autor,
         tipo: evento.tipo,
         texto: evento.texto,
         midia_mime: evento.midia?.mime || null,
@@ -224,13 +224,34 @@ async function guardarMidia(tenant, msg, evento) {
 // Conversa: uma por telefone, por negócio. Casa com o lead usando a
 // capta_fone() do banco — o telefone do lead mora em `contato`.
 // ---------------------------------------------------------------------
+// Mensagens do robô do Kommo chegam como "enviadas por mim". Reconhecemos pelo
+// jeito de falar dele, para o chat mostrar "Robô" em vez do nome de uma pessoa.
+function ehTextoDoBot(t) {
+  const x = String(t || '');
+  return /Que bom ter você aqui na My Robot/i.test(x) || /Pra eu te ajudar direitinho/i.test(x)
+      || /Em qual bairro/i.test(x) || /Qual área interessa mais/i.test(x) || /Qual é o momento/i.test(x)
+      || /agradece seu contato\. Como podemos/i.test(x) || /Perfeito! .*vou te passar/i.test(x)
+      || /^(1|2|3|4|5|6|7) ?[-–—]/.test(x.trim()) && x.split('\n').length >= 3;
+}
+
 async function acharOuCriarConversa(tenant, canalId, evento) {
   const fone = evento.telefone;
 
+  // acha pelo telefone OU pelo @lid (o WhatsApp pode mandar um ou outro)
+  const filtro = evento.lid ? `or=(telefone.eq.${fone},lid.eq.${evento.lid})` : `telefone=eq.${fone}`;
   const achadas = await sb(
-    `capta_conversas?select=id,lead_id&tenant_id=eq.${tenant}&telefone=eq.${fone}`
+    `capta_conversas?select=id,lead_id,nome,foto_url,lid,telefone&tenant_id=eq.${tenant}&${filtro}&limit=1`
   );
-  if (achadas?.[0]) return achadas[0];
+  if (achadas?.[0]) {
+    const c = achadas[0]; const patch = {};
+    if (!c.nome && evento.nome) patch.nome = evento.nome;
+    if (!c.foto_url && evento.foto) patch.foto_url = evento.foto;
+    if (!c.lid && evento.lid) patch.lid = evento.lid;
+    // chegou o número real de uma conversa que só tinha @lid: troca
+    if (evento.lid && !evento.telefone_e_lid && c.telefone && c.telefone.replace(/\D/g,'').length > 13) patch.telefone = fone;
+    if (Object.keys(patch).length) sb(`capta_conversas?id=eq.${c.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) }).catch(() => null);
+    return c;
+  }
 
   // Procura um lead com esse telefone. A comparação normalizada é feita
   // pela função capta_lead_por_fone (RPC) — ver nota 3.
@@ -287,6 +308,9 @@ async function acharOuCriarConversa(tenant, canalId, evento) {
       canal_id: canalId,
       lead_id: leadId,
       telefone: fone,
+      nome: evento?.nome || null,
+      foto_url: evento?.foto || null,
+      lid: evento?.lid || null,
       agente_ativo: true,
       status: 'aberta'
     })
