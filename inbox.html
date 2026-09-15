@@ -190,6 +190,10 @@ button{font-family:inherit;cursor:pointer}
 .mini-tag.et-rem{background:rgba(124,92,219,.13);color:#5B3FBF}
 .mini-tag.mt-enc{background:var(--verde-bg);color:var(--verde)}
 .conv-tags{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:3px}
+
+.conv-av img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.conv-av{overflow:hidden}
+.conv{border-left:4px solid transparent}
 /* inbox v2 */
 
 .conv{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--line-2);background:transparent;cursor:pointer;font-family:inherit}
@@ -360,13 +364,15 @@ function desenharLista(){
     : k==='quentes' ? CONVS.filter(c=>(c.lead?.temperatura||'').toLowerCase()==='quente').length : k==='sem_dono' ? CONVS.filter(c=>!c.atendente&&!c.resolvida_em).length : CONVS.filter(c=>!c.resolvida_em).length;
   const orfas = CONVS.filter(c => !c.lead).length;
   document.getElementById('filtros').innerHTML = [['abertas','Abertas'],['nao_lidas','Não lidas'],['minhas','Minhas'],['sem_dono','Sem dono'],['quentes','Quentes'],['resolvidas','Resolvidas']].map(([k,t]) => `<button class="${FI.f===k?'on':''}" onclick="FI.f='${k}';desenharLista()">${t} <span style="opacity:.7">${n(k)}</span></button>`).join('')
-    + (orfas ? `<button style="border-color:var(--brand);color:var(--brand)" onclick="casarConversas()" title="Ligar conversas ao lead pelo telefone">ligar ${orfas} sem nome</button>` : '');
+    + (orfas ? `<button style="border-color:var(--brand);color:var(--brand)" onclick="casarLid()" title="Conversas sem lead: descobre o número pelos leads do Kommo (via @lid) e liga">ligar ${orfas} sem nome</button>` : '');
   elCont.textContent = lista.length ? `${lista.length} conversa${lista.length > 1 ? 's' : ''}` : 'Nenhuma conversa';
   if (!lista.length) { elConvs.innerHTML = `<div class="vazio">${CONVS.length ? 'Nada com esse filtro.' : 'Nada por aqui ainda.<br>As mensagens aparecem assim que alguém escrever para o seu WhatsApp.'}</div>`; return; }
   elConvs.innerHTML = lista.map(c => {
-    const nome = c.lead?.nome || fone(c.telefone); const temp = c.lead?.temperatura; const at = c.atendente || c.lead?.atendente;
-    return `<button class="conv ${c.resolvida_em?'res':''}" data-id="${c.id}" aria-current="${c.id === atual}">
-      <span class="conv-av">${esc(iniciais(nome))}</span>
+    const ehLid = String(c.telefone||'').replace(/\D/g,'').length > 13;
+    const nome = c.lead?.nome || c.nome || (ehLid ? 'Contato sem número' : fone(c.telefone)); const temp = c.lead?.temperatura; const at = c.atendente || c.lead?.atendente;
+    const e = (ETAPAS||[]).find(x => x.id === (c.lead && c.lead.etapa_id));
+    return `<button class="conv ${c.resolvida_em?'res':''}" data-id="${c.id}" aria-current="${c.id === atual}" style="${e && e.cor ? `border-left:4px solid ${e.cor}` : ''}">
+      <span class="conv-av">${c.foto_url ? `<img src="${esc(c.foto_url)}" alt="" onerror="this.remove()">` : esc(iniciais(nome))}</span>
       <span class="conv-mid"><span class="conv-nome">${esc(nome)}</span><span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span>
         <span class="conv-tags">${tagEtapa(c.lead && c.lead.etapa_id)}${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?tagPessoa(at, 'atendendo: ' + at):'<span class="mini-tag sem">sem dono</span>'}${c.resolvida_em?'<span class="mini-tag mt-enc">encerrada</span>':''}</span></span>
       <span class="conv-dir"><span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>` : ''}</span></button>`;
@@ -374,6 +380,16 @@ function desenharLista(){
   elConvs.querySelectorAll('.conv').forEach(b => { b.onclick = () => abrir(b.dataset.id); });
   if (window.parent !== window) window.parent.postMessage({ capta:'nao_lidas', n: CONVS.reduce((s,c)=>s+(c.nao_lidas||0),0) }, '*');
 }
+
+async function casarLid(){
+  const aviso = toast('<span class="mini-pt-esc"></span>consultando a Z-API…', { ms: 120000 });
+  try { await api('casar_conversas').catch(()=>{});      // primeiro quem tem número de verdade
+    const r = await api('casar_lid', { limite: 60 }); aviso.remove();
+    toast(`${r.ligadas} conversa${r.ligadas===1?'':'s'} ligada${r.ligadas===1?'':'s'} · ${r.conversas_pendentes} ainda sem lead · ${r.leads_por_consultar} leads por consultar${r.aviso?' · '+r.aviso:''}`, { ms: 8000, tipo: r.ligadas ? 'ok' : undefined });
+    carregarLista(); }
+  catch(e){ aviso.remove(); toast(e.message, { tipo:'erro' }); }
+}
+
 async function casarConversas(){ try { const r = await api('casar_conversas'); toast(`${r.ligadas} conversas ligadas ao lead`, { tipo:'ok' }); await carregarEtapas().then(carregarLista); } catch(e){ toast(e.message, { tipo:'erro' }); } }
 async function carregarLista() {
   try { const { conversas } = await api('conversas'); CONVS = conversas || []; desenharLista(); }
@@ -389,7 +405,8 @@ async function abrir(id) {
 
   try {
     const { conversa, mensagens } = await api('mensagens', { conversa_id: id });
-    const nome = conversa.lead?.nome || fone(conversa.telefone);
+    const ehLidC = String(conversa.telefone||'').replace(/\D/g,'').length > 13;
+  const nome = conversa.lead?.nome || conversa.nome || (ehLidC ? 'Contato sem número' : fone(conversa.telefone));
 
     elPain.innerHTML = `
       <div class="painel-topo">
@@ -700,7 +717,8 @@ function tagEtapa(id){
   const cor = e.tipo === 'ganha' ? 'et-ganha' : e.tipo === 'perdida' ? 'et-perdida'
     : /novo lead/.test(n) ? 'et-novo' : /aula agendada/.test(n) ? 'et-aula'
     : /qualificado/.test(n) ? 'et-qual' : /matr/.test(n) ? 'et-matr' : /remarketing/.test(n) ? 'et-rem' : 'et-contato';
-  return `<span class="mini-tag ${cor}">${esc(e.nome)}</span>`;
+  const st = e.cor ? `style="background:${e.cor}1f;color:${e.cor}"` : '';
+  return `<span class="mini-tag ${cor}" ${st}>${esc(e.nome)}</span>`;
 }
 
 async function enviar() {

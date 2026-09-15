@@ -154,7 +154,7 @@
     const tipo = atual ? (atual.tipo || '') : '';
     return `<div class="linha-topo">
       <div class="campo-inline"><label>Status</label>
-        <select id="lp-etapa" class="sel-etapa ${tipo}" onchange="LeadPainel.mudarEtapa(this.value)" title="A mesma lista do Pipeline. Aluno ativo, Perdido e Remarketing encerram a conversa.">
+        <select id="lp-etapa" class="sel-etapa ${tipo}" style="${atual && atual.cor ? `border-color:${atual.cor};color:${atual.cor}` : ''}" onchange="LeadPainel.mudarEtapa(this.value)" title="A mesma lista do Pipeline. Aluno ativo, Perdido e Remarketing encerram a conversa.">
           ${!atual ? '<option value="">— sem etapa —</option>' : ''}
           ${et.map(e => `<option value="${e.id}" ${l.etapa_id===e.id?'selected':''}>${esc(e.nome)}</option>`).join('')}
         </select>
