@@ -442,7 +442,7 @@ async function abrir(id) {
           <div class="acoes-dir">
             ${conversa.resolvida_em ? `<span class="enc" title="Encerrada porque o lead virou ${esc(nomeEtapa(conversa.lead && conversa.lead.etapa_id) || 'um caso fechado')}">conversa encerrada</span>
               <button onclick="resolver('${conversa.id}', false)" title="Volta para a lista de abertas">reabrir</button>` : ''}
-            <button onclick="importarTxt({ lead_id: ${conversa.lead ? `'${conversa.lead.id}'` : 'null'}, telefone: '${esc(conversa.telefone)}', depois: () => { abrir('${conversa.id}'); carregarLista(); } })" title="Importar histórico exportado do WhatsApp (.txt)">Importar .txt</button>
+            <button onclick="importarTxt({ lead_id: ${conversa.lead ? `'${conversa.lead.id}'` : 'null'}, telefone: '${esc(conversa.telefone)}', depois: () => { abrir('${conversa.id}'); carregarLista(); } })" title="Importar conversa exportada do WhatsApp (.zip com mídia ou .txt)">Importar histórico</button>
           </div>
         </div>
       </div>
@@ -619,26 +619,70 @@ function enviarAnexo(input){
 }
 
 
-// ---- importar histórico (.txt exportado do WhatsApp) ----
+// ---- importar histórico exportado do WhatsApp (.zip com mídia ou .txt) ----
+// No celular: conversa → ⋮ → Mais → Exportar conversa → "Incluir mídia". O .zip
+// traz o texto e os arquivos; os áudios entram no chat e podem ser lidos pela IA.
 function importarTxt(opts){ // opts: {lead_id?, telefone?, depois}
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.txt,text/plain';
-  inp.onchange = () => { const f = inp.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => previaImport(rd.result, opts); rd.readAsText(f); };
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,.txt,application/zip,text/plain';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    if (/\.zip$/i.test(f.name) || f.type.includes('zip')) {
+      try {
+        if (!window.JSZip) await new Promise((ok, err) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload = ok; sc.onerror = () => err(new Error('Não carregou o leitor de .zip.')); document.head.appendChild(sc); });
+        const zip = await JSZip.loadAsync(f);
+        const txts = Object.keys(zip.files).filter(n => /\.txt$/i.test(n) && !zip.files[n].dir && !/__MACOSX/.test(n));
+        const nomeTxt = txts.find(n => /_chat\.txt$/i.test(n)) || txts.sort((a, b) => zip.files[b]._data?.uncompressedSize - zip.files[a]._data?.uncompressedSize)[0];
+        if (!nomeTxt) return toast('Esse .zip não tem o texto da conversa. Exporte de novo pelo WhatsApp.', { tipo:'erro' });
+        previaImport(await zip.file(nomeTxt).async('string'), opts, zip);
+      } catch(e){ toast(e.message, { tipo:'erro' }); }
+    } else {
+      const rd = new FileReader(); rd.onload = () => previaImport(rd.result, opts, null); rd.readAsText(f);
+    }
+  };
   inp.click();
 }
-async function previaImport(texto, opts){
+async function previaImport(texto, opts, zip){
   let pv; try { pv = await api('importar_historico', { texto, previa: true }); } catch(e){ return toast(e.message,{tipo:'erro'}); }
   const autores = Object.entries(pv.autores).sort((a,b)=>b[1]-a[1]);
+  const nArq = zip ? Object.keys(zip.files).filter(n => !zip.files[n].dir && !/\.txt$/i.test(n) && !/__MACOSX/.test(n)).length : 0;
   const box = document.createElement('div'); box.className = 'fundo'; box.id = 'imp-fundo';
-  box.innerHTML = `<div class="janela"><h3>Importar conversa</h3><p>${pv.total} mensagens, de ${new Date(pv.de).toLocaleDateString('pt-BR')} a ${new Date(pv.ate).toLocaleDateString('pt-BR')}.<br>Quem é <b>a escola</b> nessa conversa? (o resto é o lead)</p>
+  box.innerHTML = `<div class="janela"><h3>Importar conversa</h3><p>${pv.total} mensagens, de ${new Date(pv.de).toLocaleDateString('pt-BR')} a ${new Date(pv.ate).toLocaleDateString('pt-BR')}${nArq ? ` · ${nArq} arquivo${nArq > 1 ? 's' : ''} de mídia` : ''}.<br>Quem é <b>a escola</b> nessa conversa? (o resto é o lead)</p>
     <div class="chips" style="margin-top:12px">${autores.map(([n,q]) => `<button class="chip" onclick="this.classList.toggle('on')" data-n="${esc(n)}">${esc(n)} <span style="opacity:.7">${q}</span></button>`).join('')}</div>
     ${opts.lead_id ? '' : `<div class="campo" style="margin-top:12px"><label>Telefone do lead (com DDD)</label><input id="imp-tel" placeholder="92999999999"></div>`}
-    <div class="fim"><button class="btn g" onclick="document.getElementById('imp-fundo').remove()">Cancelar</button><button class="btn" id="imp-ok">Importar</button></div></div>`;
+    <div id="imp-prog" style="margin-top:12px;color:var(--muted);font-size:13px;display:none"></div>
+    <div class="fim"><button class="btn g" id="imp-cancel" onclick="document.getElementById('imp-fundo').remove()">Cancelar</button><button class="btn" id="imp-ok">Importar</button></div></div>`;
   document.body.appendChild(box);
   document.getElementById('imp-ok').onclick = async () => {
     const nomes = [...box.querySelectorAll('.chip.on')].map(c => c.dataset.n); if (!nomes.length) return toast('Marque quem é a escola.',{tipo:'erro'});
     const telefone = opts.telefone || (document.getElementById('imp-tel') || {}).value;
-    try { const r = await api('importar_historico', { texto, nomes_escola: nomes, lead_id: opts.lead_id, telefone }); box.remove(); toast(`${r.importadas} mensagens importadas`, {tipo:'ok'}); opts.depois && opts.depois(r); }
-    catch(e){ toast(e.message,{tipo:'erro'}); }
+    const ok = document.getElementById('imp-ok'), prog = document.getElementById('imp-prog');
+    ok.disabled = true; ok.textContent = 'Importando…'; prog.style.display = 'block'; prog.textContent = 'Gravando as mensagens…';
+    try {
+      const r = await api('importar_historico', { texto, nomes_escola: nomes, lead_id: opts.lead_id, telefone });
+      const pend = zip ? (r.midias || []) : [];
+      let subidos = 0, pulados = 0;
+      if (pend.length) {
+        document.getElementById('imp-cancel').style.display = 'none';
+        const entradas = Object.keys(zip.files).filter(n => !zip.files[n].dir);
+        for (let i = 0; i < pend.length; i++) {
+          const p = pend[i];
+          prog.textContent = `Subindo mídia ${i + 1} de ${pend.length}…`;
+          const nome = entradas.find(n => n === p.arquivo || n.endsWith('/' + p.arquivo)) || entradas.find(n => n.split('/').pop().toLowerCase() === p.arquivo.toLowerCase());
+          if (!nome) { pulados++; continue; }
+          try {
+            const blob = await zip.file(nome).async('blob');
+            if (blob.size > 4 * 1024 * 1024) { pulados++; continue; }   // acima do limite do servidor
+            const dados = await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(rd.result); rd.onerror = rej; rd.readAsDataURL(blob); });
+            await api('importar_midia', { mensagem_id: p.mensagem_id, dados, nome: p.arquivo });
+            subidos++;
+          } catch(e) { pulados++; }
+        }
+      }
+      box.remove();
+      toast(`${r.importadas} mensagens importadas${subidos ? ` · ${subidos} arquivo${subidos > 1 ? 's' : ''} de mídia` : ''}${pulados ? ` · ${pulados} não subiram` : ''}`, { tipo: pulados ? 'erro' : 'ok' });
+      opts.depois && opts.depois(r);
+    }
+    catch(e){ ok.disabled = false; ok.textContent = 'Importar'; prog.style.display = 'none'; toast(e.message,{tipo:'erro'}); }
   };
 }
 

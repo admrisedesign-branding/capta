@@ -1,7 +1,7 @@
 /* lead-painel.js — a gaveta do lead, igual em todas as telas do Capta.
    Uso:  LeadPainel.init({ slug, token, getLead:(id)=>lead, getEtapas:()=>[...], onMover:(lead, etapaId, motivo)=>{}, onAgendou:(lead)=>{}, onExcluir:(lead)=>{}, leadsApi:'/api/capta-leads' })
          LeadPainel.abrir(id, 'conversa'|'dados'|'agendar')   LeadPainel.fechar()
-   Abas: Conversa (chat do WhatsApp, atendente, resolver, respostas prontas, anexos, importar .txt) · Dados · Agendar aula.  */
+   Abas: Conversa (chat do WhatsApp, atendente, resolver, respostas prontas, anexos, importar .zip/.txt) · Dados · Agendar aula.  */
 (function () {
   const CSS = `
   #lp{position:fixed;top:0;right:0;height:100vh;width:0;overflow:hidden;transition:.22s cubic-bezier(.4,0,.2,1);border-left:1px solid var(--line,#E9ECF3);background:var(--card,#fff);display:flex;flex-direction:column;z-index:80;box-shadow:-10px 0 40px rgba(20,26,46,.12);font-family:inherit}
@@ -203,7 +203,7 @@
       ${c ? `<span class="robo ${c.agente_ativo?'on':''}"><i></i>${c.agente_ativo ? 'Robô' : 'Você'}</span>
       <select onchange="LeadPainel.atribuir(this.value)" title="Quem está atendendo"><option value="">— atendente —</option>${[...new Set([...ATEND, EU()].filter(Boolean))].map(a=>`<option ${(c.atendente||EU())===a?'selected':''}>${a}</option>`).join('')}</select>
       ${c.resolvida_em ? `<button onclick="LeadPainel.resolver(false)">Reabrir</button>` : `<button class="ok" onclick="LeadPainel.resolver(true)">Encerrar conversa</button>`}` : `<span class="robo"><i></i>${conectado ? 'sem conversa ainda' : 'WhatsApp não conectado'}</span>`}
-      <button onclick="LeadPainel.importarTxt()" title="Importar histórico exportado do WhatsApp (.txt)">Importar .txt</button>
+      <button onclick="LeadPainel.importarTxt()" title="Importar conversa exportada do WhatsApp (.zip com mídia ou .txt)">Importar histórico</button>
       <span style="margin-left:auto;display:flex;gap:6px">${l.contato ? `<a class="lnk" style="font-size:12px" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">abrir no WhatsApp ↗</a>` : ''}</span></div>`;
     let corpo;
     if (!i) corpo = `<div class="aviso-p">Carregando…</div>`;
@@ -246,23 +246,61 @@
     const tipo = f.type.startsWith('image/') ? 'imagem' : f.type.startsWith('audio/') ? 'audio' : 'documento';
     const rd = new FileReader(); rd.onload = async () => { try { await api('enviar_midia', { conversa_id: S.info.conversa.id, tipo, dados: rd.result, nome: f.name, legenda: (document.getElementById('lp-txt')?.value||'').trim() || undefined }); S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); say('Enviado', { tipo:'ok' }); } catch (e) { say(e.message, { tipo:'erro' }); } }; rd.readAsDataURL(f);
   }
+  // Aceita o .zip "Exportar conversa → Incluir mídia" (texto + áudios/fotos) ou só o .txt.
   function importarTxt() {
-    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.txt,text/plain';
-    inp.onchange = () => { const f = inp.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => previaImport(rd.result); rd.readAsText(f); };
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,.txt,application/zip,text/plain';
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      if (/\.zip$/i.test(f.name) || f.type.includes('zip')) {
+        try {
+          if (!window.JSZip) await new Promise((ok, err) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload = ok; sc.onerror = () => err(new Error('Não carregou o leitor de .zip.')); document.head.appendChild(sc); });
+          const zip = await JSZip.loadAsync(f);
+          const txts = Object.keys(zip.files).filter(n => /\.txt$/i.test(n) && !zip.files[n].dir && !/__MACOSX/.test(n));
+          const nomeTxt = txts.find(n => /_chat\.txt$/i.test(n)) || txts[0];
+          if (!nomeTxt) return say('Esse .zip não tem o texto da conversa. Exporte de novo pelo WhatsApp.', { tipo:'erro' });
+          previaImport(await zip.file(nomeTxt).async('string'), zip);
+        } catch (e) { say(e.message, { tipo:'erro' }); }
+      } else { const rd = new FileReader(); rd.onload = () => previaImport(rd.result, null); rd.readAsText(f); }
+    };
     inp.click();
   }
-  async function previaImport(texto) {
+  async function previaImport(texto, zip) {
     let pv; try { pv = await api('importar_historico', { texto, previa: true }); } catch (e) { return say(e.message, { tipo:'erro' }); }
     const autores = Object.entries(pv.autores).sort((a,b)=>b[1]-a[1]);
+    const nArq = zip ? Object.keys(zip.files).filter(n => !zip.files[n].dir && !/\.txt$/i.test(n) && !/__MACOSX/.test(n)).length : 0;
     const box = document.createElement('div'); box.id = 'lp-imp'; box.style.cssText = 'position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:90';
-    box.innerHTML = `<div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:440px;font-family:inherit"><h3 style="font-size:16px;font-weight:700;margin:0">Importar conversa</h3><p style="color:#697089;font-size:13px;margin:6px 0 0;line-height:1.5">${pv.total} mensagens, de ${new Date(pv.de).toLocaleDateString('pt-BR')} a ${new Date(pv.ate).toLocaleDateString('pt-BR')}.<br>Marque quem é <b>a escola</b> (o resto é o lead):</p>
+    box.innerHTML = `<div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:440px;font-family:inherit"><h3 style="font-size:16px;font-weight:700;margin:0">Importar conversa</h3><p style="color:#697089;font-size:13px;margin:6px 0 0;line-height:1.5">${pv.total} mensagens, de ${new Date(pv.de).toLocaleDateString('pt-BR')} a ${new Date(pv.ate).toLocaleDateString('pt-BR')}${nArq ? ` · ${nArq} arquivo${nArq > 1 ? 's' : ''} de mídia` : ''}.<br>Marque quem é <b>a escola</b> (o resto é o lead):</p>
       <div id="lp-imp-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">${autores.map(([n,q]) => `<button data-n="${esc(n)}" style="border:1px solid #E9ECF3;background:#fff;border-radius:99px;padding:6px 11px;font-size:12.5px;font-weight:600;color:#697089;cursor:pointer;font-family:inherit" onclick="this.dataset.on=this.dataset.on?'':'1';this.style.background=this.dataset.on?'#2E5BFF':'#fff';this.style.color=this.dataset.on?'#fff':'#697089'">${esc(n)} (${q})</button>`).join('')}</div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px"><button class="btn g" style="border:1px solid #E9ECF3;background:#fff;color:#697089;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="document.getElementById('lp-imp').remove()">Cancelar</button><button id="lp-imp-ok" style="border:0;background:#2E5BFF;color:#fff;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit">Importar</button></div></div>`;
+      <div id="lp-imp-prog" style="display:none;color:#697089;font-size:13px;margin-top:12px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px"><button id="lp-imp-cancel" style="border:1px solid #E9ECF3;background:#fff;color:#697089;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="document.getElementById('lp-imp').remove()">Cancelar</button><button id="lp-imp-ok" style="border:0;background:#2E5BFF;color:#fff;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit">Importar</button></div></div>`;
     document.body.appendChild(box);
     document.getElementById('lp-imp-ok').onclick = async () => {
       const nomes = [...box.querySelectorAll('[data-on="1"]')].map(c => c.dataset.n); if (!nomes.length) return say('Marque quem é a escola.', { tipo:'erro' });
-      try { const r = await api('importar_historico', { texto, nomes_escola: nomes, lead_id: S.lead.id, telefone: S.lead.contato }); box.remove(); say(`${r.importadas} mensagens importadas`, { tipo:'ok' }); S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
-      catch (e) { say(e.message, { tipo:'erro' }); }
+      const ok = document.getElementById('lp-imp-ok'), prog = document.getElementById('lp-imp-prog');
+      ok.disabled = true; ok.textContent = 'Importando…'; prog.style.display = 'block'; prog.textContent = 'Gravando as mensagens…';
+      try {
+        const r = await api('importar_historico', { texto, nomes_escola: nomes, lead_id: S.lead.id, telefone: S.lead.contato });
+        const pend = zip ? (r.midias || []) : []; let subidos = 0, pulados = 0;
+        if (pend.length) {
+          document.getElementById('lp-imp-cancel').style.display = 'none';
+          const entradas = Object.keys(zip.files).filter(n => !zip.files[n].dir);
+          for (let i = 0; i < pend.length; i++) {
+            const p = pend[i]; prog.textContent = `Subindo mídia ${i + 1} de ${pend.length}…`;
+            const nome = entradas.find(n => n === p.arquivo || n.endsWith('/' + p.arquivo)) || entradas.find(n => n.split('/').pop().toLowerCase() === p.arquivo.toLowerCase());
+            if (!nome) { pulados++; continue; }
+            try {
+              const blob = await zip.file(nome).async('blob');
+              if (blob.size > 4 * 1024 * 1024) { pulados++; continue; }
+              const dados = await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(rd.result); rd.onerror = rej; rd.readAsDataURL(blob); });
+              await api('importar_midia', { mensagem_id: p.mensagem_id, dados, nome: p.arquivo }); subidos++;
+            } catch (e) { pulados++; }
+          }
+        }
+        box.remove();
+        say(`${r.importadas} mensagens importadas${subidos ? ` · ${subidos} arquivo${subidos > 1 ? 's' : ''} de mídia` : ''}${pulados ? ` · ${pulados} não subiram` : ''}`, { tipo: pulados ? 'erro' : 'ok' });
+        S.info = await api('lead', { lead_id: S.lead.id }); desenhar();
+      }
+      catch (e) { ok.disabled = false; ok.textContent = 'Importar'; prog.style.display = 'none'; say(e.message, { tipo:'erro' }); }
     };
   }
 
