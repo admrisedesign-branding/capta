@@ -29,6 +29,20 @@
   #lp .msg{max-width:88%;padding:8px 10px;border-radius:12px;font-size:13px;line-height:1.45;background:var(--line-2,#F1F3F8);align-self:flex-start;white-space:pre-wrap}
   #lp .msg.saida{background:var(--brand-soft,rgba(46,91,255,.1));align-self:flex-end}#lp .msg small{display:block;color:var(--faint);font-size:10.5px;margin-top:3px}
   #lp .msg img{max-width:100%;border-radius:8px;display:block;margin-top:4px}
+
+  #lp .linha-topo{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;margin-bottom:12px}
+  #lp .campo-inline label{display:block;font-size:10.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  #lp .sel-etapa{border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-size:13.5px;font-weight:700;
+    font-family:inherit;background:var(--card);color:var(--ink);min-width:180px;cursor:pointer}
+  #lp .sel-etapa:focus{outline:0;border-color:var(--brand)}
+  #lp .sel-etapa.ganha{border-color:var(--verde);color:var(--verde)}
+  #lp .sel-etapa.perdida{border-color:var(--quente);color:var(--quente)}
+  #lp .dica-etapa{display:block;font-size:11.5px;color:var(--faint);margin-top:4px;line-height:1.4;max-width:280px}
+  #lp .at-box{display:flex;align-items:center;gap:6px;min-height:36px}
+  #lp .sem-dono{font-size:12px;color:var(--faint);font-weight:600}
+  #lp .bt-assumir{border:1px solid var(--brand);background:var(--brand-softer);color:var(--brand);border-radius:8px;
+    padding:4px 9px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit}
+  #lp .bt-assumir:hover{background:var(--brand-soft)}
   #lp .t-pessoa{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;display:inline-flex;align-items:center;gap:4px}
   #lp .t-pessoa:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
   #lp .transcr{margin-top:6px;padding-top:6px;border-top:1px solid rgba(105,112,137,.2);font-size:12.5px;line-height:1.45;color:var(--muted);white-space:pre-wrap}
@@ -126,7 +140,29 @@
     const ms = document.getElementById('lp-msgs'); if (ms) ms.scrollTop = ms.scrollHeight;
   }
   function chipsEtapa(l, et) {
-    return `<div class="sec">Etapa</div><div class="chips">${et.map(e => `<button class="chip ${e.tipo||''} ${l.etapa_id===e.id?'on':''}" onclick="LeadPainel.mudarEtapa('${e.id}')" title="${esc(AJUDA_ETAPA[String(e.nome||'').toLowerCase()] || '')}">${esc(e.nome)}</button>`).join('')}</div>`;
+    const atual = et.find(e => e.id === l.etapa_id);
+    return `<div class="linha-topo">
+      <div class="campo-inline"><label>Status</label>
+        <select id="lp-etapa" class="sel-etapa ${atual?(atual.tipo||''):''}" onchange="LeadPainel.mudarEtapa(this.value)">
+          ${!atual ? '<option value="">— sem etapa —</option>' : ''}
+          ${et.map(e => `<option value="${e.id}" ${l.etapa_id===e.id?'selected':''}>${esc(e.nome)}</option>`).join('')}
+        </select>
+        ${atual ? `<span class="dica-etapa">${esc(AJUDA_ETAPA[String(atual.nome||'').toLowerCase()] || '')}</span>` : ''}
+      </div>
+      <div class="campo-inline"><label>Quem atende</label>
+        <div class="at-box">${l.atendente ? tagPessoa(l.atendente) : '<span class="sem-dono">sem dono</span>'}
+          ${EU() && l.atendente !== EU() ? `<button class="bt-assumir" onclick="LeadPainel.assumir()">assumir</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }
+  // quem está logado assume o lead e a conversa
+  async function assumir(){
+    const l = S.lead, eu = EU(); if (!l || !eu) return;
+    try { await api('campos', { lead_id: l.id, atendente: eu }); l.atendente = eu;
+      if (S.info?.conversa?.id) api('conversa_atualizar', { conversa_id: S.info.conversa.id, atendente: eu }).catch(()=>{});
+      desenhar(); say(`Agora ${esc(eu)} está atendendo`, { tipo:'ok' }); }
+    catch(e){ say(e.message, { tipo:'erro' }); }
   }
   async function mudarEtapa(etapaId) {
     const l = S.lead; if (!l || l.etapa_id === etapaId) return;
@@ -149,7 +185,7 @@
     const acoes = `<div class="acoes">
       ${c ? `<span class="robo ${c.agente_ativo?'on':''}"><i></i>${c.agente_ativo ? 'Robô' : 'Você'}</span>
       <select onchange="LeadPainel.atribuir(this.value)" title="Quem está atendendo"><option value="">— atendente —</option>${[...new Set([...ATEND, EU()].filter(Boolean))].map(a=>`<option ${(c.atendente||EU())===a?'selected':''}>${a}</option>`).join('')}</select>
-      ${c.resolvida_em ? `<button onclick="LeadPainel.resolver(false)">Reabrir</button>` : `<button class="ok" onclick="LeadPainel.resolver(true)">Resolver ✓</button>`}` : `<span class="robo"><i></i>${conectado ? 'sem conversa ainda' : 'WhatsApp não conectado'}</span>`}
+      ${c.resolvida_em ? `<button onclick="LeadPainel.resolver(false)">Reabrir</button>` : `<button class="ok" onclick="LeadPainel.resolver(true)">Encerrar conversa</button>`}` : `<span class="robo"><i></i>${conectado ? 'sem conversa ainda' : 'WhatsApp não conectado'}</span>`}
       <button onclick="LeadPainel.importarTxt()" title="Importar histórico exportado do WhatsApp (.txt)">Importar .txt</button>
       <span style="margin-left:auto;display:flex;gap:6px">${l.contato ? `<a class="lnk" style="font-size:12px" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">abrir no WhatsApp ↗</a>` : ''}</span></div>`;
     let corpo;
@@ -357,5 +393,5 @@
       S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
-  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, sugerir, usarSugestao, mudarEtapa, verHorarios, agendarManual, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
+  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, agendarManual, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
 })();

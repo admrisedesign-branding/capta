@@ -23,7 +23,7 @@ button{font-family:inherit;cursor:pointer}
 @media(max-width:760px){.dica{display:none}}
 
 .raia-area{padding:20px 26px 40px;overflow-x:auto}
-.raias{display:flex;gap:14px;align-items:stretch;min-height:calc(100vh - 150px)}
+.raias{display:flex;gap:14px;align-items:flex-start;min-height:calc(100vh - 150px)}
 body.embed .raias{min-height:calc(100vh - 120px)}
 
 .raia{flex:1 1 240px;min-width:240px;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:var(--r);
@@ -34,7 +34,7 @@ body.embed .raias{min-height:calc(100vh - 120px)}
 .raia-nome{font-weight:700;font-size:13.5px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .raia-cab .ajuda{margin-right:auto}
 .raia-qtd{font-size:12px;font-weight:700;color:var(--muted);background:var(--gray-bg);border-radius:99px;padding:2px 8px}
-.raia-corpo{padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;flex:1}
+.raia-corpo{padding:10px;display:flex;flex-direction:column;gap:8px;flex:1}
 
 .lead{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--card);cursor:grab;transition:.14s}
 .lead:hover{border-color:var(--brand-2);box-shadow:0 2px 8px rgba(20,26,46,.06)}
@@ -163,6 +163,11 @@ body.embed .filtros-bar,body.embed .org-topo,body.embed .org-aviso{max-width:cal
 }
 .t-pessoa{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;text-transform:none;letter-spacing:0;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .t-pessoa:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+
+/* a página inteira rola: as colunas crescem com os cards, sem rolagem interna */
+.raia-corpo{overflow:visible}
+.raia{align-self:flex-start}
+.raia-cab{position:sticky;top:46px;z-index:2;background:var(--card);border-radius:var(--r) var(--r) 0 0}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
