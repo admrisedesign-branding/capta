@@ -194,7 +194,13 @@ module.exports = async function handler(req, res) {
 // STATUS — a tela chama de 3 em 3s enquanto estiver aguardando o QR
 // ---------------------------------------------------------------------
 async function acaoStatus(canal, res) {
-  const s = await prov.obterStatus(canal);
+  let s;
+  try { s = await prov.obterStatus(canal); }
+  catch (e) {
+    // provedor fora: devolve o último estado conhecido, com o aviso — a tela não trava
+    return res.status(200).json({ status: canal.status || 'desconhecido', numero: canal.numero || null,
+      provedor_fora: true, erro: e.message, ultimo_status_em: canal.conectado_em || null });
+  }
 
   // Só grava quando muda, para não escrever no banco a cada polling.
   if (s.status !== canal.status || (s.numero && s.numero !== canal.numero)) {
