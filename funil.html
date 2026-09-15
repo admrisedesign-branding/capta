@@ -190,6 +190,15 @@ body.embed .filtros-bar{width:calc(100vw - 130px)}
 .sg-aula.vem{background:var(--exp-bg);color:#8C3D1F}
 .sg-aula.passou{background:var(--line-2);color:var(--muted)}
 .sg-aula .sg-auto{color:var(--verde);font-weight:700}
+
+.sg-sel{border:1px solid var(--brand-2);background:var(--brand-softer);color:var(--brand);border-radius:8px;padding:3px 6px;
+  font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;max-width:170px}
+.sg-sel.meta{border-color:var(--morno);background:var(--morno-bg);color:var(--morno)}
+.sg-mais{border:1px solid var(--line);background:var(--card);border-radius:7px;width:24px;height:24px;font-size:14px;
+  font-weight:800;color:var(--muted);cursor:pointer;line-height:1;padding:0;flex:0 0 24px}
+.sg-mais:hover{border-color:var(--brand);color:var(--brand)}
+.sg-nota{font-size:12px;color:var(--ink);background:var(--line-2);border-left:3px solid var(--brand);border-radius:6px;
+  padding:5px 8px;margin-top:6px;line-height:1.45}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -411,7 +420,8 @@ async function aplicarSug(){
   const itens = ORG.sug.filter(s => ORG.marcados.has(s.lead_id) && !s.avisa_meta);
   if (!itens.length) return;
   try {
-    const d = await api('triagem_aplicar', { itens });
+    const eu = (window.CaptaUser&&CaptaUser.nome&&CaptaUser.nome())||undefined;
+    const d = await api('triagem_aplicar', { itens: itens.map(x => ({ ...x, atendente: eu })) });
     toast(`${d.movidos} lead${d.movidos===1?'':'s'} movido${d.movidos===1?'':'s'} · Kommo atualizado`, { tipo:'ok' });
     ORG.sug = ORG.sug.filter(s => !ORG.marcados.has(s.lead_id)); ORG.marcados = new Set();
     await carregar();
@@ -421,7 +431,7 @@ async function aplicarUmaSug(id){
   const s = sugDe(id); if (!s) return;
   if (!confirm(`Mover ${s.nome || 'este lead'} para "${s.etapa_nova}"?\n\nIsso envia um evento de conversão para a Meta. Só confirme se estiver certo.`)) return;
   try {
-    const d = await api('triagem_aplicar', { itens: [{ ...s, confirmado_individual: true }] });
+    const d = await api('triagem_aplicar', { itens: [{ ...s, confirmado_individual: true, atendente: (window.CaptaUser&&CaptaUser.nome&&CaptaUser.nome())||undefined }] });
     if (d.movidos) { toast(`${esc(s.nome||'Lead')} → ${esc(s.etapa_nova)}`, { tipo:'ok' }); ORG.sug = ORG.sug.filter(x => x.lead_id !== id); await carregar(); }
     else toast(d.falhas?.[0]?.erro || 'Não deu certo', { tipo:'erro' });
   } catch(e){ toast(e.message, { tipo:'erro' }); }
@@ -431,14 +441,37 @@ function verConversaSug(id){
   abrirLead(s.lead_id);     // a gaveta do lead já abre na conversa
 }
 // faixa de sugestão dentro do card
+
+// a pessoa corrige a etapa que a IA propôs
+function trocarSug(id, etapaId){
+  const s = sugDe(id); if (!s) return;
+  const e = etapas.find(x => x.id === etapaId); if (!e) return;
+  s.etapa_nova_id = e.id; s.etapa_nova = e.nome;
+  s.avisa_meta = /qualificado|aula agendada/i.test(e.nome);
+  if (s.avisa_meta) ORG.marcados.delete(id);
+  desenhar();
+}
+// anotação que entra no histórico do lead ao aprovar
+function anotarSug(id){
+  const s = sugDe(id); if (!s) return;
+  const t = prompt('Informação para o histórico deste lead:\n(ex.: "mãe amou, mas a distância não permite matricular")', s.nota || '');
+  if (t === null) return;
+  s.nota = t.trim() || null; desenhar();
+}
+
 function faixaSug(l){
   const s = sugDe(l.id); if (!s || !ORG.ligado) return '';
   return `<div class="sg-faixa ${s.avisa_meta?'meta':''}" onclick="event.stopPropagation()">
     <div class="sg-top">
       ${s.avisa_meta ? '' : `<input type="checkbox" ${ORG.marcados.has(l.id)?'checked':''} onchange="marcarSug('${l.id}', this.checked)">`}
-      <span class="sg-para">→ ${esc(s.etapa_nova)}</span>
+      <span class="sg-para">→</span>
+      <select class="sg-sel ${s.avisa_meta?'meta':''}" onchange="trocarSug('${l.id}', this.value)" title="A IA propôs; você pode corrigir antes de aprovar">
+        ${etapas.map(e => `<option value="${e.id}" ${e.id===s.etapa_nova_id?'selected':''}>${esc(e.nome)}</option>`).join('')}
+      </select>
       <span class="sg-conf ${s.confianca}">${s.confianca === 'alta' ? 'alta' : s.confianca === 'baixa' ? 'baixa' : 'média'}</span>
+      <button class="sg-mais" onclick="anotarSug('${l.id}')" title="Adicionar uma informação ao histórico do lead (vai junto na aprovação, e para o Kommo)">${s.nota ? '📝' : '+'}</button>
     </div>
+    ${s.nota ? `<div class="sg-nota">${esc(s.nota)}</div>` : ''}
     <div class="sg-motivo">${esc(s.motivo)}</div>
     ${s.crianca ? `<div class="sg-cri">criança: <b>${esc(s.crianca)}</b>${s.idade?`, ${s.idade} anos`:''}</div>` : ''}
     ${s.aula_data ? `<div class="sg-aula ${s.aula_passou?'passou':'vem'}">
