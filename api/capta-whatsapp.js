@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -112,6 +112,7 @@ module.exports = async function handler(req, res) {
         case 'conversa_atualizar': return await acaoConversaAtualizar(tenant, body, res);
         case 'respostas': return await acaoRespostas(tenant, body, res);
         case 'importar_historico': return await acaoImportarHistorico(tenant, body, res);
+        case 'importar_midia':     return await acaoImportarMidia(tenant, body, res);
         case 'equipe':   return await acaoEquipe(tenant, body, res);
         case 'equipe_salvar': return await acaoEquipeSalvar(tenant, body, res);
         case 'eu':       return await acaoEu(tenant, body, res);
@@ -1125,14 +1126,27 @@ async function acaoImportarHistorico(tenant, body, res) {
   } else if (lead && !conv.lead_id) await sb(`capta_conversas?id=eq.${conv.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lead_id: lead.id }) }).catch(() => null);
 
   const crypto = require('crypto');
-  const linhas = msgs.map(m => ({
-    tenant_id: tenant.id, conversa_id: conv.id,
-    direcao: escola.includes(m.autor.toLowerCase()) ? 'saida' : 'entrada',
-    autor: escola.includes(m.autor.toLowerCase()) ? m.autor : 'lead',
-    tipo: /<M[ií]dia oculta>|\(arquivo anexado\)|imagem omitida|áudio omitido|<Media omitted>/i.test(m.texto) ? 'midia' : 'texto',
-    texto: m.texto.slice(0, 4000), entrega: 'importada', criado_em: m.quando.toISOString(),
-    provedor_msg_id: 'import:' + crypto.createHash('md5').update(`${telefone}|${m.quando.toISOString()}|${m.autor}|${m.texto}`).digest('hex').slice(0, 24)
-  }));
+  // Export "com mídia": a linha traz o nome do arquivo que está dentro do .zip.
+  //   iPhone:  <anexado: 00000012-AUDIO-2026-09-01-10-22-33.opus>
+  //   Android: PTT-20260901-WA0012.opus (arquivo anexado)
+  // O arquivo em si sobe depois, um a um, pela ação importar_midia.
+  const anexos = [];
+  const linhas = msgs.map(m => {
+    const daEscola = escola.includes(m.autor.toLowerCase());
+    const arq = anexoDaLinha(m.texto);
+    const tipo = arq ? tipoPorArquivo(arq.nome) : (/<M[ií]dia oculta>|imagem omitida|áudio omitido|<Media omitted>|v[ií]deo omitido|documento omitido|figurinha omitida/i.test(m.texto) ? 'midia' : 'texto');
+    const texto = arq ? (arq.legenda || null) : m.texto.slice(0, 4000);
+    const provedor_msg_id = 'import:' + crypto.createHash('md5').update(`${telefone}|${m.quando.toISOString()}|${m.autor}|${m.texto}`).digest('hex').slice(0, 24);
+    if (arq) anexos.push({ provedor_msg_id, arquivo: arq.nome, tipo });
+    return {
+      tenant_id: tenant.id, conversa_id: conv.id,
+      direcao: daEscola ? 'saida' : 'entrada',
+      autor: daEscola ? m.autor : 'lead',
+      tipo, texto, entrega: 'importada', criado_em: m.quando.toISOString(),
+      transcricao_status: tipo === 'audio' ? 'pendente' : null,
+      provedor_msg_id
+    };
+  });
   let gravadas = 0;
   for (let i = 0; i < linhas.length; i += 200) {
     const lote = linhas.slice(i, i + 200);
@@ -1142,7 +1156,73 @@ async function acaoImportarHistorico(tenant, body, res) {
   }
   const ultima = msgs[msgs.length - 1];
   await sb(`capta_conversas?id=eq.${conv.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ultima_mensagem: (ultima.texto || '').slice(0, 120) }) }).catch(() => null);
-  return res.status(200).json({ ok: true, conversa_id: conv.id, importadas: gravadas });
+
+  // Devolve quais mensagens ainda estão sem arquivo, com o nome que o
+  // navegador deve procurar dentro do .zip. Quem já tem midia_url (importação
+  // repetida) não volta: não sobe o mesmo áudio duas vezes.
+  let pendentes = [];
+  if (anexos.length) {
+    const ids = anexos.map(a => `"${a.provedor_msg_id}"`).join(',');
+    const rows = await sb(`capta_mensagens?conversa_id=eq.${conv.id}&provedor_msg_id=in.(${ids})&select=id,provedor_msg_id,midia_url`).catch(() => []);
+    for (const r of rows || []) {
+      if (r.midia_url) continue;
+      const a = anexos.find(x => x.provedor_msg_id === r.provedor_msg_id);
+      if (a) pendentes.push({ mensagem_id: r.id, arquivo: a.arquivo, tipo: a.tipo });
+    }
+  }
+  return res.status(200).json({ ok: true, conversa_id: conv.id, importadas: gravadas, midias: pendentes });
+}
+
+// "<anexado: X>" (iPhone, também <attached: X>) ou "X (arquivo anexado)" (Android, também (file attached)).
+// Legenda, quando existe, vem na linha seguinte — o parser já juntou com \n.
+function anexoDaLinha(texto) {
+  const t = String(texto || '');
+  let m = t.match(/<(?:anexado|attached|adjunto):\s*([^>]+)>/i);
+  if (m) return { nome: m[1].trim(), legenda: t.replace(m[0], '').trim().slice(0, 4000) };
+  m = t.match(/^(.+?\.[A-Za-z0-9]{2,5})\s*\((?:arquivo anexado|file attached|archivo adjunto)\)/i);
+  if (m) return { nome: m[1].trim(), legenda: t.replace(m[0], '').trim().slice(0, 4000) };
+  return null;
+}
+const MIME_IMPORT = {
+  opus: 'audio/ogg', ogg: 'audio/ogg', oga: 'audio/ogg', mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/mp4', wav: 'audio/wav', amr: 'audio/amr',
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
+  mp4: 'video/mp4', mov: 'video/quicktime', '3gp': 'video/3gpp',
+  pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', txt: 'text/plain', vcf: 'text/vcard'
+};
+function extDe(nome) { return String(nome || '').split('.').pop().toLowerCase(); }
+function tipoPorArquivo(nome) {
+  const e = extDe(nome), mime = MIME_IMPORT[e] || '';
+  if (mime.startsWith('audio/')) return 'audio';
+  if (mime.startsWith('image/')) return /sticker|STK-/i.test(nome) || e === 'webp' ? 'figurinha' : 'imagem';
+  if (mime.startsWith('video/')) return 'video';
+  return 'documento';
+}
+// Sobe um arquivo do .zip exportado para a mensagem já importada.
+// Vem em base64 (data URL), um por chamada — o mesmo caminho do enviar_midia,
+// dentro do limite de corpo do Vercel (~4,5 MB). Guarda igual ao webhook:
+// capta-midia/<tenant>/<mensagem>.<ext> + linha em capta_midias.
+async function acaoImportarMidia(tenant, body, res) {
+  const { mensagem_id, dados, nome } = body;
+  if (!mensagem_id || !dados) return res.status(400).json({ erro: 'Dados incompletos.' });
+  const [m] = await sb(`capta_mensagens?id=eq.${mensagem_id}&tenant_id=eq.${tenant.id}&entrega=eq.importada&select=id,tipo,midia_url&limit=1`).catch(() => []);
+  if (!m) return res.status(404).json({ erro: 'Mensagem importada não encontrada.' });
+  if (m.midia_url) return res.status(200).json({ ok: true, ja: true });
+
+  const b64 = String(dados).replace(/^data:[^;]*;base64,/, '');
+  const bytes = Buffer.from(b64, 'base64');
+  if (!bytes.length) return res.status(400).json({ erro: 'Arquivo vazio.' });
+  const ext0 = extDe(nome);
+  const mime = MIME_IMPORT[ext0] || (String(dados).match(/^data:([^;]+);/) || [])[1] || 'application/octet-stream';
+  const ext = mime === 'audio/ogg' ? 'ogg' : mime === 'audio/mp4' ? 'm4a' : mime === 'image/jpeg' ? 'jpg' : (ext0 || 'bin');
+  const caminho = `${tenant.id}/${m.id}.${ext}`;
+
+  const up = await fetch(`${SUPABASE_URL}/storage/v1/object/capta-midia/${caminho}`, {
+    method: 'POST', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': mime, 'x-upsert': 'true' }, body: bytes
+  });
+  if (!up.ok) return res.status(500).json({ erro: `Não consegui guardar o arquivo (${up.status}).` });
+  await sb('capta_midias', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ tenant_id: tenant.id, mensagem_id: m.id, caminho, mime, tamanho: bytes.length }) }).catch(() => null);
+  await sb(`capta_mensagens?id=eq.${m.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ midia_url: caminho, midia_mime: mime }) });
+  return res.status(200).json({ ok: true, caminho });
 }
 
 
@@ -1152,7 +1232,7 @@ async function acaoImportarHistorico(tenant, body, res) {
 // ---------------------------------------------------------------------
 const PAPEIS = {
   gestor:     { nome: 'Gestor',     desc: 'Vê e faz tudo, inclusive equipe e painel.',              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos','eventos','ajustes'], pode: ['*'] },
-  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','alunos','eu'] },
+  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','alunos','eu'] },
   secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','lead','funil','eu'] },
   leitura:    { nome: 'Só leitura', desc: 'Vê tudo, não altera nada.',                              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos'],                   pode: ['agenda','funil','lead','experimentais','alunos','conversas','mensagens','midia','eu'] },
 };
