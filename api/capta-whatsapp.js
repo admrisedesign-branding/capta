@@ -1499,6 +1499,34 @@ async function acaoFichaAluno(tenant, body, res) {
 // TRANSCRIÇÃO DE ÁUDIO — o áudio do WhatsApp vira texto no chat
 // Usa a API da Anthropic (ANTHROPIC_API_KEY). Sem a chave, fica pendente.
 // ---------------------------------------------------------------------
+// transcreve e grava; devolve o texto (usado pela triagem e pela sugestão de resposta)
+async function transcreverAudio(tenant, id) {
+  const groq = process.env.GROQ_API_KEY, openai = process.env.OPENAI_API_KEY;
+  if (!groq && !openai) return null;
+  const [m] = await sb(`capta_mensagens?id=eq.${id}&tenant_id=eq.${tenant.id}&select=id,midia_url,midia_mime,transcricao&limit=1`);
+  if (!m || !m.midia_url) return null;
+  if (m.transcricao) return m.transcricao;
+  const assin = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/capta-midia/${m.midia_url}`, {
+    method: 'POST', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expiresIn: 300 }) }).then(r => r.json());
+  const bin = Buffer.from(await (await fetch(`${SUPABASE_URL}/storage/v1${assin.signedURL || assin.signedUrl}`)).arrayBuffer());
+  if (!bin.length || bin.length > 24 * 1024 * 1024) return null;
+  const mime = m.midia_mime || 'audio/ogg';
+  const ext = mime.includes('mp4') || mime.includes('m4a') ? 'm4a' : mime.includes('mpeg') ? 'mp3' : mime.includes('wav') ? 'wav' : 'ogg';
+  const form = new FormData();
+  form.append('file', new Blob([bin], { type: mime }), `audio.${ext}`);
+  form.append('model', groq ? 'whisper-large-v3-turbo' : 'gpt-4o-mini-transcribe');
+  form.append('language', 'pt'); form.append('response_format', 'json');
+  const r = await fetch(groq ? 'https://api.groq.com/openai/v1/audio/transcriptions' : 'https://api.openai.com/v1/audio/transcriptions',
+    { method: 'POST', headers: { Authorization: `Bearer ${groq || openai}` }, body: form });
+  const j = await r.json().catch(() => ({}));
+  const texto = (j.text || '').trim();
+  if (!r.ok || !texto) return null;
+  await sb(`capta_mensagens?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ transcricao: texto.slice(0, 4000), transcricao_status: 'pronta' }) }).catch(() => null);
+  return texto;
+}
+
 async function acaoTranscrever(tenant, body, res) {
   // O Claude não transcreve áudio: isso exige um serviço de fala.
   // Aceitamos Groq (grátis, roda Whisper) ou OpenAI. Basta uma das chaves.
@@ -1640,7 +1668,8 @@ async function acaoSugerir(tenant, body, res) {
   const idLead = conv?.lead_id || leadId;
   const [lead] = idLead ? await sb(`capta_leads?id=eq.${idLead}&select=nome,contato,temperatura,crianca,idade,fonte,porta,etapa_id,notas,data_aula&limit=1`) : [];
   const [etapa] = lead?.etapa_id ? await sb(`capta_etapas?id=eq.${lead.etapa_id}&select=nome&limit=1`) : [];
-  const msgs = conv ? await sb(`capta_mensagens?conversa_id=eq.${conv.id}&select=direcao,autor,texto,transcricao,tipo,criado_em&order=criado_em.desc&limit=25`).catch(() => []) : [];
+  const msgs = conv ? await sb(`capta_mensagens?conversa_id=eq.${conv.id}&select=id,direcao,autor,texto,transcricao,tipo,criado_em,midia_url&order=criado_em.desc&limit=25`).catch(() => []) : [];
+  for (const m of (msgs || []).filter(x => x.tipo === 'audio' && !x.transcricao && x.midia_url).slice(0, 3)) { const t = await transcreverAudio(tenant, m.id).catch(() => null); if (t) m.transcricao = t; }
   const historico = (msgs || []).reverse()
     .map(m => `${m.direcao === 'entrada' ? 'CLIENTE' : 'ESCOLA'}: ${(m.texto || m.transcricao || '[' + (m.tipo || 'mídia') + ']').slice(0, 400)}`)
     .join('\n') || '(ainda sem mensagens)';
@@ -1724,7 +1753,10 @@ async function acaoTriagem(tenant, body, res) {
     // não mexe em quem já é aluno ou já foi perdido de propósito
     if (etapaAtual && ['ganha', 'perdida'].includes(etapaAtual.tipo)) continue;
 
-    const msgs = await sb(`capta_mensagens?conversa_id=eq.${c.id}&select=direcao,autor,texto,transcricao,tipo,criado_em&order=criado_em.desc&limit=30`).catch(() => []);
+    let msgs = await sb(`capta_mensagens?conversa_id=eq.${c.id}&select=id,direcao,autor,texto,transcricao,tipo,criado_em,midia_url&order=criado_em.desc&limit=30`).catch(() => []);
+    // áudio sem transcrição: transcreve antes, senão a IA lê "[audio]" e erra
+    const pend = (msgs || []).filter(m => m.tipo === 'audio' && !m.transcricao && m.midia_url).slice(0, 4);
+    for (const m of pend) { const t = await transcreverAudio(tenant, m.id).catch(() => null); if (t) m.transcricao = t; }
     const hist = (msgs || []).reverse()
       .map(m => `${m.direcao === 'entrada' ? 'CLIENTE' : 'ESCOLA'}: ${(m.texto || m.transcricao || '[' + (m.tipo || 'mídia') + ']').slice(0, 300)}`).join('\n');
     if (!hist || hist.length < 30) continue;    // conversa vazia não dá para julgar
@@ -1806,9 +1838,15 @@ async function acaoTriagemAplicar(tenant, body, res) {
       await moverLead(tenant.id, it.lead_id, destino.id, it.motivo || 'triagem');
       await empurrarKommo(tenant.id, it.lead_id, destino.id, it.motivo || null).catch(() => null);
       if (agendado) await kommoCampos(tenant.id, it.lead_id, { data_aula: `${it.aula_data}T${it.aula_hora || '09:00'}:00-04:00`, curso: 'First' }).catch(() => null);
-      if (it.crianca || it.idade) {
-        await sb(`capta_leads?id=eq.${it.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify({ ...(it.crianca ? { crianca: it.crianca } : {}), ...(it.idade ? { idade: it.idade } : {}) }) }).catch(() => null);
+      if (it.crianca || it.idade || it.nota) {
+        const patch = { ...(it.crianca ? { crianca: it.crianca } : {}), ...(it.idade ? { idade: it.idade } : {}) };
+        if (it.nota) {
+          const [l] = await sb(`capta_leads?id=eq.${it.lead_id}&select=notas&limit=1`).catch(() => [{}]);
+          const carimbo = new Date().toLocaleDateString('pt-BR');
+          patch.notas = ((l?.notas || '') + `\n[${carimbo}${it.atendente ? ' · ' + it.atendente : ''}] ${it.nota}`).trim().slice(0, 4000);
+          await kommoNota(tenant.id, it.lead_id, it.nota).catch(() => null);
+        }
+        await sb(`capta_leads?id=eq.${it.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) }).catch(() => null);
       }
       feitos.push(it.lead_id);
     } catch (e) { falhas.push({ lead_id: it.lead_id, erro: e.message }); }
