@@ -2903,17 +2903,22 @@ function montarMenuGestao(){
   document.head.appendChild(st);
   const ativar = t => { document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('on')); t.classList.add('on'); };
   document.querySelectorAll('.nav-item[data-t]').forEach(t => t.onclick = () => { ativar(t); render(t.dataset.t); });
+  const LEMBRA = 'capta_tela_' + (new URLSearchParams(location.search).get('t') || '');
   document.querySelectorAll('.nav-item[data-page]').forEach(t => t.onclick = () => {
     ativar(t);
     const titulo = t.textContent.replace(/em breve/,'').trim();
     document.getElementById('page-title').textContent = titulo;
     activeTab = 'embed';
     view.innerHTML = `<iframe class="embed" src="${t.dataset.page}${qs}&embed=1" title="${titulo}"></iframe>`;
+    try { localStorage.setItem(LEMBRA, t.dataset.page); } catch(e){}
     window.scrollTo(0,0);
     if(typeof closeSide === 'function') closeSide();
   });
-  // no plano Gestão a home é a lista de leads (o Painel Gestão é página própria)
-  const home=nav.querySelector('.nav-item[data-page="/atendimento.html"]'); if(home){ home.classList.add('on'); setTimeout(()=>{ if(activeTab!=='embed') home.click(); }, 0); }
+  // ao recarregar, volta para a tela em que a pessoa estava
+  let guardada = null; try { guardada = localStorage.getItem(LEMBRA); } catch(e){}
+  const alvo = (guardada && nav.querySelector(`.nav-item[data-page="${guardada}"]`))
+    || nav.querySelector('.nav-item[data-page="/atendimento.html"]');
+  if (alvo) { alvo.classList.add('on'); setTimeout(() => { if (activeTab !== 'embed') alvo.click(); }, 0); }
   window.__gestao=true;
   montarTabbar(); prepararInstalacao(); pedirNotificacao();
   (function(){ const q=document.getElementById('quem'); if(!q) return;

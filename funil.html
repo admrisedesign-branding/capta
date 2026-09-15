@@ -169,6 +169,21 @@ body.embed .filtros-bar,body.embed .org-topo,body.embed .org-aviso{max-width:cal
 .raia{align-self:flex-start}
 .raia-cab{position:sticky;top:46px;z-index:2;background:var(--card);border-radius:var(--r) var(--r) 0 0}
 .sem-dono-tag{background:transparent;border:1px dashed var(--line);color:var(--faint);font-weight:700}
+
+/* --- correções do kanban rolando na página --- */
+.filtros-bar{background:var(--bg);box-shadow:0 6px 12px -8px rgba(20,26,46,.25);z-index:20}
+body.embed .filtros-bar{background:var(--bg)}
+.org-topo{z-index:19}.org-aviso{z-index:18}
+/* a coluna acompanha os cards: sem retângulo cinza sobrando */
+.raias{min-height:0!important;align-items:flex-start}
+.raia{align-self:flex-start;background:transparent;border:0;box-shadow:none;padding:0}
+.raia-cab{position:sticky;top:52px;z-index:6;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:8px}
+.raia-corpo{padding:0;background:transparent;overflow:visible}
+.raia-corpo .lead{background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);position:relative;z-index:1}
+.raia-cab{position:sticky;top:52px;z-index:6}
+.vazia{background:transparent;border:1px dashed var(--line);border-radius:var(--r)}
+@media(max-width:760px){.raia-cab{top:0}}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
