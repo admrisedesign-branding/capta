@@ -2002,6 +2002,31 @@ async function acaoDesfazerRemarcacao(tenant, body, res) {
 async function acaoCasarLid(tenant, canal, body, res) {
   if (!canal) return res.status(400).json({ erro: 'Sem canal de WhatsApp.' });
   const limite = Math.min(Number(body.limite) || 40, 80);
+
+  // ---- 0) fundir duplicadas: a mesma pessoa como conversa A (número real) e B (@lid) ----
+  // Descobre o @lid das conversas com número real (pergunta à Z-API), e quando
+  // acha uma conversa B com esse @lid, move as mensagens dela para A e apaga B.
+  let fundidas = 0;
+  const reais = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lid=is.null&select=id,telefone,lead_id&order=ultima_mensagem_em.desc.nullslast&limit=${limite}`).catch(() => []);
+  for (const a of reais || []) {
+    const dig = String(a.telefone || '').replace(/\D/g, '');
+    if (!dig || dig.length > 13) continue;                       // já é @lid, pula
+    const lid = await prov.lidDoTelefone(canal, a.telefone).catch(() => null);
+    await sb(`capta_conversas?id=eq.${a.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lid: lid || 'sem' }) }).catch(() => null);
+    if (!lid) continue;
+    const bs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&id=neq.${a.id}&or=(lid.eq.${lid},telefone.eq.${lid},telefone.eq.55${lid})&select=id,nao_lidas`).catch(() => []);
+    for (const b of bs || []) {
+      await sb(`capta_mensagens?conversa_id=eq.${b.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ conversa_id: a.id }) }).catch(() => null);
+      await sb(`capta_conversas?id=eq.${b.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => null);
+      fundidas++;
+    }
+    if (bs?.length) {
+      // recalcula última mensagem e espera da conversa A
+      const ult = await sb(`capta_mensagens?conversa_id=eq.${a.id}&select=texto,criado_em,direcao,tipo&order=criado_em.desc&limit=1`).catch(() => []);
+      if (ult?.[0]) await sb(`capta_conversas?id=eq.${a.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ ultima_mensagem: ult[0].texto || `[${ult[0].tipo}]`, ultima_mensagem_em: ult[0].criado_em, aguardando_desde: ult[0].direcao === 'entrada' ? undefined : null }) }).catch(() => null);
+    }
+  }
   const convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=is.null&select=id,telefone,lid,nome&limit=300`).catch(() => []);
   const pend = (convs || []).filter(c => c.lid || String(c.telefone || '').replace(/\D/g, '').length > 13);
   if (!pend.length) return res.status(200).json({ ok: true, ligadas: 0, restantes: 0, aviso: 'Nenhuma conversa com @lid pendente.' });
@@ -2029,7 +2054,7 @@ async function acaoCasarLid(tenant, canal, body, res) {
     await sb(`capta_conversas?id=eq.${c.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lead_id: l.id, telefone: prov.comDDI(l.contato) || c.telefone }) }).catch(() => null);
     ligadas++; lids.delete(l.lid); } }
   const faltamLeads = (await sb(`capta_leads?tenant_id=eq.${tenant.id}&contato=not.is.null&lid=is.null&select=id&limit=1000`).catch(() => [])).length;
-  return res.status(200).json({ ok: true, ligadas, consultados, conversas_pendentes: lids.size, leads_por_consultar: faltamLeads });
+  return res.status(200).json({ ok: true, fundidas, ligadas, consultados, conversas_pendentes: lids.size, leads_por_consultar: faltamLeads });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
