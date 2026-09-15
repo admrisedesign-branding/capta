@@ -22,14 +22,26 @@ const zapiUrl = (canal, caminho) =>
   `https://api.z-api.io/instances/${canal.instancia_id}/token/${canal.instancia_token}/${caminho}`;
 
 async function zapiFetch(canal, caminho, opcoes = {}) {
-  const r = await fetch(zapiUrl(canal, caminho), {
-    ...opcoes,
-    headers: {
-      'Content-Type': 'application/json',
-      'Client-Token': canal.client_token || ZAPI_CLIENT_TOKEN,   // por canal (conta Z-API diferente) ou o da RISE
-      ...(opcoes.headers || {})
-    }
-  });
+  // A Z-API às vezes some sem responder. Sem limite, a tela fica em "Carregando…"
+  // para sempre — com limite, ela avisa que o provedor está fora.
+  const ctl = new AbortController();
+  const limite = setTimeout(() => ctl.abort(), opcoes.timeoutMs || 8000);
+  let r;
+  try {
+    r = await fetch(zapiUrl(canal, caminho), {
+      ...opcoes, signal: ctl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Token': canal.client_token || ZAPI_CLIENT_TOKEN,   // por canal (conta Z-API diferente) ou o da RISE
+        ...(opcoes.headers || {})
+      }
+    });
+  } catch (e) {
+    clearTimeout(limite);
+    const erro = new Error(e.name === 'AbortError' ? 'A Z-API (provedor do WhatsApp) não respondeu. Tente de novo em instantes.' : `Sem acesso à Z-API: ${e.message}`);
+    erro.status = 504; throw erro;
+  }
+  clearTimeout(limite);
   const texto = await r.text();
   let corpo;
   try { corpo = texto ? JSON.parse(texto) : {}; } catch { corpo = { raw: texto }; }
