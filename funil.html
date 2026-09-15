@@ -185,6 +185,11 @@ body.embed .filtros-bar{width:calc(100vw - 130px)}
 .vazia{background:transparent;border:1px dashed var(--line);border-radius:12px;color:var(--faint);
   font-size:12.5px;text-align:center;padding:18px 10px}
 @media(max-width:760px){.raia-area{padding:0 14px 40px}.raia{min-width:0}}
+
+.sg-aula{font-size:12px;margin-top:5px;padding:5px 8px;border-radius:8px;line-height:1.4}
+.sg-aula.vem{background:var(--exp-bg);color:#8C3D1F}
+.sg-aula.passou{background:var(--line-2);color:var(--muted)}
+.sg-aula .sg-auto{color:var(--verde);font-weight:700}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -436,6 +441,9 @@ function faixaSug(l){
     </div>
     <div class="sg-motivo">${esc(s.motivo)}</div>
     ${s.crianca ? `<div class="sg-cri">criança: <b>${esc(s.crianca)}</b>${s.idade?`, ${s.idade} anos`:''}</div>` : ''}
+    ${s.aula_data ? `<div class="sg-aula ${s.aula_passou?'passou':'vem'}">
+      ${s.aula_passou ? '⏱ aula combinada <b>já passou</b>' : '📅 aula combinada'}: <b>${['dom','seg','ter','qua','qui','sex','sáb'][new Date(s.aula_data+'T12:00:00').getDay()]} ${s.aula_data.split('-').reverse().slice(0,2).join('/')}${s.aula_hora?' às '+s.aula_hora:''}</b>
+      ${!s.aula_passou && /aula agendada/i.test(s.etapa_nova) ? '<span class="sg-auto">· entra na Agenda ao aprovar</span>' : ''}</div>` : ''}
     <div class="sg-acs">
       ${s.avisa_meta ? `<button class="sg-ind" onclick="aplicarUmaSug('${l.id}')">mover (avisa a Meta)</button>` : ''}
       <button onclick="verConversaSug('${l.id}')">ver conversa</button>
