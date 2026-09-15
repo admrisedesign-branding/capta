@@ -136,6 +136,12 @@ async function desconectar(canal) {
 // pesquisa já prefixam. Aqui a gente garante de novo, porque envio com
 // número errado falha silenciosamente e ninguém descobre.
 // ---------------------------------------------------------------------
+function semLid(nome) {
+  const n = String(nome || '').trim();
+  if (!n || /@lid$/i.test(n) || /^\+?[\d\s()-]{10,}$/.test(n)) return null;
+  return n;
+}
+
 function comDDI(telefone) {
   const d = String(telefone || '').replace(/\D/g, '');
   if (!d) return null;
@@ -210,7 +216,9 @@ function normalizarWebhook(payload) {
     numero_conectado: payload.connectedPhone || null,
     de_mim: payload.fromMe === true,           // enviada pelo celular, fora do Capta
     // quem enviou pode ser a própria escola (fromMe): o nome do CONTATO é o do chat
-    nome: (payload.fromMe ? (payload.chatName || null) : (payload.chatName || payload.senderName || null)),
+    // Contato de número escondido: o Z-API manda o próprio @lid como "nome".
+    // Isso não é nome — fica vazio e a tela mostra "Contato sem número".
+    nome: semLid(payload.fromMe ? payload.chatName : (payload.chatName || payload.senderName)),
     foto: (payload.fromMe ? (payload.photo || null) : (payload.senderPhoto || payload.photo || null)),
     lid: String(payload.chatLid || payload.senderLid || (/@lid$/.test(String(payload.phone || '')) ? payload.phone : '') || '').replace('@lid', '').replace(/\D/g, '') || null,
     // "phone" pode vir como @lid em vez de número: quando isso acontece, não é telefone
