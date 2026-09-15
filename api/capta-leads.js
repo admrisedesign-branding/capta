@@ -52,6 +52,12 @@ module.exports = async function handler(req, res) {
         leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&select=id,nome,contato,origem,temperatura,score,status,criado_em,respostas,tags,etapa_nome,fonte,porta,atendente,kommo_lead_id,ganho_em,perdido_em,valor,data_aula,curso,kommo_criado_em,etapa_em,evento_id,notas,crianca,idade&order=criado_em.desc`);
       } catch (e2) { return res.status(500).json({ error: e2.message }); }
     }
+    // espera de resposta (vem da conversa aberta do lead)
+    try {
+      const convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=not.is.null&resolvida_em=is.null&select=lead_id,aguardando_desde,nao_lidas,ultima_mensagem_em`);
+      const por = {}; (convs || []).forEach(c => { const a = por[c.lead_id]; if (!a || new Date(c.ultima_mensagem_em||0) > new Date(a.ultima_mensagem_em||0)) por[c.lead_id] = c; });
+      (leads || []).forEach(l => { const c = por[l.id]; if (c) { l.aguardando_desde = c.aguardando_desde; l.nao_lidas = c.nao_lidas; l.ultima_mensagem_em = c.ultima_mensagem_em; } });
+    } catch (e) {}
     return res.status(200).json({
       tenant: { nome: tenant.nome, plano: tenant.plano, slug: tenant.slug, integracao: tenant.integracao },
       leads: leads || [],

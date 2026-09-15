@@ -740,14 +740,20 @@ async function acaoPresenca(tenant, body, res) {
 // FUNIL
 // ---------------------------------------------------------------------
 async function acaoFunil(tenant, res) {
-  const [etapas, leads, motivos] = await Promise.all([
+  const [etapas, leads, motivos, convs] = await Promise.all([
     sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=*&order=ordem`),
     sb(`capta_leads?tenant_id=eq.${tenant.id}` +
-       `&select=id,nome,contato,temperatura,score,origem,etapa_id,etapa_em,criado_em,motivo_perda,kommo_lead_id,atendente,tags,fonte,porta,crianca,idade,curso,data_aula,bloco,notas,email` +
-       `&order=etapa_em.desc.nullslast,criado_em.desc&limit=500`),
+       `&select=id,nome,contato,temperatura,score,origem,etapa_id,etapa_em,criado_em,kommo_criado_em,motivo_perda,kommo_lead_id,atendente,tags,fonte,porta,crianca,idade,curso,data_aula,bloco,notas,email,campanha` +
+       `&order=etapa_em.desc.nullslast,criado_em.desc&limit=1000`),
     sb(`capta_motivos?tenant_id=eq.${tenant.id}&ativo=is.true&select=id,nome,etapa&order=ordem`)
+      .catch(() => []),
+    // espera de resposta por lead (vem da conversa)
+    sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=not.is.null&resolvida_em=is.null&select=lead_id,aguardando_desde,nao_lidas,ultima_mensagem_em,id`)
       .catch(() => [])
   ]);
+  const porLead = {};
+  (convs || []).forEach(c => { const a = porLead[c.lead_id]; if (!a || new Date(c.ultima_mensagem_em||0) > new Date(a.ultima_mensagem_em||0)) porLead[c.lead_id] = c; });
+  (leads || []).forEach(l => { const c = porLead[l.id]; if (c) { l.aguardando_desde = c.aguardando_desde; l.nao_lidas = c.nao_lidas; l.conversa_id = c.id; l.ultima_mensagem_em = c.ultima_mensagem_em; } });
   return res.status(200).json({ etapas: etapas || [], leads: leads || [], motivos: motivos || [] });
 }
 
