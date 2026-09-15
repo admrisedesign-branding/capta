@@ -303,11 +303,13 @@ async function acaoEnviar(tenant, canal, body, res) {
 
   if (body.conversa_id) {
     const rows = await sb(
-      `capta_conversas?id=eq.${body.conversa_id}&tenant_id=eq.${tenant.id}&select=id,telefone&limit=1`
+      `capta_conversas?id=eq.${body.conversa_id}&tenant_id=eq.${tenant.id}&select=id,telefone,lid&limit=1`
     );
     conversa = rows && rows[0];
     if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada.' });
-    telefone = prov.comDDI(conversa.telefone);
+    // conversa de número escondido: manda para o @lid, não para "55"+lid
+    const digitos = String(conversa.telefone || '').replace(/\D/g, '');
+    telefone = digitos.length > 13 || (!digitos && conversa.lid) ? `${conversa.lid || digitos}@lid` : prov.comDDI(conversa.telefone);   // conversa antiga pode ter "55"+lid no telefone: o campo lid é o certo
   }
 
   if (!telefone) return res.status(400).json({ erro: 'Informe conversa_id ou telefone.' });
@@ -410,8 +412,12 @@ async function acaoMensagens(tenant, body, res) {
     `capta_mensagens?conversa_id=eq.${id}&tenant_id=eq.${tenant.id}` +
     `&select=id,direcao,autor,tipo,texto,midia_url,midia_mime,entrega,criado_em,` +
     `transcricao,transcricao_status,responde_a,provedor_msg_id` +
-    `&order=criado_em.asc&limit=200`
+    `&order=criado_em.desc&limit=300`
   );
+  // Busca em ordem decrescente para pegar as MAIS RECENTES e devolve em
+  // ordem cronológica. Com asc+limit, uma conversa longa (ou com histórico
+  // importado) mostrava as 200 primeiras e engolia a mensagem recém-enviada.
+  if (Array.isArray(msgs)) msgs.reverse();
 
   // abrir não conta como atendido: as não lidas só zeram quando alguém responde
   if (false && conv[0].nao_lidas > 0) {
@@ -816,7 +822,8 @@ async function acaoLead(tenant, body, res) {
   ]);
   let mensagens = [];
   if (conv?.[0]) {
-    mensagens = await sb(`capta_mensagens?conversa_id=eq.${conv[0].id}&tenant_id=eq.${tenant.id}&select=id,direcao,autor,tipo,texto,transcricao,transcricao_status,midia_url,criado_em&order=criado_em.asc&limit=100`).catch(() => []);
+    mensagens = await sb(`capta_mensagens?conversa_id=eq.${conv[0].id}&tenant_id=eq.${tenant.id}&select=id,direcao,autor,tipo,texto,transcricao,transcricao_status,midia_url,criado_em&order=criado_em.desc&limit=100`).catch(() => []);
+    if (Array.isArray(mensagens)) mensagens.reverse();   // as 100 MAIS RECENTES, em ordem cronológica
   }
   // histórico completo: presença de cada aula, matrícula e aluno
   const agIds = (ags || []).map(a => a.id);
@@ -1077,9 +1084,9 @@ async function acaoRespostas(tenant, body, res) {
 async function acaoEnviarMidia(tenant, canal, body, res) {
   const { conversa_id, tipo, dados, nome, legenda } = body;
   if (!conversa_id || !dados || !['imagem', 'audio', 'documento'].includes(tipo)) return res.status(400).json({ erro: 'Dados incompletos.' });
-  const conv = (await sb(`capta_conversas?id=eq.${conversa_id}&tenant_id=eq.${tenant.id}&select=id,telefone,lead_id&limit=1`))?.[0];
+  const conv = (await sb(`capta_conversas?id=eq.${conversa_id}&tenant_id=eq.${tenant.id}&select=id,telefone,lid,lead_id&limit=1`))?.[0];
   if (!conv) return res.status(404).json({ erro: 'Conversa não encontrada.' });
-  const envio = await prov.enviarMidia(canal, conv.telefone, tipo, dados, { nome, legenda });
+  const envio = await prov.enviarMidia(canal, String(conv.telefone || '').replace(/\D/g, '').length > 13 ? `${conv.lid || String(conv.telefone).replace(/\D/g, '')}@lid` : conv.telefone, tipo, dados, { nome, legenda });
   await sb('capta_mensagens', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
     tenant_id: tenant.id, conversa_id: conv.id, direcao: 'saida', autor: body.autor || 'atendente', tipo, texto: legenda || nome || null,
     provedor_msg_id: envio.provedor_msg_id, entrega: 'enviada', criado_em: new Date().toISOString() }) }).catch(() => null);

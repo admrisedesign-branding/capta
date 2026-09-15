@@ -238,7 +238,7 @@ async function acharOuCriarConversa(tenant, canalId, evento) {
   const fone = evento.telefone;
 
   // acha pelo telefone OU pelo @lid (o WhatsApp pode mandar um ou outro)
-  const filtro = evento.lid ? `or=(telefone.eq.${fone},lid.eq.${evento.lid})` : `telefone=eq.${fone}`;
+  const filtro = evento.lid ? `or=(telefone.eq.${fone},lid.eq.${evento.lid},telefone.eq.55${evento.lid})` : `telefone=eq.${fone}`;
   const achadas = await sb(
     `capta_conversas?select=id,lead_id,nome,foto_url,lid,telefone&tenant_id=eq.${tenant}&${filtro}&limit=1`
   );
@@ -251,6 +251,32 @@ async function acharOuCriarConversa(tenant, canalId, evento) {
     if (evento.lid && !evento.telefone_e_lid && c.telefone && c.telefone.replace(/\D/g,'').length > 13) patch.telefone = fone;
     if (Object.keys(patch).length) sb(`capta_conversas?id=eq.${c.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) }).catch(() => null);
     return c;
+  }
+
+  // Chegou só com @lid e o lead desse @lid já é conhecido (o botão "ligar N
+  // sem nome" grava capta_leads.lid): usa a conversa do número real do lead
+  // em vez de abrir uma segunda conversa "Contato sem número" para a mesma pessoa.
+  if (evento.lid) {
+    const ls = await sb(`capta_leads?tenant_id=eq.${tenant}&lid=eq.${evento.lid}&select=id,nome,contato&limit=1`).catch(() => []);
+    const l = ls?.[0];
+    if (l && l.contato) {
+      const foneReal = String(l.contato).replace(/\D/g, '');
+      const foneDDI = foneReal.startsWith('55') ? foneReal : `55${foneReal}`;
+      const cs = await sb(`capta_conversas?select=id,lead_id,nome,foto_url,lid,telefone&tenant_id=eq.${tenant}&telefone=eq.${foneDDI}&limit=1`).catch(() => []);
+      if (cs?.[0]) {
+        const c = cs[0]; const patch = { lid: evento.lid };
+        if (!c.lead_id) patch.lead_id = l.id;
+        if (!c.nome && evento.nome) patch.nome = evento.nome;
+        if (!c.foto_url && evento.foto) patch.foto_url = evento.foto;
+        sb(`capta_conversas?id=eq.${c.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) }).catch(() => null);
+        return { ...c, ...patch };
+      }
+      // sem conversa ainda: nasce já com o número real e ligada ao lead
+      const criada = await sb('capta_conversas', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+        tenant_id: tenant, canal_id: canalId, lead_id: l.id, telefone: foneDDI, nome: evento?.nome || l.nome || null,
+        foto_url: evento?.foto || null, lid: evento.lid, agente_ativo: true, status: 'aberta' }) });
+      return criada[0];
+    }
   }
 
   // Procura um lead com esse telefone. A comparação normalizada é feita
