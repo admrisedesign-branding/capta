@@ -163,6 +163,8 @@ function desenhar(){
   const pend = aulas.filter(a => !desfechoDe(a) && a.status !== 'faltou');
   // conversas sem resposta: última mensagem recebida e não lida
   const semResp = (Array.isArray(D.conversas) ? D.conversas : []).filter(c => (c.nao_lidas||0) > 0).sort((a,b) => new Date(b.ultima_mensagem_em||0) - new Date(a.ultima_mensagem_em||0));
+  // sem resposta há mais de 1h30 (mesmo critério do filtro "Urgentes" da inbox)
+  const urgentes = semResp.filter(c => window.CaptaAlerta ? CaptaAlerta.nivel(c) === 'urgente' : (c.aguardando_desde && Date.now() - new Date(c.aguardando_desde) > 90 * 60e3)).length;
   // querem fechar sem aula
   const etAula = D.etapas.filter(e => /aula agendada|matr|aluno|remarketing|perdido/i.test(e.nome)).map(e => e.id);
   const quentes = D.leads.filter(l => (l.temperatura||'').toLowerCase() === 'quente' && !etAula.includes(l.etapa_id) && !l.data_aula).sort((a,b) => new Date(b.etapa_em||b.criado_em) - new Date(a.etapa_em||a.criado_em));
