@@ -120,7 +120,9 @@ function comDDI(telefone) {
 }
 
 async function enviarTexto(canal, telefone, mensagem) {
-  const phone = comDDI(telefone);
+  // @lid também é destino válido (contato com número oculto)
+  const phone = /@lid$/.test(String(telefone)) || String(telefone).replace(/\D/g,'').length > 13
+    ? String(telefone).replace(/\D/g,'') + '@lid' : comDDI(telefone);
   if (!phone) throw new Error('Telefone inválido');
 
   const r = await zapiFetch(canal, 'send-text', {
@@ -180,6 +182,11 @@ function normalizarWebhook(payload) {
     numero_conectado: payload.connectedPhone || null,
     de_mim: payload.fromMe === true,           // enviada pelo celular, fora do Capta
     nome: payload.senderName || payload.chatName || null,
+    foto: payload.senderPhoto || payload.photo || null,
+    lid: String(payload.chatLid || payload.senderLid || '').replace('@lid', '') || null,
+    // "phone" pode vir como @lid em vez de número: quando isso acontece, não é telefone
+    telefone_e_lid: /@lid$/.test(String(payload.phone || '')) || String(payload.phone || '').replace(/\D/g, '').length > 13,
+    de_api: !!payload.fromApi,
     criado_em: payload.momment ? new Date(payload.momment).toISOString() : new Date().toISOString(),
     tipo,
     texto,
@@ -194,6 +201,18 @@ function normalizarWebhook(payload) {
 // É o único jeito de separar anúncio pago de Instagram orgânico sem
 // depender de alguém preencher o campo na mão.
 // ---------------------------------------------------------------------
+// Pergunta à Z-API se o número tem WhatsApp e qual é o @lid dele.
+// É o que permite casar as conversas que chegam só com @lid aos leads do Kommo.
+async function lidDoTelefone(canal, telefone) {
+  const fone = comDDI(telefone);
+  if (!fone) return null;
+  const r = await zapiFetch(canal, `phone-exists/${fone}`, { method: 'GET' });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.exists) return null;
+  const lid = String(j.lid || j.jid || '').replace('@lid', '').replace(/\D/g, '');
+  return lid || null;
+}
+
 function extrairAnuncio(p) {
   const r = p.referralMessage || p.referral || p.adReferral ||
             p.text?.referralMessage || p.image?.referralMessage || null;
@@ -278,7 +297,7 @@ module.exports = {
   enviarTexto,
   normalizarWebhook,
   configurarWebhooks,
-  comDDI, obterCodigo, enviarMidia };
+  comDDI, obterCodigo, enviarMidia, lidDoTelefone };
 
 // =====================================================================
 // NOTAS
