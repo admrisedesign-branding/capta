@@ -77,8 +77,19 @@ async function obterCodigo(canal, numero) {
 }
 
 // Envio de mídia (imagem / áudio / documento) em base64 (data URI) ou URL
+// Destino da Z-API: número com DDI, ou "<lid>@lid" quando o contato tem o
+// número escondido. Aceita "…@lid", o valor de capta_conversas.lid ou o
+// telefone cru; nunca põe 55 na frente de um @lid.
+function destino(telefone) {
+  const t = String(telefone || '');
+  if (/@lid$/.test(t)) return t.replace(/\D/g, '') + '@lid';
+  const d = t.replace(/\D/g, '');
+  if (d.length > 13) return d + '@lid';
+  return comDDI(d);
+}
+
 async function enviarMidia(canal, telefone, tipo, dados, extra = {}) {
-  const phone = comDDI(telefone);
+  const phone = destino(telefone);
   if (!phone) throw new Error('Telefone inválido');
   let rota, body;
   if (tipo === 'imagem')   { rota = 'send-image';   body = { phone, image: dados, caption: extra.legenda || undefined }; }
@@ -133,8 +144,7 @@ function comDDI(telefone) {
 
 async function enviarTexto(canal, telefone, mensagem) {
   // @lid também é destino válido (contato com número oculto)
-  const phone = /@lid$/.test(String(telefone)) || String(telefone).replace(/\D/g,'').length > 13
-    ? String(telefone).replace(/\D/g,'') + '@lid' : comDDI(telefone);
+  const phone = destino(telefone);
   if (!phone) throw new Error('Telefone inválido');
 
   const r = await zapiFetch(canal, 'send-text', {
@@ -190,13 +200,19 @@ function normalizarWebhook(payload) {
     tipo_evento: 'mensagem',
     instancia_id: payload.instanceId,
     provedor_msg_id: payload.messageId,
-    telefone: comDDI(payload.phone),
+    // Quando o WhatsApp esconde o número, "phone" chega como "<lid>@lid".
+    // Isso NÃO é telefone: guardamos os dígitos do @lid puros, sem pôr 55 na
+    // frente, e o mesmo valor em `lid` — assim a conversa é achada por qualquer
+    // um dos dois e o "ligar N sem nome" consegue casar com o lead do Kommo.
+    telefone: /@lid$/.test(String(payload.phone || ''))
+      ? (String(payload.phone).replace(/\D/g, '') || null)
+      : comDDI(payload.phone),
     numero_conectado: payload.connectedPhone || null,
     de_mim: payload.fromMe === true,           // enviada pelo celular, fora do Capta
     // quem enviou pode ser a própria escola (fromMe): o nome do CONTATO é o do chat
     nome: (payload.fromMe ? (payload.chatName || null) : (payload.chatName || payload.senderName || null)),
     foto: (payload.fromMe ? (payload.photo || null) : (payload.senderPhoto || payload.photo || null)),
-    lid: String(payload.chatLid || payload.senderLid || '').replace('@lid', '') || null,
+    lid: String(payload.chatLid || payload.senderLid || (/@lid$/.test(String(payload.phone || '')) ? payload.phone : '') || '').replace('@lid', '').replace(/\D/g, '') || null,
     // "phone" pode vir como @lid em vez de número: quando isso acontece, não é telefone
     telefone_e_lid: /@lid$/.test(String(payload.phone || '')) || String(payload.phone || '').replace(/\D/g, '').length > 13,
     de_api: !!payload.fromApi,
@@ -310,7 +326,7 @@ module.exports = {
   enviarTexto,
   normalizarWebhook,
   configurarWebhooks,
-  comDDI, obterCodigo, enviarMidia, lidDoTelefone };
+  comDDI, destino, obterCodigo, enviarMidia, lidDoTelefone };
 
 // =====================================================================
 // NOTAS
