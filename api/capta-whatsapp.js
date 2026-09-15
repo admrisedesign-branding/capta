@@ -379,9 +379,9 @@ async function acaoEnviar(tenant, canal, body, res) {
 async function acaoConversas(tenant, res) {
   const rows = await sb(
     `capta_conversas?tenant_id=eq.${tenant.id}` +
-    `&select=id,telefone,agente_ativo,status,nao_lidas,ultima_mensagem,ultima_mensagem_em,atendente,resolvida_em,nome,foto_url,lid,` +
+    `&select=id,telefone,agente_ativo,status,nao_lidas,ultima_mensagem,ultima_mensagem_em,atendente,resolvida_em,nome,foto_url,lid,aguardando_desde,` +
     `lead:lead_id(id,nome,temperatura,status,etapa_id,atendente,notas,contato,crianca,idade,kommo_lead_id)` +
-    `&order=ultima_mensagem_em.desc.nullslast&limit=100`
+    `&order=ultima_mensagem_em.desc.nullslast&limit=300`
   );
   return res.status(200).json({ conversas: rows || [] });
 }
