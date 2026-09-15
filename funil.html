@@ -205,6 +205,16 @@ body.embed .filtros-bar{width:calc(100vw - 130px)}
 .lead-quando .entrou:before{content:'·';margin-right:8px}
 .lead-aula{font-size:11.5px;font-weight:700;color:#B8522F;background:var(--exp-bg);border-radius:7px;padding:2px 8px;margin-top:5px;display:inline-block}
 .lead-aula.passou{color:var(--muted);background:var(--line-2)}
+
+.fb-resp{display:flex;gap:3px;background:var(--line-2);padding:3px;border-radius:10px}
+.fb-resp button{border:0;background:transparent;font-weight:700;font-size:12px;color:var(--muted);padding:6px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
+.fb-resp button b{margin-left:4px;opacity:.7}
+.fb-resp button.on{background:var(--card);color:var(--brand);box-shadow:var(--shadow)}
+.fb-resp button.urg.on{color:var(--quente)}
+.lead-espera{margin-top:6px}
+.lead-espera .al-tag{background:var(--line-2);color:var(--muted)}
+.lead.atrasada{border-left:3px solid var(--morno)}
+.lead.urgente{border-left:3px solid var(--quente)}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -242,6 +252,7 @@ window.CaptaUser = (function(){
 </script>
 <link rel="stylesheet" href="/mobile.css">
 <script src="/capta-ui.js"></script>
+<script src="/capta-alerta.js"></script>
 </head>
 <body>
 <div class="topbar">
@@ -329,23 +340,30 @@ const AJUDA_ETAPA = {
 };
 const ajudaEtapa = nome => AJUDA_ETAPA[String(nome||'').toLowerCase().trim()] || null;
 const iconeAjuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
-const F = { parado: 0, temp: '', busca: '', ordem: 'recente', esconderFrios: false };
+const F = { parado: 0, temp: '', busca: '', ordem: 'recente', esconderFrios: false, resposta: '' };
+const nivelLead = l => (window.CaptaAlerta ? CaptaAlerta.nivel({ aguardando_desde: l.aguardando_desde, lead: l }) : '');
 const diasParado = l => Math.floor((Date.now() - new Date(l.etapa_em || l.criado_em).getTime()) / 864e5);
 function filtrar(lista) {
   const q = F.busca.trim().toLowerCase();
   let out = lista.filter(l => (!F.parado || diasParado(l) >= F.parado)
     && (!F.temp || (l.temperatura||'').toLowerCase() === F.temp)
     && (!q || (l.nome||'').toLowerCase().includes(q) || (l.contato||'').includes(q))
-    && !(F.esconderFrios && (l.temperatura||'').toLowerCase() === 'frio' && diasParado(l) >= 30));
+    && !(F.esconderFrios && (l.temperatura||'').toLowerCase() === 'frio' && diasParado(l) >= 30)
+    && (!F.resposta || (F.resposta === 'sem_resposta' ? !!l.aguardando_desde : nivelLead(l) === 'urgente')));
   const peso = { quente: 0, morno: 1, frio: 2 };
   if (F.ordem === 'temperatura') out.sort((a,b) => (peso[(a.temperatura||'').toLowerCase()] ?? 3) - (peso[(b.temperatura||'').toLowerCase()] ?? 3) || diasParado(b) - diasParado(a));
   else if (F.ordem === 'parado') out.sort((a,b) => diasParado(b) - diasParado(a));
-  else out.sort((a,b) => new Date(b.etapa_em||b.criado_em) - new Date(a.etapa_em||a.criado_em));
+  else out.sort((a,b) => new Date(b.ultima_mensagem_em||b.etapa_em||b.criado_em) - new Date(a.ultima_mensagem_em||a.etapa_em||a.criado_em));
   return out;
 }
 function barraFiltros(total, vis) {
   return `<div class="filtros-bar">
     <input class="fb-busca" placeholder="Buscar nome ou telefone" value="${esc(F.busca)}" oninput="F.busca=this.value;desenhar()">
+    <div class="fb-resp">
+      <button class="${!F.resposta?'on':''}" onclick="F.resposta='';desenhar()">Todos</button>
+      <button class="${F.resposta==='sem_resposta'?'on':''}" onclick="F.resposta='sem_resposta';desenhar()">Sem resposta <b>${leads.filter(l=>l.aguardando_desde).length}</b></button>
+      <button class="urg ${F.resposta==='urgentes'?'on':''}" onclick="F.resposta='urgentes';desenhar()">⏰ Urgentes <b>${leads.filter(l=>nivelLead(l)==='urgente').length}</b></button>
+    </div>
     <select class="fb-sel" onchange="F.parado=+this.value;desenhar()"><option value="0" ${F.parado===0?'selected':''}>Parado: qualquer</option><option value="3" ${F.parado===3?'selected':''}>Parado há 3+ dias</option><option value="7" ${F.parado===7?'selected':''}>7+ dias</option><option value="30" ${F.parado===30?'selected':''}>30+ dias</option></select>
     <select class="fb-sel" onchange="F.temp=this.value;desenhar()"><option value="" ${!F.temp?'selected':''}>Temperatura: todas</option><option value="quente" ${F.temp==='quente'?'selected':''}>Quer fechar</option><option value="morno" ${F.temp==='morno'?'selected':''}>Considerando</option><option value="frio" ${F.temp==='frio'?'selected':''}>Só conhecendo</option></select>
     <select class="fb-sel" onchange="F.ordem=this.value;desenhar()"><option value="recente" ${F.ordem==='recente'?'selected':''}>Mais recente primeiro</option><option value="temperatura" ${F.ordem==='temperatura'?'selected':''}>Quentes primeiro</option><option value="parado" ${F.ordem==='parado'?'selected':''}>Mais parado primeiro</option></select>
@@ -511,11 +529,13 @@ function quandoAula(iso){
 
 function cartao(l) {
   const pd = parado(l.etapa_em || l.criado_em);
-  return `<article class="lead" draggable="true" data-lead="${l.id}" onclick="abrirLead('${l.id}')">
+  const nv = nivelLead(l);
+  return `<article class="lead ${nv}" draggable="true" data-lead="${l.id}" onclick="abrirLead('${l.id}')">
     <div class="lead-nome">${esc(l.nome || 'Sem nome')}</div>
     <div class="lead-sub">${esc(l.contato || '')}${l.origem ? ' · ' + esc(l.origem) : ''}</div>
     ${l.data_aula ? `<div class="lead-aula ${new Date(l.data_aula) < new Date() ? 'passou' : ''}" title="${new Date(l.data_aula) < new Date() ? 'aula experimental já aconteceu' : 'aula experimental marcada'}">📅 ${quandoAula(l.data_aula)}</div>` : ''}
     <div class="lead-quando" title="última mudança de etapa · entrou no funil"><span>${quandoCurto(l.etapa_em || l.criado_em)}</span>${l.kommo_criado_em || l.criado_em ? `<span class="entrou">entrou ${quandoCurto(l.kommo_criado_em || l.criado_em)}</span>` : ''}</div>
+    ${l.aguardando_desde && window.CaptaAlerta ? `<div class="lead-espera">${CaptaAlerta.etiqueta({ aguardando_desde: l.aguardando_desde, lead: l, nao_lidas: l.nao_lidas }) || `<span class="al-tag">⏱ ${CaptaAlerta.rotulo({ aguardando_desde: l.aguardando_desde })}</span>`}</div>` : ''}
     <div class="lead-fim">
       ${l.temperatura ? `<span class="tag t-${esc(l.temperatura)}">${esc(l.temperatura)}</span>` : ''}
       ${l.atendente ? tagPessoa(l.atendente, 'atendendo: ' + l.atendente) : '<span class="tag sem-dono-tag">sem dono</span>'}

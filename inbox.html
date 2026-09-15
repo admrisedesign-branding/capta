@@ -357,18 +357,22 @@ function desenharLista(){
     if (FI.f === 'minhas') return FI.eu && c.atendente === FI.eu;
     if (FI.f === 'quentes') return (c.lead?.temperatura||'').toLowerCase() === 'quente' && !c.resolvida_em;
     if (FI.f === 'sem_dono') return !c.atendente && !c.resolvida_em;
+    if (FI.f === 'sem_resposta') return !!c.aguardando_desde && !c.resolvida_em;
+    if (FI.f === 'urgentes') return window.CaptaAlerta && CaptaAlerta.nivel(c) === 'urgente' && !c.resolvida_em;
     if (FI.f === 'resolvidas') return !!c.resolvida_em;
     if (FI.f === 'abertas') return !c.resolvida_em;
     return true;
   });
   const n = k => k==='nao_lidas' ? CONVS.filter(c=>(c.nao_lidas||0)>0).length : k==='minhas' ? CONVS.filter(c=>FI.eu&&c.atendente===FI.eu).length : k==='resolvidas' ? CONVS.filter(c=>c.resolvida_em).length
-    : k==='quentes' ? CONVS.filter(c=>(c.lead?.temperatura||'').toLowerCase()==='quente').length : k==='sem_dono' ? CONVS.filter(c=>!c.atendente&&!c.resolvida_em).length : CONVS.filter(c=>!c.resolvida_em).length;
+    : k==='quentes' ? CONVS.filter(c=>(c.lead?.temperatura||'').toLowerCase()==='quente').length : k==='sem_dono' ? CONVS.filter(c=>!c.atendente&&!c.resolvida_em).length
+    : k==='sem_resposta' ? CONVS.filter(c=>c.aguardando_desde&&!c.resolvida_em).length : k==='urgentes' ? CONVS.filter(c=>window.CaptaAlerta&&CaptaAlerta.nivel(c)==='urgente'&&!c.resolvida_em).length : CONVS.filter(c=>!c.resolvida_em).length;
   const orfas = CONVS.filter(c => !c.lead).length;
-  document.getElementById('filtros').innerHTML = [['abertas','Abertas'],['nao_lidas','Não lidas'],['minhas','Minhas'],['sem_dono','Sem dono'],['quentes','Quentes'],['resolvidas','Resolvidas']].map(([k,t]) => `<button class="${FI.f===k?'on':''}" onclick="FI.f='${k}';desenharLista()">${t} <span style="opacity:.7">${n(k)}</span></button>`).join('')
+  document.getElementById('filtros').innerHTML = [['abertas','Abertas'],['sem_resposta','Sem resposta'],['urgentes','⏰ Urgentes'],['nao_lidas','Não lidas'],['minhas','Minhas'],['sem_dono','Sem dono'],['quentes','Quentes'],['resolvidas','Resolvidas']].map(([k,t]) => `<button class="${FI.f===k?'on':''}" onclick="FI.f='${k}';desenharLista()">${t} <span style="opacity:.7">${n(k)}</span></button>`).join('')
     + (orfas ? `<button style="border-color:var(--brand);color:var(--brand)" onclick="casarLid()" title="Conversas sem lead: descobre o número pelos leads do Kommo (via @lid) e liga">ligar ${orfas} sem nome</button>` : '');
   elCont.textContent = lista.length ? `${lista.length} conversa${lista.length > 1 ? 's' : ''}` : 'Nenhuma conversa';
   if (!lista.length) { elConvs.innerHTML = `<div class="vazio">${CONVS.length ? 'Nada com esse filtro.' : 'Nada por aqui ainda.<br>As mensagens aparecem assim que alguém escrever para o seu WhatsApp.'}</div>`; return; }
-  if (window.CaptaAlerta && FI.f !== 'resolvidas') lista = [...lista].sort((a, b) => CaptaAlerta.peso(b) - CaptaAlerta.peso(a) || new Date(b.ultima_mensagem_em||0) - new Date(a.ultima_mensagem_em||0));
+  // ordem sempre pela hora da última mensagem (mais recente em cima); prioridade é filtro
+  lista = [...lista].sort((a, b) => new Date(b.ultima_mensagem_em||0) - new Date(a.ultima_mensagem_em||0));
   elConvs.innerHTML = lista.map(c => {
     const ehLid = String(c.telefone||'').replace(/\D/g,'').length > 13;
     const nome = c.lead?.nome || c.nome || (ehLid ? 'Contato sem número' : fone(c.telefone)); const temp = c.lead?.temperatura; const at = c.atendente || c.lead?.atendente;

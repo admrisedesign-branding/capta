@@ -3276,6 +3276,9 @@ function renderLeads(){
         <button class="chip ${filter==='q'?'on':''}" data-f="q">Quentes ${c.q}</button>
         <button class="chip ${filter==='m'?'on':''}" data-f="m">Mornos ${c.m}</button>
         <button class="chip ${filter==='f'?'on':''}" data-f="f">Frios ${c.f}</button>
+        <span style="width:1px;height:18px;background:var(--line);margin:0 4px"></span>
+        <button class="chip ${filter==='sem_resposta'?'on':''}" data-f="sem_resposta">Sem resposta ${(DATA.leads||[]).filter(l=>l.aguardando_desde).length}</button>
+        <button class="chip ${filter==='urgentes'?'on':''}" data-f="urgentes" style="${filter==='urgentes'?'color:var(--quente)':''}">⏰ Urgentes ${(DATA.leads||[]).filter(l=>window.CaptaAlerta&&CaptaAlerta.nivel({aguardando_desde:l.aguardando_desde,lead:l})==='urgente').length}</button>
       </div>`}
     <div id="leads-list-wrap">${leadsList(f)}${free?'':countLine(f)}</div>
   </div>`;
@@ -3290,7 +3293,11 @@ function renderLeads(){
 function currentFilteredLeads(){
   let f = DATA.leads||[];
   if(isFree()) return f;
-  if(filter!=='all') f = f.filter(l => tcss(l.temperatura)===filter);
+  if(filter==='sem_resposta') f = f.filter(l => !!l.aguardando_desde);
+  else if(filter==='urgentes') f = f.filter(l => window.CaptaAlerta && CaptaAlerta.nivel({aguardando_desde:l.aguardando_desde,lead:l})==='urgente');
+  else if(filter!=='all') f = f.filter(l => tcss(l.temperatura)===filter);
+  // ordem: hora de chegada da última mensagem, mais recente em cima
+  f = [...f].sort((a,b) => new Date(b.ultima_mensagem_em||b.criado_em||0) - new Date(a.ultima_mensagem_em||a.criado_em||0));
   if(statusFilter!=='all') f = f.filter(l => (l.status||'novo')===statusFilter);
   const q = leadSearch.trim().toLowerCase();
   if(q) f = f.filter(l => (l.nome||'').toLowerCase().includes(q) || (l.contato||'').toLowerCase().includes(q));
@@ -3382,9 +3389,9 @@ function leadRow(l,i){
   const score = free ? `<span class="lockmini">🔒</span>` : `${l.score??'–'}`;
   const zap = zapHref(l);
   return `<tr data-i="${i}">
-    <td><div class="cell-lead"><span class="av sm" style="background:${color(l.nome)}">${ini(l.nome)}</span><div><div class="nm">${esc(l.nome)}${l.notas?'<span class="nota-dot" title="Tem anotação">📝</span>':''}${tagsHtml(l)}</div><div class="sub">${esc(l.contato||'')}</div></div></div></td>
+    <td><div class="cell-lead"><span class="av sm" style="background:${color(l.nome)}">${ini(l.nome)}</span><div><div class="nm">${esc(l.nome)}${l.notas?'<span class="nota-dot" title="Tem anotação">📝</span>':''}${tagsHtml(l)}</div><div class="sub">${esc(l.contato||'')}${l.aguardando_desde&&window.CaptaAlerta?' '+(CaptaAlerta.etiqueta({aguardando_desde:l.aguardando_desde,lead:l})||`<span class="al-tag">⏱ ${CaptaAlerta.rotulo({aguardando_desde:l.aguardando_desde})}</span>`):''}</div></div></div></td>
     <td>${l.origem?esc(l.origem):'—'}</td>
-    <td>${timeAgo(l.criado_em)}</td>
+    <td title="última mensagem · entrou">${l.ultima_mensagem_em?timeAgo(l.ultima_mensagem_em):timeAgo(l.criado_em)}</td>
     <td>${temp}</td>
     <td class="score-cell">${score}</td>
     <td><span class="status ${l.status||'novo'}">${l.status||'novo'}</span></td>
