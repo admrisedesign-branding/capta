@@ -1500,43 +1500,60 @@ async function acaoFichaAluno(tenant, body, res) {
 // Usa a API da Anthropic (ANTHROPIC_API_KEY). Sem a chave, fica pendente.
 // ---------------------------------------------------------------------
 async function acaoTranscrever(tenant, body, res) {
-  const chave = process.env.ANTHROPIC_API_KEY;
+  // O Claude não transcreve áudio: isso exige um serviço de fala.
+  // Aceitamos Groq (grátis, roda Whisper) ou OpenAI. Basta uma das chaves.
+  const groq = process.env.GROQ_API_KEY, openai = process.env.OPENAI_API_KEY;
   const id = body.mensagem_id;
   if (!id) return res.status(400).json({ erro: 'Informe a mensagem.' });
-  const [m] = await sb(`capta_mensagens?id=eq.${id}&tenant_id=eq.${tenant.id}&select=id,tipo,midia_url,midia_mime,transcricao,transcricao_status&limit=1`);
+  const [m] = await sb(`capta_mensagens?id=eq.${id}&tenant_id=eq.${tenant.id}&select=id,tipo,midia_url,midia_mime,texto,transcricao,transcricao_status&limit=1`);
   if (!m) return res.status(404).json({ erro: 'Mensagem não encontrada.' });
   if (m.transcricao) return res.status(200).json({ transcricao: m.transcricao, ja: true });
-  if (!chave) return res.status(200).json({ erro: 'Transcrição ainda não está ativa nesta conta.' });
-  if (!m.midia_url) return res.status(400).json({ erro: 'Áudio não está guardado.' });
+  if (!groq && !openai) return res.status(200).json({ erro: 'Transcrição de áudio ainda não está ativa: falta a chave do serviço de voz (Groq ou OpenAI).' });
+  if (!m.midia_url) return res.status(400).json({ erro: 'O áudio não está guardado no Capta.' });
 
   await sb(`capta_mensagens?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ transcricao_status: 'processando' }) }).catch(() => null);
   try {
-    // 1) baixa o áudio do nosso próprio storage
+    // 1) baixa o áudio do nosso armazenamento
     const assin = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/capta-midia/${m.midia_url}`, {
       method: 'POST', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ expiresIn: 300 }) }).then(r => r.json());
     const url = `${SUPABASE_URL}/storage/v1${assin.signedURL || assin.signedUrl}`;
     const bin = Buffer.from(await (await fetch(url)).arrayBuffer());
-    if (bin.length > 20 * 1024 * 1024) throw new Error('Áudio grande demais para transcrever.');
+    if (!bin.length) throw new Error('Áudio vazio.');
+    if (bin.length > 24 * 1024 * 1024) throw new Error('Áudio grande demais (máximo 24 MB).');
 
-    // 2) manda para a Anthropic transcrever e resumir em uma linha
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': chave, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6', max_tokens: 1200,
-        system: 'Você transcreve áudios de WhatsApp de pais interessados numa escola de robótica infantil em Manaus. Devolva SOMENTE a transcrição fiel, em português, sem comentários. Se houver silêncio ou ruído, escreva [inaudível].',
-        messages: [{ role: 'user', content: [
-          { type: 'document', source: { type: 'base64', media_type: m.midia_mime || 'audio/ogg', data: bin.toString('base64') } },
-          { type: 'text', text: 'Transcreva este áudio.' }
-        ] }]
-      })
-    });
-    const j = await r.json();
-    if (j.error) throw new Error(j.error.message || 'A IA recusou o áudio.');
-    const texto = (j.content || []).filter(x => x.type === 'text').map(x => x.text).join('\n').trim();
+    // 2) manda para o serviço de voz
+    const mime = m.midia_mime || 'audio/ogg';
+    const ext = mime.includes('mp4') || mime.includes('m4a') ? 'm4a' : mime.includes('mpeg') ? 'mp3' : mime.includes('wav') ? 'wav' : 'ogg';
+    const form = new FormData();
+    form.append('file', new Blob([bin], { type: mime }), `audio.${ext}`);
+    form.append('model', groq ? 'whisper-large-v3-turbo' : 'gpt-4o-mini-transcribe');
+    form.append('language', 'pt');
+    form.append('response_format', 'json');
+    const alvo = groq ? 'https://api.groq.com/openai/v1/audio/transcriptions'
+                      : 'https://api.openai.com/v1/audio/transcriptions';
+    const r = await fetch(alvo, { method: 'POST', headers: { Authorization: `Bearer ${groq || openai}` }, body: form });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j?.error?.message || `O serviço de voz recusou (${r.status}).`);
+    let texto = (j.text || '').trim();
     if (!texto) throw new Error('Não consegui entender o áudio.');
-    await sb(`capta_mensagens?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ transcricao: texto.slice(0, 4000), transcricao_status: 'pronta' }) });
+
+    // 3) com a chave da Anthropic, dá um trato no texto (pontuação e nomes)
+    if (process.env.ANTHROPIC_API_KEY && texto.length > 40) {
+      try {
+        const rr = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST', headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000,
+            system: 'Você arruma a pontuação de transcrições de áudio de WhatsApp de pais falando com uma escola de robótica infantil em Manaus. Corrija só pontuação, maiúsculas e palavras claramente truncadas. NÃO invente, não resuma, não mude o sentido nem o jeito de falar. Devolva apenas o texto corrigido.',
+            messages: [{ role: 'user', content: texto }] }) });
+        const jj = await rr.json();
+        const limpo = (jj.content || []).filter(x => x.type === 'text').map(x => x.text).join('').trim();
+        if (limpo && limpo.length > texto.length * 0.6) texto = limpo;
+      } catch (e) { /* se falhar, fica a transcrição crua */ }
+    }
+
+    await sb(`capta_mensagens?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ transcricao: texto.slice(0, 4000), transcricao_status: 'pronta' }) });
     return res.status(200).json({ transcricao: texto });
   } catch (e) {
     await sb(`capta_mensagens?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ transcricao_status: 'erro' }) }).catch(() => null);
@@ -1544,6 +1561,7 @@ async function acaoTranscrever(tenant, body, res) {
     return res.status(200).json({ erro: e.message });
   }
 }
+
 
 
 // ---------------------------------------------------------------------
