@@ -199,6 +199,12 @@ body.embed .filtros-bar{width:calc(100vw - 130px)}
 .sg-mais:hover{border-color:var(--brand);color:var(--brand)}
 .sg-nota{font-size:12px;color:var(--ink);background:var(--line-2);border-left:3px solid var(--brand);border-radius:6px;
   padding:5px 8px;margin-top:6px;line-height:1.45}
+
+.lead-quando{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--faint);margin-top:4px;font-weight:600}
+.lead-quando .entrou{opacity:.75}
+.lead-quando .entrou:before{content:'·';margin-right:8px}
+.lead-aula{font-size:11.5px;font-weight:700;color:#B8522F;background:var(--exp-bg);border-radius:7px;padding:2px 8px;margin-top:5px;display:inline-block}
+.lead-aula.passou{color:var(--muted);background:var(--line-2)}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -485,11 +491,31 @@ function faixaSug(l){
   </div>`;
 }
 
+
+// data e hora nos cards, curtas: "hoje 14:32", "ontem 09:10", "seg 08/09 16:45"
+const DIAS3F = ['dom','seg','ter','qua','qui','sex','sáb'];
+function quandoCurto(iso){
+  if (!iso) return '';
+  const d = new Date(iso), hoje = new Date(), ontem = new Date(Date.now() - 864e5);
+  const hm = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+  if (d.toDateString() === hoje.toDateString()) return `hoje ${hm}`;
+  if (d.toDateString() === ontem.toDateString()) return `ontem ${hm}`;
+  const dm = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  return `${DIAS3F[d.getDay()]} ${dm} ${hm}`;
+}
+function quandoAula(iso){
+  const d = new Date(iso);
+  const dm = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  return `${DIAS3F[d.getDay()]} ${dm} às ${d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}`;
+}
+
 function cartao(l) {
   const pd = parado(l.etapa_em || l.criado_em);
   return `<article class="lead" draggable="true" data-lead="${l.id}" onclick="abrirLead('${l.id}')">
     <div class="lead-nome">${esc(l.nome || 'Sem nome')}</div>
     <div class="lead-sub">${esc(l.contato || '')}${l.origem ? ' · ' + esc(l.origem) : ''}</div>
+    ${l.data_aula ? `<div class="lead-aula ${new Date(l.data_aula) < new Date() ? 'passou' : ''}" title="${new Date(l.data_aula) < new Date() ? 'aula experimental já aconteceu' : 'aula experimental marcada'}">📅 ${quandoAula(l.data_aula)}</div>` : ''}
+    <div class="lead-quando" title="última mudança de etapa · entrou no funil"><span>${quandoCurto(l.etapa_em || l.criado_em)}</span>${l.kommo_criado_em || l.criado_em ? `<span class="entrou">entrou ${quandoCurto(l.kommo_criado_em || l.criado_em)}</span>` : ''}</div>
     <div class="lead-fim">
       ${l.temperatura ? `<span class="tag t-${esc(l.temperatura)}">${esc(l.temperatura)}</span>` : ''}
       ${l.atendente ? tagPessoa(l.atendente, 'atendendo: ' + l.atendente) : '<span class="tag sem-dono-tag">sem dono</span>'}
