@@ -154,6 +154,10 @@ button{font-family:inherit;cursor:pointer}
 .sg b{display:block;font-size:11.5px;color:var(--brand);margin-bottom:3px}
 .sg span{font-size:13px;line-height:1.5;color:var(--ink);white-space:pre-wrap}
 .ico.ia{color:var(--brand);border-color:var(--brand-soft);background:var(--brand-softer)}
+.tr-erro{color:var(--quente);cursor:help}
+.mini-pt-esc{display:inline-block;width:11px;height:11px;border:2px solid var(--line);border-top-color:var(--brand);
+  border-radius:50%;animation:gira .7s linear infinite;margin-right:6px;vertical-align:-1px}
+@keyframes gira{to{transform:rotate(360deg)}}
 /* inbox v2 */
 
 .conv{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--line-2);background:transparent;cursor:pointer;font-family:inherit}
@@ -572,10 +576,10 @@ async function assumir(id, quem){
 
 // ---- transcrever áudio (a IA lê e escreve o que foi dito) ----
 async function transcrever(id){
-  const alvo = document.getElementById('tr-' + id); if (alvo) alvo.textContent = 'transcrevendo…';
+  const alvo = document.getElementById('tr-' + id); if (alvo) alvo.innerHTML = '<span class="mini-pt-esc"></span>transcrevendo…';
   try {
     const d = await api('transcrever', { mensagem_id: id });
-    if (d.erro) { if (alvo) alvo.innerHTML = `<span title="${esc(d.erro)}">não deu pra transcrever</span>`; return toast(d.erro, { tipo:'erro' }); }
+    if (d.erro) { if (alvo) alvo.innerHTML = `<span class="tr-erro" title="${esc(d.erro)}">não deu pra transcrever</span>`; return toast(d.erro, { tipo:'erro', ms: 6000 }); }
     if (alvo) { alvo.className = 'transcricao'; alvo.textContent = d.transcricao; }
     const m = (CONV_MSGS||[]).find(x => x.id === id); if (m) m.transcricao = d.transcricao;
   } catch(e){ if (alvo) alvo.textContent = 'não deu pra transcrever'; toast(e.message, { tipo:'erro' }); }
