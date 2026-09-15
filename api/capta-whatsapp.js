@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -121,6 +121,7 @@ module.exports = async function handler(req, res) {
         case 'evento_leads':  return await acaoEventoLeads(tenant, body, res);
         case 'casar_conversas': return await acaoCasarConversas(tenant, body, res);
         case 'sem_data':      return await acaoSemData(tenant, body, res);
+        case 'mapear_aulas':  return await acaoMapearAulas(tenant, body, res);
         case 'saude':         return await acaoSaude(tenant, body, res);
         case 'transcrever':   return await acaoTranscrever(tenant, body, res);
         case 'vagas_kit':     return await acaoVagasKit(tenant, body, res);
@@ -1384,6 +1385,61 @@ async function acaoSemData(tenant, body, res) {
     comAula = new Set((ags || []).map(a => a.lead_id));
   }
   return res.status(200).json({ leads: (leads || []).filter(l => !comAula.has(l.id)) });
+}
+
+// ---------------------------------------------------------------------
+// MAPEAR AULAS — leads parados em "Aula agendada" sem agendamento no Capta.
+// Descobre o dia e a hora combinados: primeiro pelo campo "Data da aula" do
+// Kommo; se ele estiver vazio, a IA lê a conversa do WhatsApp (e as notas do
+// lead) e extrai. Devolve uma PROPOSTA por lead, com confiança e o trecho
+// que a justifica — quem agenda é a tela, depois que a pessoa confere.
+// Vem em lotes pequenos (até 8) por causa do tempo limite da função.
+// ---------------------------------------------------------------------
+async function acaoMapearAulas(tenant, body, res) {
+  const ids = Array.isArray(body.lead_ids) ? body.lead_ids.slice(0, 8) : [];
+  if (!ids.length) return res.status(400).json({ erro: 'Informe lead_ids.' });
+  const chave = process.env.ANTHROPIC_API_KEY;
+  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${ids.join(',')})&select=id,nome,contato,crianca,idade,notas,data_aula,etapa_em,kommo_lead_id`).catch(() => []);
+  const hoje = new Date(Date.now() - 4 * 3600e3);   // Manaus (UTC-4)
+  const DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+  const fmtMsg = m => {
+    const d = new Date(new Date(m.criado_em).getTime() - 4 * 3600e3);
+    const quando = `${d.toISOString().slice(0, 10)} (${DIAS[d.getUTCDay()]}) ${d.toISOString().slice(11, 16)}`;
+    const quem = m.direcao === 'saida' ? 'ESCOLA' : 'RESPONSÁVEL';
+    const txt = m.texto || m.transcricao || (m.tipo && m.tipo !== 'texto' ? `[${m.tipo}]` : '');
+    return `[${quando}] ${quem}: ${String(txt).replace(/\s+/g, ' ').slice(0, 400)}`;
+  };
+  const resultados = await Promise.all((leads || []).map(async l => {
+    const base = { lead_id: l.id, nome: l.nome, crianca: l.crianca, idade: l.idade, kommo_lead_id: l.kommo_lead_id };
+    // 1) campo do Kommo já traz dia e hora
+    if (l.data_aula) {
+      const d = new Date(l.data_aula);
+      if (!isNaN(d) && d.getUTCHours() + d.getUTCMinutes() > 0) {
+        const loc = new Date(d.getTime() - 4 * 3600e3);
+        return { ...base, data: loc.toISOString().slice(0, 10), hora: loc.toISOString().slice(11, 16), confianca: 'alta', fonte: 'campo "Data da aula" do Kommo', trecho: null };
+      }
+    }
+    // 2) conversa
+    const conv = (await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=eq.${l.id}&select=id&order=ultima_mensagem_em.desc.nullslast&limit=1`).catch(() => []))?.[0];
+    const msgs = conv ? await sb(`capta_mensagens?conversa_id=eq.${conv.id}&select=direcao,tipo,texto,transcricao,criado_em&order=criado_em.desc&limit=60`).catch(() => []) : [];
+    const fala = (msgs || []).reverse().map(fmtMsg).filter(x => !/: $/.test(x));
+    if (!fala.length && !l.notas) return { ...base, data: null, hora: null, confianca: 'nenhuma', fonte: 'sem conversa no Capta', trecho: null };
+    if (!chave) return { ...base, data: null, hora: null, confianca: 'nenhuma', fonte: 'IA não configurada', trecho: null };
+    try {
+      const rr = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', headers: { 'x-api-key': chave, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 300,
+          system: `Você lê conversas de WhatsApp entre uma escola de robótica infantil em Manaus e responsáveis, e descobre QUANDO ficou combinada a aula experimental. Hoje é ${hoje.toISOString().slice(0, 10)} (${DIAS[hoje.getUTCDay()]}). Cada mensagem traz a data em que foi enviada: resolva "amanhã", "sábado", "semana que vem" a partir da data da mensagem que combinou, não de hoje. Considere combinado só o que a escola confirmou ou o responsável aceitou; se depois remarcaram, vale a última combinação. Responda SOMENTE um JSON: {"data":"AAAA-MM-DD" ou null,"hora":"HH:MM" ou null,"crianca":nome ou null,"idade":número ou null,"confianca":"alta"|"media"|"baixa"|"nenhuma","trecho":"a frase da conversa que mostra a combinação, curta"}. Sem hora explícita, hora null. Nunca invente.`,
+          messages: [{ role: 'user', content: `LEAD: ${l.nome || ''}${l.crianca ? ` · filho(a): ${l.crianca}` : ''}${l.idade ? `, ${l.idade} anos` : ''}\nNOTAS: ${l.notas || '—'}\n\nCONVERSA:\n${fala.join('\n')}` }] }) });
+      const jj = await rr.json();
+      const txt = (jj.content || []).filter(x => x.type === 'text').map(x => x.text).join('').replace(/```json|```/g, '').trim();
+      const j = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1));
+      return { ...base, crianca: base.crianca || j.crianca || null, idade: base.idade || j.idade || null, data: j.data || null, hora: j.hora || null, confianca: j.confianca || 'baixa', fonte: 'conversa do WhatsApp', trecho: j.trecho || null };
+    } catch (e) {
+      return { ...base, data: null, hora: null, confianca: 'nenhuma', fonte: 'IA não conseguiu ler', trecho: null };
+    }
+  }));
+  return res.status(200).json({ leads: resultados });
 }
 
 
