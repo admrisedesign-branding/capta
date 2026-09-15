@@ -168,6 +168,7 @@ body.embed .filtros-bar,body.embed .org-topo,body.embed .org-aviso{max-width:cal
 .raia-corpo{overflow:visible}
 .raia{align-self:flex-start}
 .raia-cab{position:sticky;top:46px;z-index:2;background:var(--card);border-radius:var(--r) var(--r) 0 0}
+.sem-dono-tag{background:transparent;border:1px dashed var(--line);color:var(--faint);font-weight:700}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -434,7 +435,7 @@ function cartao(l) {
     <div class="lead-sub">${esc(l.contato || '')}${l.origem ? ' · ' + esc(l.origem) : ''}</div>
     <div class="lead-fim">
       ${l.temperatura ? `<span class="tag t-${esc(l.temperatura)}">${esc(l.temperatura)}</span>` : ''}
-      ${l.atendente ? tagPessoa(l.atendente, 'atendendo: ' + l.atendente) : ''}
+      ${l.atendente ? tagPessoa(l.atendente, 'atendendo: ' + l.atendente) : '<span class="tag sem-dono-tag">sem dono</span>'}
       <span class="parado ${pd.cls}">${pd.txt}</span>
       ${l.kommo_lead_id ? `<a class="kommo-lnk" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Abrir no Kommo">Kommo ↗</a>` : ''}
     </div>

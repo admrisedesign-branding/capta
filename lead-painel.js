@@ -30,6 +30,9 @@
   #lp .msg.saida{background:var(--brand-soft,rgba(46,91,255,.1));align-self:flex-end}#lp .msg small{display:block;color:var(--faint);font-size:10.5px;margin-top:3px}
   #lp .msg img{max-width:100%;border-radius:8px;display:block;margin-top:4px}
 
+
+  #lp .msg small.quem{display:block;font-size:10px;font-weight:800;opacity:.75;margin-top:3px}
+  #lp #lp-txt{min-height:64px;max-height:150px;line-height:1.5;resize:none}
   #lp .linha-topo{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;margin-bottom:12px}
   #lp .campo-inline label{display:block;font-size:10.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
   #lp .sel-etapa{border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-size:13.5px;font-weight:700;
@@ -139,11 +142,19 @@
     const ta = document.getElementById('lp-txt'); if (ta) { ta.oninput = () => { ta.style.height='auto'; ta.style.height = Math.min(ta.scrollHeight,120)+'px'; if (ta.value === '/') { ta.value=''; rapidas(); } }; ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }; }
     const ms = document.getElementById('lp-msgs'); if (ms) ms.scrollTop = ms.scrollHeight;
   }
+  // quem falou: o nome do cliente de um lado, quem respondeu do outro
+  function quemMsg(m, l){
+    if (m.direcao === 'entrada') return (l && l.nome) || 'Cliente';
+    if (m.autor === 'agente' || m.autor === 'bot') return 'Robô';
+    if (m.autor && !['atendente','humano','sistema'].includes(m.autor)) return m.autor;
+    return EU() || 'Escola';
+  }
   function chipsEtapa(l, et) {
     const atual = et.find(e => e.id === l.etapa_id);
+    const tipo = atual ? (atual.tipo || '') : '';
     return `<div class="linha-topo">
       <div class="campo-inline"><label>Status</label>
-        <select id="lp-etapa" class="sel-etapa ${atual?(atual.tipo||''):''}" onchange="LeadPainel.mudarEtapa(this.value)">
+        <select id="lp-etapa" class="sel-etapa ${tipo}" onchange="LeadPainel.mudarEtapa(this.value)" title="A mesma lista do Pipeline. Aluno ativo, Perdido e Remarketing encerram a conversa.">
           ${!atual ? '<option value="">— sem etapa —</option>' : ''}
           ${et.map(e => `<option value="${e.id}" ${l.etapa_id===e.id?'selected':''}>${esc(e.nome)}</option>`).join('')}
         </select>
@@ -164,6 +175,7 @@
       desenhar(); say(`Agora ${esc(eu)} está atendendo`, { tipo:'ok' }); }
     catch(e){ say(e.message, { tipo:'erro' }); }
   }
+  const ENCERRA = /aluno ativo|perdido|remarketing|desist|trancad/i;
   async function mudarEtapa(etapaId) {
     const l = S.lead; if (!l || l.etapa_id === etapaId) return;
     const et = await etapas(); const e = et.find(x => x.id === etapaId); let motivo = null;
@@ -174,6 +186,11 @@
     if (e && e.tipo === 'perdida') { motivo = prompt('Motivo da perda (opcional):') || null; }
     const antes = l.etapa_id; l.etapa_id = etapaId; l.etapa_em = new Date().toISOString(); desenhar();
     try { if (cfg.onMover) await cfg.onMover(l, etapaId, motivo); else await api('mover', { lead_id: l.id, etapa_id: etapaId, motivo });
+      // etapa que fecha o assunto encerra a conversa junto
+      const conv = S.info && S.info.conversa;
+      if (conv && e) { const fecha = ENCERRA.test(e.nome);
+        if (fecha && !conv.resolvida_em) { api('conversa_atualizar', { conversa_id: conv.id, resolver: true }).catch(()=>{}); conv.resolvida_em = new Date().toISOString(); }
+        else if (!fecha && conv.resolvida_em) { api('conversa_atualizar', { conversa_id: conv.id, resolver: false }).catch(()=>{}); conv.resolvida_em = null; } }
       if (!l.atendente && EU()) { api('campos', { lead_id: l.id, atendente: EU() }).catch(()=>{}); l.atendente = EU(); }
       say(`<b>${esc(l.nome||'Lead')}</b> → ${esc(e ? e.nome : '')} · Kommo atualizado`, { acao:'desfazer', onAcao: () => mudarEtapa(antes) }); }
     catch (err) { l.etapa_id = antes; desenhar(); say(err.message, { tipo:'erro' }); }
@@ -190,7 +207,7 @@
       <span style="margin-left:auto;display:flex;gap:6px">${l.contato ? `<a class="lnk" style="font-size:12px" href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener">abrir no WhatsApp ↗</a>` : ''}</span></div>`;
     let corpo;
     if (!i) corpo = `<div class="aviso-p">Carregando…</div>`;
-    else if (i.mensagens && i.mensagens.length) corpo = `<div class="msgs" id="lp-msgs">${i.mensagens.map(m => `<div class="msg ${m.direcao==='saida'?'saida':''}">${m.tipo==='imagem'&&m.midia_url ? `<div data-midia="${m.id}" data-tipo="imagem">🖼️ imagem</div>` : m.tipo==='audio'&&m.midia_url ? `<div data-midia="${m.id}" data-tipo="audio">🎤 áudio</div>${m.transcricao ? `<div class="transcr">${esc(m.transcricao)}</div>` : `<button class="bt-tr" onclick="LeadPainel.transcrever('${m.id}')">📝 ler o que diz</button>`}` : ''}${esc(m.texto || m.transcricao || (m.midia_url ? '' : '['+(m.tipo||'mídia')+']'))}<small>${esc(m.autor||'')} · ${hora(m.criado_em)}</small></div>`).join('')}</div>`;
+    else if (i.mensagens && i.mensagens.length) corpo = `<div class="msgs" id="lp-msgs">${i.mensagens.map(m => `<div class="msg ${m.direcao==='saida'?'saida':''}">${m.tipo==='imagem'&&m.midia_url ? `<div data-midia="${m.id}" data-tipo="imagem">🖼️ imagem</div>` : m.tipo==='audio'&&m.midia_url ? `<div data-midia="${m.id}" data-tipo="audio">🎤 áudio</div>${m.transcricao ? `<div class="transcr">${esc(m.transcricao)}</div>` : `<button class="bt-tr" onclick="LeadPainel.transcrever('${m.id}')">📝 ler o que diz</button>`}` : ''}${esc(m.texto || m.transcricao || (m.midia_url ? '' : '['+(m.tipo||'mídia')+']'))}<small class="quem">${esc(quemMsg(m, l))} · ${hora(m.criado_em)}</small></div>`).join('')}</div>`;
     else corpo = `<div class="aviso-p">${conectado ? 'Ainda não há conversa com este lead pelo Capta. Escreva abaixo pra começar.' : 'A conversa aparece aqui quando o WhatsApp da unidade estiver conectado.'}${l.kommo_lead_id ? `<br><a class="lnk" href="https://roboticanorte.kommo.com/leads/detail/${l.kommo_lead_id}" target="_blank" rel="noopener">Ver a conversa no Kommo ↗</a>` : ''}</div>`;
     setTimeout(carregarMidias, 50);
     return `${acoes}<div class="corpo">${chipsEtapa(l, et)}<div class="sec">Conversa</div>${corpo}</div>

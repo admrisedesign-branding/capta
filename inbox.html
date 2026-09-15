@@ -169,6 +169,27 @@ button{font-family:inherit;cursor:pointer}
 .bt-assumir{border:1px solid var(--brand)!important;background:var(--brand-softer);color:var(--brand)!important;
   border-radius:8px;padding:4px 9px;font-size:11px;font-weight:800;cursor:pointer}
 .acoes-dir{display:flex;gap:6px;margin-left:auto}
+
+.msg-autor{display:block;font-size:10.5px;font-weight:800;margin-bottom:2px;letter-spacing:.02em}
+.msg-autor.entrada{color:var(--muted)}
+.msg-autor.saida{color:#1f7a4d}
+#txt{min-height:66px;max-height:160px;line-height:1.5;resize:none;padding:10px 12px}
+.enc{font-size:11.5px;font-weight:800;color:var(--verde);background:var(--verde-bg);border-radius:99px;padding:3px 9px}
+.sel-etapa.ganha{border-color:var(--verde);color:var(--verde)}
+.sel-etapa.perdida{border-color:var(--quente);color:var(--quente)}
+.painel-acoes .campo-topo:first-child{margin-right:auto}
+
+.mini-tag.sem{background:transparent;border:1px dashed var(--line);color:var(--faint)}
+.mini-tag.et-novo{background:var(--brand-soft);color:var(--brand)}
+.mini-tag.et-contato{background:var(--line-2);color:var(--muted)}
+.mini-tag.et-qual{background:rgba(14,138,158,.13);color:#0E8A9E}
+.mini-tag.et-aula{background:var(--exp-bg);color:#B8522F}
+.mini-tag.et-matr{background:var(--morno-bg);color:var(--morno)}
+.mini-tag.et-ganha{background:var(--verde-bg);color:var(--verde)}
+.mini-tag.et-perdida{background:var(--quente-bg);color:var(--quente)}
+.mini-tag.et-rem{background:rgba(124,92,219,.13);color:#5B3FBF}
+.mini-tag.mt-enc{background:var(--verde-bg);color:var(--verde)}
+.conv-tags{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:3px}
 /* inbox v2 */
 
 .conv{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--line-2);background:transparent;cursor:pointer;font-family:inherit}
@@ -347,13 +368,13 @@ function desenharLista(){
     return `<button class="conv ${c.resolvida_em?'res':''}" data-id="${c.id}" aria-current="${c.id === atual}">
       <span class="conv-av">${esc(iniciais(nome))}</span>
       <span class="conv-mid"><span class="conv-nome">${esc(nome)}</span><span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span>
-        <span class="conv-tags">${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?tagPessoa(at, 'atendendo: ' + at):''}${c.resolvida_em?'<span class="mini-tag mt-at">resolvida</span>':''}</span></span>
+        <span class="conv-tags">${tagEtapa(c.lead && c.lead.etapa_id)}${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?tagPessoa(at, 'atendendo: ' + at):'<span class="mini-tag sem">sem dono</span>'}${c.resolvida_em?'<span class="mini-tag mt-enc">encerrada</span>':''}</span></span>
       <span class="conv-dir"><span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>` : ''}</span></button>`;
   }).join('');
   elConvs.querySelectorAll('.conv').forEach(b => { b.onclick = () => abrir(b.dataset.id); });
   if (window.parent !== window) window.parent.postMessage({ capta:'nao_lidas', n: CONVS.reduce((s,c)=>s+(c.nao_lidas||0),0) }, '*');
 }
-async function casarConversas(){ try { const r = await api('casar_conversas'); toast(`${r.ligadas} conversas ligadas ao lead`, { tipo:'ok' }); await carregarLista(); carregarEtapas(); } catch(e){ toast(e.message, { tipo:'erro' }); } }
+async function casarConversas(){ try { const r = await api('casar_conversas'); toast(`${r.ligadas} conversas ligadas ao lead`, { tipo:'ok' }); await carregarEtapas().then(carregarLista); } catch(e){ toast(e.message, { tipo:'erro' }); } }
 async function carregarLista() {
   try { const { conversas } = await api('conversas'); CONVS = conversas || []; desenharLista(); }
   catch (e) { elCont.textContent = 'Erro'; elConvs.innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
@@ -361,6 +382,7 @@ async function carregarLista() {
 
 async function abrir(id) {
   document.body.classList.add('chat-aberto');
+  { const c = CONVS.find(x => x.id === id); CONV_NOME = (c && ((c.lead && c.lead.nome) || c.nome)) || 'Cliente'; }
   atual = id;
   document.body.classList.add('aberta');
   elConvs.querySelectorAll('.conv').forEach(b => b.setAttribute('aria-current', b.dataset.id === id));
@@ -381,7 +403,7 @@ async function abrir(id) {
         <button class="voltar-chat" onclick="document.body.classList.remove('chat-aberto')">← conversas</button>
     <div class="painel-acoes">
           <div class="campo-topo"><label>Status do lead</label>
-            ${conversa.lead ? `<select class="sel-etapa" onchange="mudarEtapaLead('${conversa.lead.id}', this.value)" title="A mesma lista do Pipeline">
+            ${conversa.lead ? `<select class="sel-etapa ${corEtapa(conversa.lead.etapa_id)}" onchange="mudarEtapaLead('${conversa.lead.id}', this.value)" title="A mesma lista do Pipeline. Aluno ativo, Perdido e Remarketing encerram a conversa automaticamente.">
               ${!conversa.lead.etapa_id ? '<option value="">— sem etapa —</option>' : ''}
               ${(ETAPAS||[]).map(e => `<option value="${e.id}" ${conversa.lead.etapa_id===e.id?'selected':''}>${esc(e.nome)}</option>`).join('')}
             </select>` : '<span class="sem-lead">sem lead ligado</span>'}
@@ -394,9 +416,9 @@ async function abrir(id) {
           </div>
           <div class="robo ${conversa.agente_ativo ? 'on' : 'off'}" title="${conversa.agente_ativo ? 'O robô ainda responde nesta conversa' : 'Uma pessoa assumiu: o robô parou de responder aqui'}"><span class="ponto"></span>${conversa.agente_ativo ? 'Robô' : 'Humano'}</div>
           <div class="acoes-dir">
-          ${conversa.resolvida_em ? `<button onclick="resolver('${conversa.id}', false)" title="Volta para a lista de conversas abertas">Reabrir</button>`
-            : `<button class="ok" onclick="resolver('${conversa.id}', true)" title="Marca que não há mais nada pendente aqui: a conversa sai da lista de abertas. Não muda a etapa do lead nem apaga o histórico.">Encerrar conversa</button>`}
-          <button onclick="importarTxt({ lead_id: ${conversa.lead ? `'${conversa.lead.id}'` : 'null'}, telefone: '${esc(conversa.telefone)}', depois: () => { abrir('${conversa.id}'); carregarLista(); } })" title="Importar histórico exportado do WhatsApp (.txt)">Importar .txt</button>
+            ${conversa.resolvida_em ? `<span class="enc" title="Encerrada porque o lead virou ${esc(nomeEtapa(conversa.lead && conversa.lead.etapa_id) || 'um caso fechado')}">conversa encerrada</span>
+              <button onclick="resolver('${conversa.id}', false)" title="Volta para a lista de abertas">reabrir</button>` : ''}
+            <button onclick="importarTxt({ lead_id: ${conversa.lead ? `'${conversa.lead.id}'` : 'null'}, telefone: '${esc(conversa.telefone)}', depois: () => { abrir('${conversa.id}'); carregarLista(); } })" title="Importar histórico exportado do WhatsApp (.txt)">Importar .txt</button>
           </div>
         </div>
       </div>
@@ -468,8 +490,11 @@ function corpoMsg(m) {
   const resp = m.responde_a ? (() => { const o = (CONV_MSGS||[]).find(x => x.id === m.responde_a || x.provedor_msg_id === m.responde_a);
       return o ? `<div class="resp" onclick="irParaMsg('${o.id}')"><b>${o.direcao === 'saida' ? (o.autor === 'agente' ? 'Robô' : 'Você') : 'Cliente'}</b>${esc((o.texto || '[' + (o.tipo||'mídia') + ']').slice(0, 90))}</div>` : ''; })() : '';
   const tique = m.direcao === 'saida' ? `<span class="tique ${m.entrega === 'lida' ? 'lida' : ''}">${m.entrega === 'enviando' ? '🕓' : m.entrega === 'lida' || m.entrega === 'entregue' ? '✓✓' : '✓'}</span>` : '';
+  const quem = m.direcao === 'entrada'
+    ? (CONV_NOME || 'Cliente')
+    : (m.autor === 'agente' || m.autor === 'bot' ? 'Robô' : (m.autor && !['atendente','humano','sistema'].includes(m.autor) ? m.autor : (FI.eu || 'Escola')));
   return `<div class="msg ${m.direcao} ${m.mesmo ? 'mesmo' : ''} ${m.fim ? 'fim' : ''}" id="msg-${m.id}">
-    ${!m.mesmo && m.direcao === 'saida' && m.autor && m.autor !== 'lead' ? `<span class="msg-autor">${m.autor === 'agente' ? 'Robô' : esc(m.autor === 'atendente' || m.autor === 'humano' ? 'Você' : m.autor)}</span>` : ''}
+    ${!m.mesmo ? `<span class="msg-autor ${m.direcao}">${esc(quem)}</span>` : ''}
     ${resp}<span class="msg-txt">${miolo}</span><span class="msg-meta">${hora(m.criado_em)}${tique}</span>
     <button class="msg-acao" title="Responder" onclick="responderMsg('${m.id}')">↩</button>
   </div>`;
@@ -491,7 +516,7 @@ function montarFluxo(msgs){
   });
   return html;
 }
-let CONV_MSGS = [], RESPONDENDO = null;
+let CONV_MSGS = [], RESPONDENDO = null, CONV_NOME = '';
 function responderMsg(id){
   const m = (CONV_MSGS||[]).find(x => x.id === id); if (!m) return;
   RESPONDENDO = m;
@@ -638,16 +663,44 @@ function usarSugestao(i){
 // etapas do pipeline, para o status do lead dentro do chat
 let ETAPAS = [];
 async function carregarEtapas(){ try { const d = await api('funil'); ETAPAS = d.etapas || []; } catch(e){} }
+// Etapas que fecham o assunto: a conversa é encerrada junto, sem botão separado.
+const ENCERRA = /aluno ativo|perdido|remarketing|desist|trancad/i;
+const nomeEtapa = id => { const e = (ETAPAS||[]).find(x => x.id === id); return e ? e.nome : null; };
+const corEtapa = id => { const e = (ETAPAS||[]).find(x => x.id === id); return e ? (e.tipo || '') : ''; };
 async function mudarEtapaLead(leadId, etapaId){
   if (!leadId || !etapaId) return;
   try {
     await api('mover', { lead_id: leadId, etapa_id: etapaId });
     const e = ETAPAS.find(x => x.id === etapaId);
     const c = CONVS.find(x => x.lead && x.lead.id === leadId); if (c && c.lead) c.lead.etapa_id = etapaId;
-    toast(`Status: <b>${esc(e ? e.nome : '')}</b> · Kommo atualizado`, { tipo:'ok' });
+    let extra = '';
+    if (e && ENCERRA.test(e.nome)) {
+      const conv = CONVS.find(x => x.lead && x.lead.id === leadId);
+      if (conv && !conv.resolvida_em) { await api('conversa_atualizar', { conversa_id: conv.id, resolver: true }).catch(()=>{}); conv.resolvida_em = new Date().toISOString(); extra = ' · conversa encerrada'; }
+    } else {
+      const conv = CONVS.find(x => x.lead && x.lead.id === leadId);
+      if (conv && conv.resolvida_em) { await api('conversa_atualizar', { conversa_id: conv.id, resolver: false }).catch(()=>{}); conv.resolvida_em = null; extra = ' · conversa reaberta'; }
+    }
+    toast(`Status: <b>${esc(e ? e.nome : '')}</b>${extra} · Kommo atualizado`, { tipo:'ok' });
     if (window.parent !== window) window.parent.postMessage({ capta:'mudou', o:'etapa' }, '*');
-    if (atual) abrir(atual);
+    carregarLista(); if (atual) abrir(atual);
   } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
+
+// campo de mensagem: começa com 3 linhas e cresce até caber o texto
+function ajustarAltura(el){ if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; }
+document.addEventListener('input', e => { if (e.target && e.target.id === 'txt') ajustarAltura(e.target); });
+
+
+// etiqueta do status do lead, com a cor da etapa
+function tagEtapa(id){
+  const e = (ETAPAS||[]).find(x => x.id === id); if (!e) return '<span class="mini-tag sem">sem etapa</span>';
+  const n = String(e.nome||'').toLowerCase();
+  const cor = e.tipo === 'ganha' ? 'et-ganha' : e.tipo === 'perdida' ? 'et-perdida'
+    : /novo lead/.test(n) ? 'et-novo' : /aula agendada/.test(n) ? 'et-aula'
+    : /qualificado/.test(n) ? 'et-qual' : /matr/.test(n) ? 'et-matr' : /remarketing/.test(n) ? 'et-rem' : 'et-contato';
+  return `<span class="mini-tag ${cor}">${esc(e.nome)}</span>`;
 }
 
 async function enviar() {
@@ -674,7 +727,7 @@ if (!SLUG || !TOKEN) {
   elCont.textContent = '';
   elConvs.innerHTML = '<div class="vazio">Abra esta página pelo painel do seu negócio.</div>';
 } else {
-  carregarLista();
+  carregarEtapas().then(() => carregarLista());
   timer = setInterval(() => { carregarLista(); if (atual) abrir(atual); }, 10000);
   document.addEventListener('visibilitychange', () => {
     clearInterval(timer);
