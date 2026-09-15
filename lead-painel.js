@@ -132,6 +132,8 @@
     const et = (cfg.getEtapas ? cfg.getEtapas() : S.etapas) || S.etapas; const etAtual = et.find(e => e.id === l.etapa_id);
     const ini = (l.nome || '?').trim().split(/\s+/).map(x => x[0]).slice(0,2).join('').toUpperCase();
     const abas = [['conversa','Conversa'],['dados','Dados'],['agendar','Agendar aula']];
+    // Redesenhar (chegou mensagem nova, mudou etapa) não pode engolir o que a pessoa está digitando.
+    const rascunho = (document.getElementById('lp-txt') || {}).value || '';
     document.getElementById('lp').innerHTML = `
       <div class="cab"><div class="av">${esc(ini)}</div>
         <div style="min-width:0"><h3>${esc(l.nome || 'Sem nome')}</h3>
@@ -139,7 +141,7 @@
         <button class="x" onclick="LeadPainel.fechar()" title="Fechar">×</button></div>
       <div class="abas">${abas.map(([k,t]) => `<button class="${S.aba===k?'on':''}" onclick="LeadPainel.aba('${k}')">${t}</button>`).join('')}</div>
       ${S.aba === 'conversa' ? vConversa(l, et) : S.aba === 'dados' ? vDados(l, et) : vAgendar(l)}`;
-    const ta = document.getElementById('lp-txt'); if (ta) { ta.oninput = () => { ta.style.height='auto'; ta.style.height = Math.min(ta.scrollHeight,120)+'px'; if (ta.value === '/') { ta.value=''; rapidas(); } }; ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }; }
+    const ta = document.getElementById('lp-txt'); if (ta && rascunho && !ta.value) { ta.value = rascunho; ta.style.height='auto'; ta.style.height = Math.min(ta.scrollHeight,120)+'px'; } if (ta) { ta.oninput = () => { ta.style.height='auto'; ta.style.height = Math.min(ta.scrollHeight,120)+'px'; if (ta.value === '/') { ta.value=''; rapidas(); } }; ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }; }
     const ms = document.getElementById('lp-msgs'); if (ms) ms.scrollTop = ms.scrollHeight;
   }
   // quem falou: o nome do cliente de um lado, quem respondeu do outro

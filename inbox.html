@@ -403,6 +403,31 @@ async function carregarLista() {
   catch (e) { elCont.textContent = 'Erro'; elConvs.innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
 
+// A atualização automática (10 s) NÃO reconstrói a tela: só troca as mensagens
+// se algo mudou, preserva o que está sendo digitado, a resposta selecionada e
+// a posição do scroll. Recriar o painel inteiro apagava o rascunho e jogava a
+// pessoa para o fim da conversa no meio da leitura.
+let ULTIMA_ASSINATURA = '';
+function assinatura(msgs){ return msgs.map(m => `${m.id}|${m.entrega||''}|${m.transcricao_status||''}|${m.transcricao ? 1 : 0}|${m.midia_url ? 1 : 0}`).join(','); }
+async function atualizarLeve(id) {
+  if (id !== atual) return;
+  const txt = document.getElementById('txt');
+  if (!document.getElementById('fluxo') || document.getElementById('imp-fundo')) return;
+  let dados; try { dados = await api('mensagens', { conversa_id: id }); } catch { return; }
+  if (id !== atual) return;
+  const { mensagens } = dados;
+  const nova = assinatura(mensagens);
+  if (nova === ULTIMA_ASSINATURA) return;
+  ULTIMA_ASSINATURA = nova;
+  const fluxo = document.getElementById('fluxo');
+  const noFim = fluxo.scrollHeight - fluxo.scrollTop - fluxo.clientHeight < 80;
+  const antes = fluxo.scrollHeight, topoAntes = fluxo.scrollTop;
+  fluxo.innerHTML = mensagens.length ? montarFluxo(mensagens) : '<div class="vazio">Sem mensagens nesta conversa.</div>';
+  fluxo.scrollTop = noFim ? fluxo.scrollHeight : topoAntes + (fluxo.scrollHeight - antes);
+  document.getElementById('desce')?.classList.toggle('on', !noFim);
+  carregarMidias();
+  if (txt && document.activeElement !== txt && !txt.value) setTimeout(transcreverPendentes, 400);
+}
 async function abrir(id) {
   document.body.classList.add('chat-aberto');
   { const c = CONVS.find(x => x.id === id); CONV_NOME = (c && ((c.lead && c.lead.nome) || c.nome)) || 'Cliente'; }
@@ -470,6 +495,7 @@ async function abrir(id) {
       </div>`;
 
     const fluxo = document.getElementById('fluxo');
+    ULTIMA_ASSINATURA = assinatura(mensagens);
     fluxo.scrollTop = fluxo.scrollHeight;
     setTimeout(transcreverPendentes, 400);
     fluxo.onscroll = () => { const noFim = fluxo.scrollHeight - fluxo.scrollTop - fluxo.clientHeight < 80;
@@ -798,12 +824,12 @@ if (!SLUG || !TOKEN) {
 } else {
   carregarEtapas().then(() => carregarLista());
   document.addEventListener('click', () => { if (window.CaptaAlerta) CaptaAlerta.pedirPermissao(); }, { once: true });
-  timer = setInterval(() => { carregarLista(); if (atual) abrir(atual); }, 10000);
+  timer = setInterval(() => { carregarLista(); if (atual) atualizarLeve(atual); }, 10000);
   document.addEventListener('visibilitychange', () => {
     clearInterval(timer);
     if (!document.hidden) {
-      carregarLista(); if (atual) abrir(atual);
-      timer = setInterval(() => { carregarLista(); if (atual) abrir(atual); }, 10000);
+      carregarLista(); if (atual) atualizarLeve(atual);
+      timer = setInterval(() => { carregarLista(); if (atual) atualizarLeve(atual); }, 10000);
     }
   });
 }
