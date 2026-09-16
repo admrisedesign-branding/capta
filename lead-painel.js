@@ -390,6 +390,13 @@
         <div class="acs"><button class="btn" onclick="LeadPainel.agendarManual()" ${S.horarios && S.horarios.some(h => h.vagas > 0) ? '' : 'disabled'}>Agendar nesse horário</button></div>
         <div class="liv" style="margin-top:6px">Use quando a família pedir um dia específico. Só aparecem horários com vaga real.</div>
       </div>
+      <div class="sec">Agendamento extra</div>
+      <div class="vaga" style="background:var(--card)">
+        <div class="l2"><div class="campo"><label>Dia</label><input id="lp-x-data" type="date" value="${S.xd || ''}" onchange="LeadPainel.extraCampo('xd',this.value)"></div>
+          <div class="campo"><label>Horário</label><input id="lp-x-hora" type="time" step="900" value="${S.xh || ''}" onchange="LeadPainel.extraCampo('xh',this.value)"></div></div>
+        <div class="acs"><button class="btn" onclick="LeadPainel.agendarExtra()" ${S.xd && S.xh ? '' : 'disabled'}>Agendar extra</button></div>
+        <div class="liv" style="margin-top:6px">Fora do horário comercial, fim de semana ou feriado. Sem turma e sem consumir vaga — entra na agenda como encaixe.</div>
+      </div>
       <div class="aviso-p" style="margin-top:10px;border:0;padding:6px 0;text-align:left">Estoque atualiza sozinho a cada minuto e a cada aula marcada.</div>
       ${historico(l)}</div>`;
   }
@@ -407,6 +414,22 @@
     // mantém a data escolhida visível depois de redesenhar
     const el = document.getElementById('lp-a-data'); if (el) el.value = data;
   }
+  function extraCampo(k, v) { S[k] = v; desenhar(); }
+  // Encaixe fora da grade: qualquer dia e hora, sem turma e sem vaga.
+  async function agendarExtra() {
+    const l = S.lead; if (!l || !S.xd || !S.xh) return;
+    const crianca = (document.getElementById('lp-a-cri') || {}).value?.trim() || l.crianca || '';
+    const idade = (document.getElementById('lp-a-id') || {}).value || l.idade || null;
+    if (!crianca) return say('Informe o nome da criança.', { tipo:'erro' });
+    try {
+      await api('agendar', { lead_id: l.id, data: S.xd, hora_inicio: S.xh, extra: true, crianca_nome: crianca, crianca_idade: idade });
+      S.xd = ''; S.xh = '';
+      say('Aula extra agendada · lead em Aula agendada · conversa encerrada', { tipo:'ok' });
+      S.info = await api('lead', { lead_id: l.id }); S.agenda = null; desenhar(); carregarAgenda();
+      if (window.parent !== window) window.parent.postMessage({ capta:'mudou', o:'agenda' }, '*');
+    } catch (e) { say(e.message, { tipo:'erro' }); }
+  }
+
   async function agendarManual() {
     const data = (document.getElementById('lp-a-data') || {}).value;
     const turma = (document.getElementById('lp-a-hora') || {}).value;
@@ -450,5 +473,5 @@
       S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
-  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, agendarManual, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
+  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, agendarManual, agendarExtra, extraCampo, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
 })();

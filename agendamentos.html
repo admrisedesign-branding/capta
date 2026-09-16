@@ -800,7 +800,7 @@ function vSemana(){
     const itens = [...(TIPO === 'experimental' ? [] : ts).map(t => ({ h: hN(t.hora_inicio), html: (() => { const als = alunosDa(t), v = vagasHora(d, hN(t.hora_inicio)); return `<div class="mini"><b>${hh(t.hora_inicio)}–${hh(t.hora_fim)} · ${als.length} aluno${als.length===1?'':'s'}</b><span class="v ${v&&v.n<=0?'z':''}">${v ? (v.n<=0?'sem kit p/ experimental':v.n+' kit'+(v.n>1?'s':'')+' livre'+(v.n>1?'s':'')+' p/ experimental') : '—'}</span></div>`; })() })),
       ...expDo(d).map(e => ({ h: hN(e.hora_inicio) + 0.5, html: ehRep(e)
         ? `<div class="mini rep" onclick="abrirAluno('${e.aluno_id}')"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||'')}</b>reposição</div>`
-        : `<div class="mini exp" draggable="true" ondragstart="dragExp(event,'${e.id}')" onclick="LeadPainel.abrir('${e.lead_id}','agendar')"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||leadDe(e).nome||'')}</b>experimental${e.crianca_idade?' · '+e.crianca_idade+' anos':''}</div>` }))].sort((a,b)=>a.h-b.h);
+        : `<div class="mini exp" draggable="true" ondragstart="dragExp(event,'${e.id}')" onclick="LeadPainel.abrir('${e.lead_id}','agendar')"><b>${hh(e.hora_inicio)} ${esc(e.crianca_nome||leadDe(e).nome||'')}</b>${e.extra?'extra · ':''}experimental${e.crianca_idade?' · '+e.crianca_idade+' anos':''}</div>` }))].sort((a,b)=>a.h-b.h);
     return `<div class="col ${d===hoje?'hoje':''}" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',null)"><h4 style="cursor:pointer" onclick="irDia('${d}')">${DIAS3[dow(d)]} ${new Date(d+'T12:00').getDate()}</h4>${itens.map(x=>x.html).join('') || '<div class="interv">sem turmas neste dia</div>'}</div>`; }).join('')}</div></div>`;
 }
 
@@ -899,7 +899,7 @@ async function remarcar(id, turmaId, data){ return acao('remarcar', async () => 
 // ---- novo agendamento: busca o lead, criança, escolhe a vaga ----
 let NA = { leads: null, lead: null, vagas: null, vaga: null, q: '' };
 async function novoAgendamento(data, turmaId, hora){
-  NA = { leads: null, lead: null, vagas: null, vaga: null, q: '', fixo: data ? { data, turma_id: turmaId, hora } : null }; desenharNA();
+  NA = { leads: null, lead: null, vagas: null, vaga: null, q: '', extra: false, xd: '', xh: '', fixo: data ? { data, turma_id: turmaId, hora } : null }; desenharNA();
   try { const [f, ag] = await Promise.all([api('funil'), api('agenda', { dias: 30 })]); NA.leads = f.leads || []; NA.vagas = (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0);
     if (NA.fixo) NA.vaga = NA.vagas.find(h => h.data === NA.fixo.data && hN(h.hora_inicio) === NA.fixo.hora) || null; }
   catch(e){ NA.leads = []; NA.vagas = []; toast(e.message, { tipo:'erro' }); }
@@ -919,14 +919,22 @@ function desenharNA(){
     ${NA.fixo && NA.vaga ? `<div class="campo"><label>Horário escolhido</label>
       <div class="vg on" style="cursor:default"><b>${DIAS[dow(NA.vaga.data)]} ${fmt(NA.vaga.data,{day:'2-digit',month:'2-digit'})} · ${hh(NA.vaga.hora_inicio)}</b><small>${NA.vaga.vagas} kit${NA.vaga.vagas>1?'s':''} First livre${NA.vaga.vagas>1?'s':''}</small></div>
       <button class="btn g sm" style="margin-top:8px" onclick="NA.fixo=null;NA.vaga=null;desenharNA()">escolher outro horário</button></div>`
-    : `<div class="campo"><label>Vaga — ofereça duas opções</label>${NA.vagas === null ? '<p>Buscando vagas…</p>' : `<div class="vagas3">${vg('Manhã','manha')}${vg('Tarde','tarde')}${vg('Sábado','sab')}</div>`}</div>`}
-    <div class="fim"><button class="btn g" onclick="fecharModal()">Cancelar</button><button class="btn" onclick="confirmarNA()" ${NA.lead && NA.vaga ? '' : 'disabled'}>Agendar</button></div></div></div>`;
+    : `<div class="campo"><label>Vaga — ofereça duas opções</label>${NA.vagas === null ? '<p>Buscando vagas…</p>' : `<div class="vagas3">${vg('Manhã','manha')}${vg('Tarde','tarde')}${vg('Sábado','sab')}</div>`}
+      <button class="btn g sm" style="margin-top:8px" onclick="NA.extra=!NA.extra;NA.vaga=null;desenharNA()">${NA.extra ? '← voltar para as vagas' : '+ agendamento extra (fora do horário)'}</button></div>
+      ${NA.extra ? `<div class="campo"><label>Agendamento extra — qualquer dia e horário</label>
+        <div class="l2"><input type="date" id="na-xd" value="${esc(NA.xd||'')}" onchange="NA.xd=this.value">
+        <input type="time" id="na-xh" step="900" value="${esc(NA.xh||'')}" onchange="NA.xh=this.value"></div>
+        <small style="color:var(--muted);display:block;margin-top:6px">Sem turma e sem contar vaga: use para encaixe fora do horário comercial, fim de semana ou feriado. A aula dura 1 hora.</small></div>` : ''}`}
+    <div class="fim"><button class="btn g" onclick="fecharModal()">Cancelar</button><button class="btn" onclick="confirmarNA()" ${NA.lead && (NA.vaga || (NA.extra && NA.xd && NA.xh)) ? '' : 'disabled'}>Agendar${NA.extra ? ' extra' : ''}</button></div></div></div>`;
   document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
 }
 async function confirmarNA(){ return acao('confirmarNA', async () => { const aviso = toast('<span class="mini-pt"></span>agendando…', { ms: 60000 });
   const crianca = document.getElementById('na-cri').value.trim(), idade = document.getElementById('na-id').value;
   if (!crianca) return toast('Informe o nome da criança.', { tipo:'erro' });
-  try { await api('agendar', { turma_id: NA.vaga.turma_id || null, data: NA.vaga.data, hora_inicio: NA.vaga.hora_inicio, crianca_nome: crianca, crianca_idade: idade || null, lead_id: NA.lead.id }); fecharModal(); toast(`<b>${esc(crianca)}</b> agendada · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' }); aviso.remove(); await carregar(); if (AULA_ABERTA) pintarAula(); }
+  const pedido = NA.extra && NA.xd && NA.xh
+    ? { data: NA.xd, hora_inicio: NA.xh, extra: true, crianca_nome: crianca, crianca_idade: idade || null, lead_id: NA.lead.id }
+    : { turma_id: NA.vaga.turma_id || null, data: NA.vaga.data, hora_inicio: NA.vaga.hora_inicio, crianca_nome: crianca, crianca_idade: idade || null, lead_id: NA.lead.id };
+  try { await api('agendar', pedido); fecharModal(); toast(`<b>${esc(crianca)}</b> agendada · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' }); aviso.remove(); await carregar(); if (AULA_ABERTA) pintarAula(); }
   catch(e){ aviso.remove(); toast(e.message, { tipo:'erro' }); }
  }, 'agendando…'); }
 
