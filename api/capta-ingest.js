@@ -6,6 +6,16 @@
 //   nome, contato, origem,
 //   respostas: [ { texto, label, pontos } ],
 //   extra: { bairro, cidade, ... }     // vira anotação no lead
+//   somente_consentimento: true,        // LGPD: só registra o aceite, NÃO cria lead
+//                                      //   (o site da My Robot usa isso; o lead chega pelo espelho do Kommo
+//                                      //    e o banco liga os dois pelo telefone)
+//   consentimento: {                   // LGPD (opcional, mas recomendado)
+//     contato: true,                   //   autorizou contato (obrigatório pra gravar)
+//     marketing: false,                //   opt-in de promoções
+//     imagem: false, dados_crianca: false,
+//     responsavel: true,               //   declarou ser o responsável (art. 14 §5)
+//     versao: 'site-v1', texto: '...'  //   texto mostrado, pra prova
+//   }
 // }
 //
 // A nota (0–100) e a temperatura NÃO vêm do site: quem calcula é o gatilho
@@ -52,7 +62,7 @@ module.exports = async function handler(req, res) {
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
-  const { slug, token, nome, contato, origem, respostas, extra } = body || {};
+  const { slug, token, nome, contato, origem, respostas, extra, consentimento, somente_consentimento } = body || {};
   // freio de abuso: campos longos e payload gigante são recusados antes de tocar no banco
   const tam = JSON.stringify(body || {}).length;
   if (tam > 20000) return res.status(413).json({ error: 'Envio muito grande.' });
@@ -71,6 +81,23 @@ module.exports = async function handler(req, res) {
     if (!t || !t.ativo) return res.status(404).json({ error: 'Negócio não encontrado ou inativo.' });
     if (!t.ingest_token || t.ingest_token !== token) {
       return res.status(403).json({ error: 'Token inválido.' });
+    }
+
+    // 1b) modo "só consentimento": grava o aceite e sai, sem criar lead
+    if (somente_consentimento) {
+      if (!consentimento || typeof consentimento !== 'object' || !consentimento.contato)
+        return res.status(400).json({ error: 'consentimento.contato é obrigatório.' });
+      const fone = String(contato || '').replace(/\D/g, '').slice(0, 20);
+      if (fone.length < 10) return res.status(400).json({ error: 'contato (WhatsApp com DDD) é obrigatório.' });
+      let leadId = null;
+      try {
+        const ach = await sb(`capta_leads?tenant_id=eq.${t.id}&contato=like.*${fone.slice(-8)}&select=id&order=criado_em.desc&limit=1`);
+        if (ach && ach[0]) leadId = ach[0].id;
+      } catch (e) {}
+      const ids = await gravarConsentimento(req, t.id, leadId, {
+        nome: String(nome || '').trim().slice(0, 120) || null, contato: fone, origem: String(origem || 'site').slice(0, 60),
+      }, consentimento);
+      return res.status(200).json({ ok: true, lead_id: leadId, ids });
     }
 
     // 2) perguntas cadastradas — servem para pontuar E para escolher o formulário
@@ -183,6 +210,19 @@ module.exports = async function handler(req, res) {
     // Se o gatilho de unificação fundiu este lead em outro (mesmo telefone
     // nos últimos 30 dias), o banco não devolve linha nova — e isso é sucesso.
     const fundido = !novo;
+
+    // 6) consentimento LGPD — uma linha por finalidade; nunca bloqueia o lead
+    if (consentimento && typeof consentimento === 'object' && consentimento.contato) {
+      try {
+        let leadId = novo && novo.id;
+        if (!leadId && lead.contato) {
+          const fim = lead.contato.slice(-8);
+          const ach = await sb(`capta_leads?tenant_id=eq.${t.id}&contato=like.*${fim}&select=id&order=criado_em.desc&limit=1`);
+          if (ach && ach[0]) leadId = ach[0].id;
+        }
+        await gravarConsentimento(req, t.id, leadId || null, lead, consentimento);
+      } catch (e) { /* consentimento não pode derrubar a gravação do lead */ }
+    }
     return res.status(200).json({
       ok: true,
       merged: fundido,
@@ -194,3 +234,34 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 };
+
+// ─── LGPD ─────────────────────────────────────────────────────────────────────
+const CANAIS = ['site', 'whatsapp-bot', 'evento', 'matricula', 'tablet', 'manual'];
+const FINS   = ['marketing', 'imagem', 'dados_crianca', 'pesquisa'];
+async function gravarConsentimento(req, tenantId, leadId, lead, c) {
+  const canal = CANAIS.includes(c.canal) ? c.canal : (lead.origem === 'evento' ? 'evento' : 'site');
+  const base = {
+    tenant_id: tenantId,
+    lead_id: leadId,
+    canal,
+    responsavel_nome: lead.nome || null,
+    responsavel_telefone: lead.contato || null,
+    declarou_responsavel: !!c.responsavel,
+    texto_versao: String(c.versao || 'api-v1').slice(0, 40),
+    registrado_por: c.registrado_por ? String(c.registrado_por).slice(0, 120) : null,
+    evidencia: {
+      texto: String(c.texto || '').slice(0, 1000),
+      url: c.url ? String(c.url).slice(0, 300) : null,
+      ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || null,
+      ua: String(req.headers['user-agent'] || '').slice(0, 300),
+      origem: lead.origem || null,
+    },
+  };
+  const fins = ['contato', ...FINS.filter(f => c[f])];
+  const created = await sb('capta_consentimentos', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(fins.map(finalidade => ({ ...base, finalidade }))),
+  });
+  return (created || []).map(r => r.id);
+}
