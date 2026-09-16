@@ -149,6 +149,16 @@ async function processar(canalId, payload) {
     catch (e) { console.error('[midia]', e.message); }
   }
 
+  // Conversa encerrada (aula marcada, matrícula, perdido) em que o lead
+  // volta a escrever: reabre sozinha, senão a mensagem nova ficaria escondida
+  // na aba "Resolvidas" e ninguém responderia.
+  if (!evento.de_mim && conversa.resolvida_em) {
+    await sb(`capta_conversas?id=eq.${conversa.id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ resolvida_em: null })
+    }).catch(() => null);
+  }
+
   // Resposta do lead a um lembrete: 1 confirma, 2 pede remarcação.
   if (!evento.de_mim && evento.tipo === 'texto' && conversa.lead_id) {
     try {
@@ -240,7 +250,7 @@ async function acharOuCriarConversa(tenant, canalId, evento) {
   // acha pelo telefone OU pelo @lid (o WhatsApp pode mandar um ou outro)
   const filtro = evento.lid ? `or=(telefone.eq.${fone},lid.eq.${evento.lid},telefone.eq.55${evento.lid})` : `telefone=eq.${fone}`;
   const achadas = await sb(
-    `capta_conversas?select=id,lead_id,nome,foto_url,lid,telefone&tenant_id=eq.${tenant}&${filtro}&limit=1`
+    `capta_conversas?select=id,lead_id,nome,foto_url,lid,telefone,resolvida_em&tenant_id=eq.${tenant}&${filtro}&limit=1`
   );
   if (achadas?.[0]) {
     const c = achadas[0]; const patch = {};
@@ -262,7 +272,7 @@ async function acharOuCriarConversa(tenant, canalId, evento) {
     if (l && l.contato) {
       const foneReal = String(l.contato).replace(/\D/g, '');
       const foneDDI = foneReal.startsWith('55') ? foneReal : `55${foneReal}`;
-      const cs = await sb(`capta_conversas?select=id,lead_id,nome,foto_url,lid,telefone&tenant_id=eq.${tenant}&telefone=eq.${foneDDI}&limit=1`).catch(() => []);
+      const cs = await sb(`capta_conversas?select=id,lead_id,nome,foto_url,lid,telefone,resolvida_em&tenant_id=eq.${tenant}&telefone=eq.${foneDDI}&limit=1`).catch(() => []);
       if (cs?.[0]) {
         const c = cs[0]; const patch = { lid: evento.lid };
         if (!c.lead_id) patch.lead_id = l.id;

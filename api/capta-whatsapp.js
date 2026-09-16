@@ -420,12 +420,15 @@ async function acaoMensagens(tenant, body, res) {
   // importado) mostrava as 200 primeiras e engolia a mensagem recém-enviada.
   if (Array.isArray(msgs)) msgs.reverse();
 
-  // abrir não conta como atendido: as não lidas só zeram quando alguém responde
-  if (false && conv[0].nao_lidas > 0) {
+  // Abrir a conversa zera o balão de não lidas — quem abriu, leu.
+  // "sem resposta" (aguardando_desde) continua de pé até alguém responder
+  // ou marcar como respondida: ler não é atender.
+  if (conv[0].nao_lidas > 0) {
     await sb(`capta_conversas?id=eq.${id}`, {
       method: 'PATCH', headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ nao_lidas: 0 })
-    });
+    }).catch(() => null);
+    conv[0].nao_lidas = 0;
   }
 
   return res.status(200).json({ conversa: conv[0], mensagens: msgs || [] });
@@ -636,6 +639,16 @@ async function acaoAgendar(tenant, body, res) {
       hIni = String(n).padStart(2, '0') + ':00:00';
       hFim = String(n + 1).padStart(2, '0') + ':00:00';
     }
+  } else if (body.extra) {
+    // Agendamento extra: fora do horário comercial, fim de semana, feriado.
+    // Não depende de turma nem de vaga aberta e aceita minutos (19:30).
+    const [hh0, mm0] = String(body.hora_inicio).split(':');
+    const ini = Number(hh0) * 60 + Number(mm0 || 0);
+    if (!(ini >= 0 && ini < 24 * 60)) return res.status(400).json({ erro: 'Horário inválido.' });
+    const dur = Number(body.duracao_min) > 0 ? Number(body.duracao_min) : 60;
+    const fim = Math.min(ini + dur, 24 * 60 - 1);
+    const doisP = t => `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}:00`;
+    hIni = doisP(ini); hFim = doisP(fim);
   } else {
     const n = Number(String(body.hora_inicio).slice(0, 2));
     hIni = String(n).padStart(2, '0') + ':00:00';
@@ -651,8 +664,24 @@ async function acaoAgendar(tenant, body, res) {
         crianca_nome: crianca_nome || null,
         crianca_idade: crianca_idade || null,
         status: 'agendado',
+        // a coluna "extra" vem do sql-agendamento-extra.sql; sem ela, a
+        // gravação abaixo tenta de novo sem o campo e o agendamento entra igual
+        ...(body.extra ? { extra: true } : {}),
         criado_por: body.usuario_email || 'painel'
       })
+    }).catch(async err => {
+      if (body.extra && /column .*extra|extra.* does not exist|PGRST204/i.test(String(err.message))) {
+        return await sb('capta_agendamentos', {
+          method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({
+            tenant_id: tenant.id, lead_id: leadId, turma_id: null, data,
+            hora_inicio: hIni, hora_fim: hFim,
+            crianca_nome: crianca_nome || null, crianca_idade: crianca_idade || null,
+            status: 'agendado', criado_por: body.usuario_email || 'painel'
+          })
+        });
+      }
+      throw err;
     });
 
     // Move o lead para a etapa de aula agendada, se ela existir — e leva pro Kommo.
@@ -664,6 +693,12 @@ async function acaoAgendar(tenant, body, res) {
         await moverLead(tenant.id, leadId, e[0].id, null);
         await empurrarKommo(tenant.id, leadId, e[0].id, null).catch(() => null);
       }
+      // Aula marcada = assunto resolvido: a conversa sai da fila de abertas
+      // e para de contar como "sem resposta". Volta sozinha se o lead escrever.
+      await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=eq.${leadId}&resolvida_em=is.null`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ resolvida_em: new Date().toISOString(), nao_lidas: 0, aguardando_desde: null })
+      }).catch(() => null);
       const tt = turma_id ? await sb(`capta_turmas?id=eq.${turma_id}&select=dia_semana&limit=1`).catch(() => []) : [];
       const campos = { data_aula: `${data}T${String(hIni).slice(0,5)}:00-04:00`, bloco: blocoKommo(tt?.[0]?.dia_semana ?? new Date(data + 'T12:00:00').getDay(), hIni, hFim), crianca: crianca_nome || null, idade: crianca_idade ? Number(crianca_idade) : null };
       await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos) }).catch(() => null);
@@ -1065,8 +1100,10 @@ async function acaoConversaAtualizar(tenant, body, res) {
   }
   const patch = {};
   if (body.atendente !== undefined) patch.atendente = body.atendente || null;
-  if (body.resolvida === true) patch.resolvida_em = new Date().toISOString();
-  if (body.resolvida === false) patch.resolvida_em = null;
+  // aceita "resolvida" e "resolver" — o painel já mandava o segundo nome
+  const fechar = body.resolvida !== undefined ? body.resolvida : body.resolver;
+  if (fechar === true) { patch.resolvida_em = new Date().toISOString(); patch.nao_lidas = 0; patch.aguardando_desde = null; }
+  if (fechar === false) patch.resolvida_em = null;
   if (body.lida) patch.nao_lidas = 0;
   if (!Object.keys(patch).length) return res.status(400).json({ erro: 'Nada para atualizar.' });
   await sb(`capta_conversas?id=eq.${id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
@@ -1577,7 +1614,7 @@ async function montarResumo(tenantId) {
     sb(`capta_leads?tenant_id=eq.${tenantId}&select=id,nome,temperatura,etapa_id,etapa_em,criado_em,kommo_criado_em,ganho_em,valor,data_aula&limit=2000`).catch(() => []),
     sb(`capta_etapas?tenant_id=eq.${tenantId}&select=id,nome`).catch(() => []),
     sb(`capta_alunos?tenant_id=eq.${tenantId}&status=eq.ativo&select=id`).catch(() => []),
-    sb(`capta_conversas?tenant_id=eq.${tenantId}&nao_lidas=gt.0&select=id`).catch(() => [])
+    sb(`capta_conversas?tenant_id=eq.${tenantId}&nao_lidas=gt.0&resolvida_em=is.null&select=id`).catch(() => [])
   ]);
   const nomeEt = id => (etapas.find(e => e.id === id) || {}).nome || '';
   const dt = l => l.kommo_criado_em || l.criado_em || '';
@@ -2258,6 +2295,26 @@ async function moverLead(tenantId, leadId, etapaId, motivo) {
   await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}`, {
     method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos)
   });
+  await fecharConversaPorEtapa(tenantId, leadId, etapaId);
+}
+
+// Etapas que encerram o atendimento: matriculado, aula marcada, perdido,
+// desistiu. A conversa sai das abertas e para de contar como "sem resposta";
+// se o lead escrever de novo, o webhook reabre sozinho.
+const ETAPA_ENCERRA = /aula agendada|matr[ií]cul|aluno ativo|perdido|remarketing|desist|trancad/i;
+async function fecharConversaPorEtapa(tenantId, leadId, etapaId) {
+  if (!leadId || !etapaId) return;
+  try {
+    const e = (await sb(`capta_etapas?id=eq.${etapaId}&tenant_id=eq.${tenantId}&select=nome&limit=1`))?.[0];
+    if (!e) return;
+    const fecha = ETAPA_ENCERRA.test(e.nome || '');
+    await sb(`capta_conversas?tenant_id=eq.${tenantId}&lead_id=eq.${leadId}${fecha ? '&resolvida_em=is.null' : '&resolvida_em=not.is.null'}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify(fecha
+        ? { resolvida_em: new Date().toISOString(), nao_lidas: 0, aguardando_desde: null }
+        : { resolvida_em: null })
+    });
+  } catch (err) { console.error('[fecharConversaPorEtapa]', err.message); }
 }
 
 // Mensagens de erro do Postgres não servem para o cliente ler.

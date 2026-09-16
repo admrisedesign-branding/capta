@@ -232,6 +232,24 @@ async function espelhar(leadId) {
       }
     } catch (e) { /* não bloqueia o espelho */ }
   }
+  // Etapa que encerra o atendimento (aula agendada, matrícula, aluno ativo,
+  // perdido): a conversa sai da fila de abertas e para de contar como sem
+  // resposta. Se a família escrever de novo, o webhook reabre sozinho.
+  try {
+    const fecha = /aula agendada|matr[ií]cul|aluno ativo|perdido|remarketing|desist|trancad/i.test(linha.etapa_nome || '');
+    const lr = await fetch(`${SB_URL}/rest/v1/capta_leads?tenant_id=eq.${linha.tenant_id}&kommo_lead_id=eq.${lead.id}&select=id&limit=1`, { headers: H_SB }).then(x => x.json());
+    const leadId = lr?.[0]?.id;
+    if (leadId) {
+      const filtro = `tenant_id=eq.${linha.tenant_id}&lead_id=eq.${leadId}&resolvida_em=${fecha ? 'is.null' : 'not.is.null'}`;
+      await fetch(`${SB_URL}/rest/v1/capta_conversas?${filtro}`, {
+        method: 'PATCH', headers: { ...H_SB, Prefer: 'return=minimal' },
+        body: JSON.stringify(fecha
+          ? { resolvida_em: new Date().toISOString(), nao_lidas: 0, aguardando_desde: null }
+          : { resolvida_em: null })
+      });
+    }
+  } catch (e) { /* não bloqueia o espelho */ }
+
   // LGPD: campo "Consentimento" = Sim no Kommo → registra o aceite do bot (uma vez só)
   try { await consentimentoDoBot(linha, lead); } catch (e) { console.error('consentimento bot', e.message); }
   // relê o que ficou salvo (gatilhos podem alterar score/temperatura/status)
