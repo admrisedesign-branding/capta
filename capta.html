@@ -52,6 +52,10 @@ a.btn{display:block;text-align:center;text-decoration:none;box-sizing:border-box
 .btn.ghost{background:none;color:var(--dr);border:1px solid currentColor;box-shadow:none;margin-top:10px;opacity:.9}
 .err{color:#ff8a5c;font-size:13px;font-weight:600;min-height:18px;margin-top:6px}
 .foot{text-align:center;font-size:11px;color:var(--dr);margin-top:24px}
+.ck{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.45;color:var(--dr);margin-top:12px;cursor:pointer}
+.ck input{margin-top:3px;width:18px;height:18px;flex:none;accent-color:var(--or)}
+.ck.ob{color:inherit;font-weight:600}
+.ck a{color:var(--or-deep);font-weight:600}
 .center{margin:auto 0;text-align:center}
 .spin{width:46px;height:46px;border:4px solid var(--surface2);border-top-color:var(--or);border-radius:50%;margin:0 auto 18px;animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -95,7 +99,10 @@ const params = new URLSearchParams(location.search);
 const SLUG   = params.get('t');
 const FORMID = params.get('f') || null;
 const ORIGEM = params.get('o') || null;
-const state  = { tenant:null, form:null, perguntas:[], nome:'', contato:'', email:'', ans:{}, idx:0 };
+const state  = { tenant:null, form:null, perguntas:[], nome:'', contato:'', email:'', ans:{}, idx:0, consent:null };
+// LGPD: texto padrão do aceite (o tenant pode ter o dele em capta_tenants.consentimento_texto)
+const CONSENT_VERSAO = 'site-v1';
+const CONSENT_PADRAO = 'Autorizo {negocio} a guardar meu nome e meu WhatsApp para entrar em contato sobre o que pedi aqui. Os dados ficam só com o negócio e posso pedir para apagar quando quiser.';
 
 init();
 
@@ -103,7 +110,7 @@ async function init(){
   if(!SLUG){ return fatal('Link sem identificação do negócio.'); }
   loading('Carregando…');
   const { data:t } = await sb.from('capta_tenants')
-    .select('id,nome,whatsapp,msg_template,cor,headline,plano').eq('slug',SLUG).single();
+    .select('id,nome,whatsapp,msg_template,cor,headline,plano,consentimento_texto,politica_url').eq('slug',SLUG).single();
   if(!t){ return fatal('Negócio não encontrado ou inativo.'); }
   // Resolve o formulário (multi-formulário): ?f=pubid, senão o principal.
   // "Principal" = o mais antigo ativo QUE TENHA PERGUNTAS. Sem essa condição,
@@ -153,6 +160,8 @@ function screenStart(){
       <label class="f"><span>Seu nome</span><input id="i-nome" autocomplete="name" placeholder="Como te chamam"></label>
       <label class="f"${state.form&&state.form.pede_email?'':' style="margin-bottom:4px"'}><span>Seu WhatsApp</span><input id="i-tel" inputmode="tel" autocomplete="tel" placeholder="(92) 9 ____-____"></label>
       ${state.form&&state.form.pede_email ? '<label class="f" style="margin-bottom:4px"><span>Seu e-mail</span><input id="i-email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com"></label>' : ''}
+      <label class="ck ob"><input type="checkbox" id="i-consent"><span>${esc(consentTexto())}${state.tenant.politica_url ? ` <a href="${esc(state.tenant.politica_url)}" target="_blank" rel="noopener">Como cuidamos dos seus dados</a>` : ''}</span></label>
+      <label class="ck"><input type="checkbox" id="i-mkt"><span>Quero receber novidades e promoções de ${esc(state.tenant.nome)} no WhatsApp.</span></label>
     </div>
     <div class="err" id="err"></div>
     <button class="btn" id="go">Começar →</button>
@@ -161,6 +170,8 @@ function screenStart(){
     const nome = v('i-nome'), tel = v('i-tel');
     if(nome.length < 2) return setErr('Digite seu nome.');
     if(tel.replace(/\D/g,'').length < 10) return setErr('Digite um WhatsApp válido com DDD.');
+    if(!document.getElementById('i-consent').checked) return setErr('Para continuar, marque a autorização de contato.');
+    state.consent = { contato:true, marketing: document.getElementById('i-mkt').checked, texto: consentTexto() };
     if(state.form && state.form.pede_email){
       const em = v('i-email');
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return setErr('Digite um e-mail válido.');
@@ -276,6 +287,9 @@ async function finish(){
     return;
   }
 
+  // consentimento LGPD (best effort; o banco liga ao lead pelo telefone)
+  salvarConsentimento().catch(() => {});
+
   // notificação por e-mail (best effort, não bloqueia)
   fetch(NOTIFY_API, { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ tenant_id: state.tenant.id, contato: state.contato }) }).catch(() => {});
@@ -314,6 +328,24 @@ function screenDone(url){
 
 function loading(txt){ app.innerHTML = `<div class="center"><div class="spin"></div><p class="sub" style="margin:0">${txt}</p></div>`; }
 function fatal(txt){ app.innerHTML = `<div class="center"><p class="q">Ops.</p><p class="sub">${txt}</p></div>`; }
+function consentTexto(){
+  return (state.tenant.consentimento_texto || CONSENT_PADRAO).replace(/\{negocio\}/g, state.tenant.nome);
+}
+async function salvarConsentimento(){
+  if(!state.consent) return;
+  const base = {
+    tenant_id: state.tenant.id,
+    canal: 'site',
+    responsavel_nome: state.nome,
+    responsavel_telefone: state.contato.replace(/\D/g,''),
+    declarou_responsavel: true,
+    texto_versao: CONSENT_VERSAO,
+    evidencia: { texto: state.consent.texto, ua: navigator.userAgent, url: location.href, formulario_id: state.form ? state.form.id : null }
+  };
+  const rows = [{ ...base, finalidade:'contato' }];
+  if(state.consent.marketing) rows.push({ ...base, finalidade:'marketing' });
+  await sb.from('capta_consentimentos').insert(rows);
+}
 function v(id){ return document.getElementById(id).value.trim(); }
 function setErr(t){ document.getElementById('err').textContent = t; }
 function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
