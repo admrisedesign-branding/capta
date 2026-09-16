@@ -77,6 +77,12 @@
   const FONTES = ['anúncio','instagram','google busca','google business','evento','direto','indicação'];
   const PORTAS = ['site','whatsapp-bot','whatsapp-direto','evento','my robot'];
   const ATEND = ['Rafael','Bento','RISE'];
+  let EQUIPE = null;   // nomes vindos de Ajustes; ATEND é só a reserva
+  function nomesEquipe(){ return [...new Set([...(EQUIPE || ATEND), EU()].filter(Boolean))]; }
+  async function carregarEquipe(){
+    try { const r = await api('equipe'); const n = (r.equipe || []).filter(u => u.ativo !== false).map(u => u.nome).filter(Boolean); if (n.length) { EQUIPE = n; desenhar(); } }
+    catch (e) {}
+  }
   const EU = () => (window.CaptaUser && CaptaUser.nome()) || '';
   const DIAS_N = ['dom','seg','ter','qua','qui','sex','sáb'];
   function hojeLocal(){ const d = new Date(Date.now() - 4*3600*1000); return d.toISOString().slice(0,10); }
@@ -119,6 +125,7 @@
     const l = cfg.getLead ? cfg.getLead(id) : null; if (!l) return;
     S = { ...S, lead: l, aba: aba || 'conversa', info: null, agenda: null, idx: { manha:0, tarde:0, sab:0 } };
     document.getElementById('lp').classList.add('aberto'); document.getElementById('lp-scrim').classList.add('on');
+    if (!EQUIPE) carregarEquipe();
     await etapas(); desenhar();
     try { S.info = await api('lead', { lead_id: id }); } catch (e) { S.info = { erro: e.message }; }
     desenhar(); if (S.aba === 'agendar') carregarAgenda();
@@ -163,8 +170,12 @@
         ${atual ? `<span class="dica-etapa">${esc(AJUDA_ETAPA[String(atual.nome||'').toLowerCase()] || '')}</span>` : ''}
       </div>
       <div class="campo-inline"><label>Quem atende</label>
-        <div class="at-box">${l.atendente ? tagPessoa(l.atendente) : '<span class="sem-dono">sem dono</span>'}
-          ${EU() && l.atendente !== EU() ? `<button class="bt-assumir" onclick="LeadPainel.assumir()">assumir</button>` : ''}
+        <div class="at-box">
+          <select onchange="LeadPainel.trocarAtendente(this.value, this)" title="Dono do lead. Trocar aqui muda também no card do Kommo.">
+            ${nomesEquipe().map(a => `<option value="${esc(a)}" ${l.atendente===a?'selected':''}>${esc(a)}</option>`).join('')}
+            <option value="" ${!l.atendente?'selected':''}>— sem dono —</option>
+          </select>
+          <button class="bt-assumir" onclick="LeadPainel.verHistoricoAtendente()" title="Quem já cuidou deste lead">histórico</button>
         </div>
       </div>
     </div>`;
@@ -233,6 +244,46 @@
       S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); say('Enviado', { tipo:'ok', ms:1500 }); }
     catch (e) { say(e.message, { tipo:'erro' }); btn.disabled = false; }
   }
+  // Trocar o dono do lead pede confirmação: muda no Capta e no card do Kommo,
+  // e fica registrado quem fez a troca.
+  async function trocarAtendente(quem, sel) {
+    const l = S.lead; if (!l) return;
+    const antes = l.atendente || '';
+    if (quem === antes) return;
+    const eu = EU() || 'você';
+    const alvo = quem || 'sem dono';
+    const ok = confirm(
+      `Passar ${l.nome || 'este lead'} de ${antes || 'sem dono'} para ${alvo}?\n\n` +
+      `O dono do lead passa a ser ${alvo}, no Capta e no card do Kommo.\n` +
+      `A mudança fica registrada como feita por ${eu}.`
+    );
+    if (!ok) { if (sel) sel.value = antes; return; }
+    try {
+      const conv = S.info?.conversa;
+      if (conv) await api('conversa_atualizar', { conversa_id: conv.id, atendente: quem, por_nome: eu });
+      else await api('campos', { lead_id: l.id, atendente: quem || '' });   // lead ainda sem conversa
+      l.atendente = quem || null; if (conv) conv.atendente = quem || null;
+      desenhar();
+      say(quem ? `Agora quem atende é ${esc(quem)} · dono do lead atualizado` : 'Lead sem dono', { tipo:'ok' });
+      if (window.parent !== window) window.parent.postMessage({ capta:'mudou', o:'atendente' }, '*');
+    } catch (e) { if (sel) sel.value = antes; say(e.message, { tipo:'erro' }); }
+  }
+  async function verHistoricoAtendente() {
+    const l = S.lead; if (!l) return;
+    try {
+      const r = await api('atendente_historico', { lead_id: l.id });
+      const h = r.historico || [];
+      const linhas = h.length
+        ? h.map(x => `<div style="padding:8px 0;border-bottom:1px solid #F0F2F7"><b style="font-size:13px;display:block">${esc(x.de || 'sem dono')} → ${esc(x.para || 'sem dono')}</b><small style="color:#697089;font-size:11.5px">${new Date(x.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · por ${esc(x.por_nome || 'alguém do painel')}</small></div>`).join('')
+        : '<small style="color:#697089">Ninguém trocou o dono deste lead ainda.</small>';
+      const box = document.createElement('div'); box.id = 'lp-hist';
+      box.style.cssText = 'position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:95';
+      box.innerHTML = `<div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:420px;font-family:inherit"><h3 style="font-size:16px;font-weight:700;margin:0 0 10px">Quem já atendeu</h3><div style="max-height:320px;overflow-y:auto">${linhas}</div><div style="display:flex;justify-content:flex-end;margin-top:16px"><button style="border:1px solid #E9ECF3;background:#fff;color:#697089;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="document.getElementById('lp-hist').remove()">Fechar</button></div></div>`;
+      document.body.appendChild(box);
+      box.onclick = e => { if (e.target.id === 'lp-hist') box.remove(); };
+    } catch (e) { say(e.message, { tipo:'erro' }); }
+  }
+
   async function atribuir(quem) { if (!S.info?.conversa) return; try { await api('conversa_atualizar', { conversa_id: S.info.conversa.id, atendente: quem }); S.info.conversa.atendente = quem || null; say(quem ? `Conversa com ${esc(quem)}` : 'Sem atendente'); } catch (e) { say(e.message, { tipo:'erro' }); } }
   async function resolver(sim) { if (!S.info?.conversa) return; try { await api('conversa_atualizar', { conversa_id: S.info.conversa.id, resolvida: sim }); S.info.conversa.resolvida_em = sim ? new Date().toISOString() : null; desenhar(); say(sim ? 'Conversa resolvida' : 'Conversa reaberta', sim ? { acao:'desfazer', onAcao:() => resolver(false) } : {}); } catch (e) { say(e.message, { tipo:'erro' }); } }
   async function rapidas() {
@@ -473,5 +524,5 @@
       S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
-  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, agendarManual, agendarExtra, extraCampo, enviar, atribuir, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
+  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, agendarManual, agendarExtra, extraCampo, enviar, atribuir, trocarAtendente, verHistoricoAtendente, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
 })();

@@ -145,6 +145,14 @@ button{font-family:inherit;cursor:pointer}
   .voltar-chat{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--muted);margin-right:8px}
 }
 @media(min-width:761px){.voltar-chat{display:none}}
+.sel-atend{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:5px 8px;font-family:inherit;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;max-width:150px}
+.sel-atend:focus{outline:0;border-color:var(--brand)}
+.bt-hist{border:0;background:none;color:var(--muted);font-size:11.5px;font-weight:600;text-decoration:underline;cursor:pointer;font-family:inherit;padding:2px 4px}
+.bt-hist:hover{color:var(--brand)}
+.hist{max-height:320px;overflow-y:auto;margin-top:10px}
+.hist-li{padding:9px 0;border-bottom:1px solid var(--line-2)}
+.hist-li b{font-size:13px;display:block}
+.hist-li small{color:var(--muted);font-size:11.5px}
 .mini-tag.mt-rasc{background:rgba(46,91,255,.12);color:var(--brand)}
 .bt-resp{border:1px solid var(--verde,#1f7a4d);background:rgba(31,122,77,.08);color:#1f7a4d;border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .bt-resp:hover{background:#1f7a4d;color:#fff}
@@ -315,7 +323,8 @@ let atual = null, timer = null;
 async function api(acao, extra = {}) {
   const r = await fetch('/api/capta-whatsapp', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ acao, slug: SLUG, token: TOKEN, ...extra })
+    // o e-mail do login vai junto: é dele que sai o registro de quem mudou o dono
+    body: JSON.stringify({ acao, slug: SLUG, token: TOKEN, email_atual: (window.CaptaUser && CaptaUser.email()) || undefined, ...extra })
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(d.erro || `Erro ${r.status}`), { dados: d, status: r.status });
@@ -355,7 +364,16 @@ const iniciais = t => (t || '?').trim().slice(0, 2).toUpperCase();
 
 const FI = { q: '', f: 'abertas', eu: '' };
 FI.eu = (window.CaptaUser && CaptaUser.nome()) || ''; try { FI.eu = FI.eu || localStorage.getItem('capta_atendente') || ''; } catch(e){}
-const ATEND = [...new Set(['Rafael','Bento','RISE', (window.CaptaUser&&CaptaUser.nome())||''].filter(Boolean))];
+// Quem pode atender: a equipe cadastrada em Ajustes (carregada no início),
+// com uma lista de reserva caso a chamada falhe. Quem está logado sempre entra.
+let EQUIPE = [...new Set(['Rafael','Bento','RISE', (window.CaptaUser&&CaptaUser.nome())||''].filter(Boolean))];
+async function carregarEquipe(){
+  try {
+    const r = await api('equipe');
+    const nomes = (r.equipe || []).filter(u => u.ativo !== false).map(u => u.nome).filter(Boolean);
+    if (nomes.length) EQUIPE = [...new Set([...nomes, (window.CaptaUser&&CaptaUser.nome())||''].filter(Boolean))];
+  } catch(e){}
+}
 let CONVS = [], RAPIDAS = null;
 
 // ---- Rascunhos ----------------------------------------------------
@@ -486,8 +504,11 @@ async function abrir(id) {
           </div>
           <div class="campo-topo"><label>Quem atende</label>
             <div class="at-box">
-              ${conversa.atendente ? tagPessoa(conversa.atendente) : '<span class="sem-dono">sem dono</span>'}
-              ${FI.eu && conversa.atendente !== FI.eu ? `<button class="bt-assumir" onclick="assumir('${conversa.id}','${FI.eu}')">assumir</button>` : ''}
+              <select class="sel-atend" onchange="trocarAtendente('${conversa.id}', this.value, this)" title="Quem cuida desta conversa. Trocar aqui muda também o dono do lead.">
+                ${EQUIPE.map(p => `<option value="${esc(p)}" ${conversa.atendente===p?'selected':''}>${esc(p)}</option>`).join('')}
+                <option value="" ${!conversa.atendente?'selected':''}>— sem dono —</option>
+              </select>
+              <button class="bt-hist" onclick="verHistoricoAtendente('${conversa.id}')" title="Quem já cuidou desta conversa">histórico</button>
             </div>
           </div>
           <div class="robo ${conversa.agente_ativo ? 'on' : 'off'}" title="${conversa.agente_ativo ? 'O robô ainda responde nesta conversa' : 'Uma pessoa assumiu: o robô parou de responder aqui'}"><span class="ponto"></span>${conversa.agente_ativo ? 'Robô' : 'Humano'}</div>
@@ -636,6 +657,43 @@ async function carregarMidias() {
 
 
 // ---- atribuir / resolver ----
+// Troca de dono: confirma antes, porque muda o dono do lead (e o card no Kommo).
+async function trocarAtendente(id, quem, sel){
+  const c = CONVS.find(x => x.id === id) || {};
+  const antes = c.atendente || '';
+  if (quem === antes) return;
+  const eu = (window.CaptaUser && CaptaUser.nome()) || FI.eu || 'você';
+  const alvo = quem || 'sem dono';
+  const ok = confirm(
+    `Passar esta conversa de ${antes || 'sem dono'} para ${alvo}?\n\n` +
+    `O dono do lead${c.lead && c.lead.nome ? ' ' + c.lead.nome : ''} passa a ser ${alvo}, no Capta e no card do Kommo.\n` +
+    `A mudança fica registrada como feita por ${eu}.`
+  );
+  if (!ok) { if (sel) sel.value = antes; return; }
+  try {
+    await api('conversa_atualizar', { conversa_id: id, atendente: quem, por_nome: eu });
+    c.atendente = quem || null;
+    if (c.lead) c.lead.atendente = quem || null;
+    desenharLista();
+    toast(quem ? `Agora quem atende é <b>${esc(quem)}</b> · dono do lead atualizado` : 'Conversa sem dono', { tipo:'ok' });
+    if (window.parent !== window) window.parent.postMessage({ capta:'mudou', o:'atendente' }, '*');
+  } catch(e){ if (sel) sel.value = antes; toast(e.message, { tipo:'erro' }); }
+}
+async function verHistoricoAtendente(id){
+  try {
+    const r = await api('atendente_historico', { conversa_id: id });
+    const h = r.historico || [];
+    const linhas = h.length
+      ? h.map(x => `<div class="hist-li"><b>${esc(x.de || 'sem dono')} → ${esc(x.para || 'sem dono')}</b>
+          <small>${new Date(x.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · por ${esc(x.por_nome || 'alguém do painel')}${x.por_email ? ` (${esc(x.por_email)})` : ''}</small></div>`).join('')
+      : '<div class="hist-li"><small>Ninguém trocou o dono desta conversa ainda.</small></div>';
+    const box = document.createElement('div'); box.className = 'fundo'; box.id = 'hist-fundo';
+    box.innerHTML = `<div class="janela"><h3>Quem já atendeu</h3><div class="hist">${linhas}</div>
+      <div class="fim"><button class="btn g" onclick="document.getElementById('hist-fundo').remove()">Fechar</button></div></div>`;
+    document.body.appendChild(box);
+    box.onclick = e => { if (e.target.id === 'hist-fundo') box.remove(); };
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
 async function atribuir(id, quem){ try { await api('conversa_atualizar', { conversa_id: id, atendente: quem }); if (quem) { FI.eu = quem; try{ localStorage.setItem('capta_atendente', quem); }catch(e){} } toast(quem ? `Conversa com ${esc(quem)}` : 'Sem atendente'); carregarLista(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
 async function resolver(id, sim){
   try {
@@ -865,6 +923,7 @@ if (!SLUG || !TOKEN) {
   elCont.textContent = '';
   elConvs.innerHTML = '<div class="vazio">Abra esta página pelo painel do seu negócio.</div>';
 } else {
+  carregarEquipe();
   carregarEtapas().then(() => carregarLista());
   document.addEventListener('click', () => { if (window.CaptaAlerta) CaptaAlerta.pedirPermissao(); }, { once: true });
   timer = setInterval(() => { carregarLista(); if (atual) atualizarLeve(atual); }, 10000);
