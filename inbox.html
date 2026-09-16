@@ -13,15 +13,17 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--i
 button{font-family:inherit;cursor:pointer}
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 
-.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 26px;
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:60px;padding:0 18px;
   background:rgba(244,246,251,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .topbar h1{font-size:15px;font-weight:700}
 .voltar{border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;
   padding:7px 13px;border-radius:10px;text-decoration:none;transition:.14s}
 .voltar:hover{border-color:var(--brand);color:var(--brand)}
 
-.wrap{display:grid;grid-template-columns:330px 1fr;gap:18px;padding:22px 26px 26px;
-  max-width:1240px;margin:0 auto;height:calc(100vh - 60px)}
+/* Layout do WhatsApp no computador: ocupa a janela inteira, sem margem sobrando,
+   lista à esquerda e conversa preenchendo todo o resto. */
+.wrap{display:grid;grid-template-columns:clamp(300px,26vw,420px) 1fr;gap:0;padding:0;
+  max-width:none;margin:0;height:calc(100vh - 60px)}
 @media(max-width:840px){
   .wrap{grid-template-columns:1fr}
   .painel{display:none}
@@ -29,8 +31,9 @@ button{font-family:inherit;cursor:pointer}
   body.aberta .painel{display:flex}
 }
 
-.lista,.painel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
-  box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.lista,.painel{background:var(--card);border:0;border-radius:0;
+  box-shadow:none;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.lista{border-right:1px solid var(--line)}
 
 /* Lista de conversas */
 .lista-topo{padding:14px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);font-weight:600}
@@ -65,9 +68,9 @@ button{font-family:inherit;cursor:pointer}
 .robo.on .ponto{background:var(--verde)}
 .robo.off .ponto{background:var(--faint)}
 
-.fluxo{flex:1;overflow-y:auto;padding:16px 18px 8px;display:flex;flex-direction:column;gap:2px;
+.fluxo{flex:1;overflow-y:auto;padding:16px clamp(18px,6%,90px) 8px;display:flex;flex-direction:column;gap:2px;
   background:var(--bg);background-image:radial-gradient(rgba(105,112,137,.055) 1px, transparent 1px);background-size:22px 22px;scroll-behavior:smooth}
-.msg{max-width:min(76%,560px);width:fit-content;padding:6px 10px 6px 11px;border-radius:14px;font-size:14px;line-height:1.45;
+.msg{max-width:min(70%,720px);width:fit-content;padding:6px 10px 6px 11px;border-radius:14px;font-size:14px;line-height:1.45;
   overflow-wrap:anywhere;position:relative;box-shadow:0 1px 1px rgba(20,26,46,.05);margin-top:2px}
 .msg-txt{white-space:pre-wrap}
 .msg .midia,.msg img,.msg audio,.msg video{display:block}
@@ -95,7 +98,7 @@ button{font-family:inherit;cursor:pointer}
 .msg:hover .msg-acao{opacity:.7}.msg-acao:hover{opacity:1!important}
 .msg.destaque{animation:pisca-msg 1.4s ease-out}
 @keyframes pisca-msg{0%,100%{background-color:inherit}30%{background-color:#FFF3C4}}
-.desce{position:absolute;right:22px;bottom:96px;width:38px;height:38px;border-radius:50%;background:var(--card);
+.desce{position:absolute;right:clamp(22px,7%,100px);bottom:96px;width:38px;height:38px;border-radius:50%;background:var(--card);
   border:1px solid var(--line);box-shadow:0 3px 12px rgba(20,26,46,.14);display:none;place-items:center;cursor:pointer;z-index:4;font-size:15px;color:var(--muted)}
 .desce.on{display:grid}.desce b{position:absolute;top:-6px;right:-4px;background:var(--brand);color:#fff;font-size:10px;border-radius:99px;padding:1px 5px}
 .respondendo{display:flex;align-items:center;gap:10px;padding:8px 18px;background:var(--line-2);border-top:1px solid var(--line);font-size:12.5px}
@@ -105,8 +108,8 @@ button{font-family:inherit;cursor:pointer}
 .respondendo button{border:0;background:none;color:var(--faint);font-size:16px;cursor:pointer}
 
 /* Mídia */
-.msg audio{display:block;width:250px;max-width:100%;margin:2px 0}
-.msg img{display:block;max-width:230px;border-radius:9px;margin:2px 0;cursor:zoom-in}
+.msg audio{display:block;width:320px;max-width:100%;margin:2px 0}
+.msg img{display:block;max-width:320px;border-radius:9px;margin:2px 0;cursor:zoom-in}
 .msg .arquivo{display:inline-flex;align-items:center;gap:7px;font-weight:600;text-decoration:underline}
 .transcricao{margin-top:7px;padding-top:7px;border-top:1px solid rgba(105,112,137,.18);
   font-size:12.5px;line-height:1.55;opacity:.9}
@@ -115,7 +118,7 @@ button{font-family:inherit;cursor:pointer}
 .pendente{font-size:12px;opacity:.6;margin-top:6px;font-style:italic}
 .carregando-midia{font-size:12px;opacity:.6}
 
-.escrever{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:9px;align-items:flex-end;background:var(--card)}
+.escrever{border-top:1px solid var(--line);padding:12px clamp(14px,6%,90px);display:flex;gap:9px;align-items:flex-end;background:var(--card)}
 .escrever textarea{flex:1;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-family:inherit;
   font-size:13.5px;resize:none;max-height:120px;color:var(--ink);background:var(--card)}
 .escrever textarea:focus{outline:0;border-color:var(--brand)}
@@ -126,7 +129,7 @@ button{font-family:inherit;cursor:pointer}
 
 .vazio{flex:1;display:grid;place-items:center;text-align:center;color:var(--faint);font-size:13.5px;
   line-height:1.75;padding:40px 24px}
-.aviso{margin:0 18px 12px;background:var(--morno-bg);border:1px solid rgba(224,147,15,.28);border-radius:11px;
+.aviso{margin:0 clamp(18px,6%,90px) 12px;background:var(--morno-bg);border:1px solid rgba(224,147,15,.28);border-radius:11px;
   padding:9px 12px;font-size:12.5px;color:#8A5A04;line-height:1.55}
 .voltar-lista{display:none;border:1px solid var(--line);background:var(--card);color:var(--muted);
   font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:9px}
@@ -138,7 +141,7 @@ button{font-family:inherit;cursor:pointer}
   .lista{width:100%;border-right:0}
   .painel{display:none}
   body.chat-aberto .lista{display:none}
-  body.chat-aberto .painel{display:flex;height:calc(100vh - 130px)}
+  body.chat-aberto .painel{display:flex;height:calc(100vh - 60px)}
   .voltar-chat{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--muted);margin-right:8px}
 }
 @media(min-width:761px){.voltar-chat{display:none}}
@@ -237,7 +240,7 @@ button{font-family:inherit;cursor:pointer}
 .t-pessoa{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;text-transform:none;letter-spacing:0;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .t-pessoa:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
 </style>
-<style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+<style>body.embed .wrap{height:100vh}body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
 to{opacity:1;transform:none}}
 </style>
@@ -275,7 +278,7 @@ window.CaptaUser = (function(){
 <script src="/capta-ui.js"></script>
 <script src="/capta-alerta.js"></script>
 </head>
-<body>
+<body class="chat">
 <div class="topbar">
   <a class="voltar" id="voltar" href="/dashboard.html">← Painel</a>
   <h1>Conversas</h1>

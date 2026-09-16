@@ -5,6 +5,8 @@
 
   /* respiro geral e espaço pra barra inferior */
   .wrap, .content { padding-left: 14px !important; padding-right: 14px !important; }
+  /* a inbox ocupa a tela inteira, como o WhatsApp — sem respiro lateral */
+  body.chat .wrap { padding-left: 0 !important; padding-right: 0 !important; }
   body.embed .wrap { padding-bottom: 90px !important; }
 
   /* grids viram uma coluna e param de empurrar a largura */
