@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -114,6 +114,7 @@ module.exports = async function handler(req, res) {
         case 'importar_historico': return await acaoImportarHistorico(tenant, body, res);
         case 'importar_midia':     return await acaoImportarMidia(tenant, body, res);
         case 'equipe':   return await acaoEquipe(tenant, body, res);
+        case 'atendente_historico': return await acaoAtendenteHistorico(tenant, body, res);
         case 'equipe_salvar': return await acaoEquipeSalvar(tenant, body, res);
         case 'eu':       return await acaoEu(tenant, body, res);
         case 'eventos':  return await acaoEventos(tenant, body, res);
@@ -1100,6 +1101,27 @@ async function acaoConversaAtualizar(tenant, body, res) {
   }
   const patch = {};
   if (body.atendente !== undefined) patch.atendente = body.atendente || null;
+  // Trocar quem atende também troca o DONO DO LEAD e fica registrado:
+  // quem mudou (login), de quem para quem, quando. O histórico é lido
+  // pela ação 'atendente_historico' e vira nota no card do Kommo.
+  if (body.atendente !== undefined) {
+    try {
+      const c = (await sb(`capta_conversas?id=eq.${id}&tenant_id=eq.${tenant.id}&select=atendente,lead_id&limit=1`))?.[0];
+      const de = c?.atendente || null, para = body.atendente || null;
+      if (c && de !== para) {
+        const quem = await usuarioDe(tenant.id, body.email_atual).catch(() => null);
+        await sb('capta_atendente_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+          tenant_id: tenant.id, conversa_id: id, lead_id: c.lead_id || null,
+          de, para, por_nome: quem?.nome || body.por_nome || 'alguém do painel',
+          por_email: quem?.email || body.email_atual || null
+        }) }).catch(() => null);
+        if (c.lead_id) {
+          await sb(`capta_leads?id=eq.${c.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ atendente: para }) }).catch(() => null);
+          notaKommoAtendente(tenant.id, c.lead_id, de, para, quem?.nome || body.por_nome || null).catch(() => null);
+        }
+      }
+    } catch (e) { console.error('[atendente]', e.message); }
+  }
   // aceita "resolvida" e "resolver" — o painel já mandava o segundo nome
   const fechar = body.resolvida !== undefined ? body.resolvida : body.resolver;
   if (fechar === true) { patch.resolvida_em = new Date().toISOString(); patch.nao_lidas = 0; patch.aguardando_desde = null; }
@@ -1277,7 +1299,7 @@ async function acaoImportarMidia(tenant, body, res) {
 // ---------------------------------------------------------------------
 const PAPEIS = {
   gestor:     { nome: 'Gestor',     desc: 'Vê e faz tudo, inclusive equipe e painel.',              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos','eventos','ajustes'], pode: ['*'] },
-  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','alunos','eu'] },
+  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','alunos','eu'] },
   secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','lead','funil','eu'] },
   leitura:    { nome: 'Só leitura', desc: 'Vê tudo, não altera nada.',                              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos'],                   pode: ['agenda','funil','lead','experimentais','alunos','conversas','mensagens','midia','eu'] },
 };
@@ -1297,6 +1319,30 @@ async function acaoEu(tenant, body, res) {
   const def = PAPEIS[papel] || PAPEIS.gestor;
   return res.status(200).json({ usuario: u ? { nome: u.nome, email: u.email, papel } : null, papel, telas: (u && u.telas && u.telas.length ? u.telas : def.telas), papeis: PAPEIS });
 }
+// Quem já cuidou desta conversa, na ordem: quem passou, para quem, e o
+// login de quem fez a troca.
+async function acaoAtendenteHistorico(tenant, body, res) {
+  const id = (body.conversa_id || '').trim();
+  const leadId = (body.lead_id || '').trim();
+  if (!id && !leadId) return res.status(400).json({ erro: 'Informe conversa_id ou lead_id.' });
+  const filtro = id ? `conversa_id=eq.${id}` : `lead_id=eq.${leadId}`;
+  const linhas = await sb(`capta_atendente_log?tenant_id=eq.${tenant.id}&${filtro}&select=de,para,por_nome,por_email,criado_em&order=criado_em.desc&limit=30`).catch(() => []);
+  return res.status(200).json({ historico: linhas || [] });
+}
+
+// Nota no card do Kommo, para quem trabalha lá ver a troca de dono.
+async function notaKommoAtendente(tenantId, leadId, de, para, porQuem) {
+  const token = process.env.KOMMO_TOKEN; if (!token) return;
+  const l = (await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id&limit=1`))?.[0];
+  if (!l?.kommo_lead_id) return;
+  const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
+  const texto = `Capta · quem atende: ${de || 'sem dono'} → ${para || 'sem dono'}${porQuem ? ` (alterado por ${porQuem})` : ''}`;
+  await fetch(`https://${dominio}/api/v4/leads/${l.kommo_lead_id}/notes`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify([{ note_type: 'common', params: { text: texto } }])
+  }).catch(() => {});
+}
+
 async function acaoEquipe(tenant, body, res) {
   const lista = await sb(`capta_usuarios?tenant_id=eq.${tenant.id}&select=id,nome,email,papel,ativo,telas,ultimo_acesso,criado_em&order=nome`).catch(() => []);
   return res.status(200).json({ equipe: lista || [], papeis: PAPEIS });
