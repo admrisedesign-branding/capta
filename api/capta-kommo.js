@@ -22,6 +22,7 @@ const CAMPOS = {
   curso: 'Curso', data_aula: 'Data da aula', bloco: 'Bloco', pagamento: 'Pagamento',
   score: 'Score', categoria: 'Categoria', origem: 'Origem', bairro: 'Bairro',
   area: 'Área', trilha: 'Trilha', momento: 'Momento',
+  consentimento: 'Consentimento',   // LGPD — lista Sim/Não preenchida pelo bot QUALIFICA WHATSAPP
 };
 // No Kommo, 142 = Venda ganha e 143 = Venda perdida em qualquer funil; o campo "type"
 // só vem preenchido na etapa de entrada, então não dá pra confiar só nele.
@@ -231,11 +232,39 @@ async function espelhar(leadId) {
       }
     } catch (e) { /* não bloqueia o espelho */ }
   }
+  // LGPD: campo "Consentimento" = Sim no Kommo → registra o aceite do bot (uma vez só)
+  try { await consentimentoDoBot(linha, lead); } catch (e) { console.error('consentimento bot', e.message); }
   // relê o que ficou salvo (gatilhos podem alterar score/temperatura/status)
   const g = await fetch(`${SB_URL}/rest/v1/capta_leads?tenant_id=eq.${linha.tenant_id}&kommo_lead_id=eq.${lead.id}&select=score,temperatura,status,origem,criado_em,tags`, { headers: H_SB }).then(x => x.json()).catch(() => null);
   return { lead_id: lead.id, etapa: linha.etapa_nome, fonte: linha.fonte, porta: linha.porta,
     enviado: { score: linha.score, temperatura: linha.temperatura, status: linha.status, origem: linha.origem },
     salvo: Array.isArray(g) ? g[0] : g };
+}
+
+// ─── LGPD: aceite dado no bot do WhatsApp ──────────────────────────────────
+// O bot pergunta "Você é responsável pela criança e está de acordo? Responda SIM"
+// e grava Sim no campo de lista "Consentimento" do lead. Aqui viramos isso em
+// linhas de capta_consentimentos (contato + dados_crianca), ligadas ao lead.
+const CONSENT_SIM = /^(sim|s|1|yes|true|aceito|autorizo)$/i;
+async function consentimentoDoBot(linha, lead) {
+  const v = String(valorCampo(lead, CAMPOS.consentimento) ?? '').trim();
+  if (!CONSENT_SIM.test(v)) return;
+  const lr = await fetch(`${SB_URL}/rest/v1/capta_leads?tenant_id=eq.${linha.tenant_id}&kommo_lead_id=eq.${lead.id}&select=id&limit=1`, { headers: H_SB }).then(x => x.json());
+  const leadId = lr?.[0]?.id;
+  if (!leadId) return;
+  // já registrado? (o espelho roda a cada webhook, então não pode duplicar)
+  const ja = await fetch(`${SB_URL}/rest/v1/capta_consentimentos?lead_id=eq.${leadId}&canal=eq.whatsapp-bot&finalidade=eq.contato&select=id&limit=1`, { headers: H_SB }).then(x => x.json());
+  if (ja?.length) return;
+  const base = {
+    tenant_id: linha.tenant_id, lead_id: leadId, canal: 'whatsapp-bot',
+    responsavel_nome: linha.nome || null, responsavel_telefone: linha.contato || null,
+    declarou_responsavel: true, texto_versao: 'bot-v1',
+    evidencia: { kommo_lead_id: lead.id, campo: CAMPOS.consentimento, valor: v,
+      texto: 'Antes de continuar: para agendar a aula experimental eu vou guardar seu nome, seu WhatsApp e o nome e a idade da criança. Só a escola vê isso, e a gente apaga se não fizer sentido seguir. Você é responsável pela criança e está de acordo? Responda SIM para continuar.' },
+  };
+  const r = await fetch(`${SB_URL}/rest/v1/capta_consentimentos`, { method: 'POST', headers: { ...H_SB, Prefer: 'return=minimal' },
+    body: JSON.stringify([{ ...base, finalidade: 'contato' }, { ...base, finalidade: 'dados_crianca' }]) });
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
 }
 
 // O Kommo manda form-urlencoded com chaves tipo leads[status][0][id]
