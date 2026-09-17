@@ -126,13 +126,14 @@
     S = { ...S, lead: l, aba: aba || 'conversa', info: null, agenda: null, sel7: null };
     document.getElementById('lp').classList.add('aberto'); document.getElementById('lp-scrim').classList.add('on');
     if (!EQUIPE) carregarEquipe();
+    S.notas = null; carregarNotas();
     await etapas(); desenhar();
     try { S.info = await api('lead', { lead_id: id }); } catch (e) { S.info = { erro: e.message }; }
     desenhar(); if (S.aba === 'agendar') carregarAgenda();
     clearInterval(S.timerMsg); S.timerMsg = setInterval(async () => { if (S.lead && S.aba === 'conversa') { try { const i = await api('lead', { lead_id: S.lead.id }); const n = (i.mensagens||[]).length; if (n !== (S.info?.mensagens||[]).length) { S.info = i; desenhar(); } } catch (e) {} } }, 15000);
   }
   function fechar() { const a = document.getElementById('lp'); if (a) a.classList.remove('aberto'); const s = document.getElementById('lp-scrim'); if (s) s.classList.remove('on'); S.lead = null; clearTimeout(S.timer); clearInterval(S.timerMsg); }
-  function aba(a) { S.aba = a; desenhar(); if (a === 'agendar' && !S.agenda) carregarAgenda(); }
+  function aba(a) { S.aba = a; desenhar(); if (a === 'agendar' && !S.agenda) carregarAgenda(); if (a === 'dados') carregarNotas(); }
 
   function desenhar() {
     const l = S.lead; if (!l) return;
@@ -430,13 +431,48 @@
       <div class="campo" style="margin-top:8px"><label>Quem atendeu</label>${sel('lp-at', [...new Set([...ATEND, EU()].filter(Boolean))], l.atendente || EU())}</div>
       <div class="sec">Criança</div>
       <div class="l2"><div class="campo"><label>Nome</label><input id="lp-cri" value="${esc(l.crianca||'')}"></div><div class="campo"><label>Idade</label><input id="lp-id" type="number" min="3" max="17" value="${l.idade||''}"></div></div>
-      <div class="sec">Anotações</div>
-      <div class="campo"><textarea id="lp-notas" placeholder="Ex.: mãe prefere sábado de manhã">${esc(l.notas||'')}</textarea></div>
+      <div class="sec">Resumo do lead</div>
+      <div class="campo"><textarea id="lp-notas" placeholder="Ex.: mãe prefere sábado de manhã">${esc(l.notas||'')}</textarea>
+        <div class="liv" style="margin-top:4px">Aparece no cartão do lead. Para registrar o que aconteceu, use as anotações abaixo.</div></div>
       <div style="margin-top:10px;display:flex;align-items:center"><button class="btn" onclick="LeadPainel.salvarDados()">Salvar</button><span class="salvo" id="lp-ok"></span></div>
+      <div class="sec">Anotações</div>
+      <div class="campo"><textarea id="lp-nova-nota" placeholder="O que aconteceu? Ex.: mãe ligou, quer trocar para sexta"></textarea></div>
+      <div style="margin-top:8px"><button class="btn" onclick="LeadPainel.addNota()">Adicionar anotação</button></div>
+      <div id="lp-notas-lista">${listaNotas()}</div>
       ${l.tags && l.tags.length ? `<div class="sec">Tags</div><div class="chips">${l.tags.map(t=>`<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}
       ${cfg.onExcluir ? `<button class="del" onclick="LeadPainel.excluir()">🗑️ Excluir este lead</button>` : ''}
     </div>`;
   }
+  // Anotações: cada uma vira uma linha com quem escreveu e quando, em vez de
+  // sobrescrever o campo único. Vai também como nota no card do Kommo.
+  function listaNotas() {
+    if (S.notas === null || S.notas === undefined) return `<div class="liv" style="margin-top:10px">carregando anotações…</div>`;
+    if (!S.notas.length) return `<div class="liv" style="margin-top:10px">Nenhuma anotação ainda.</div>`;
+    return `<div style="margin-top:10px">${S.notas.map(n => `<div style="padding:9px 0;border-bottom:1px solid #F0F2F7">
+      <div style="font-size:13px;line-height:1.5;white-space:pre-wrap">${esc(n.texto)}</div>
+      <small style="color:#697089;font-size:11.5px">${esc(n.autor_nome || '')} · ${new Date(n.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small>
+    </div>`).join('')}</div>`;
+  }
+  async function carregarNotas() {
+    const l = S.lead; if (!l) return;
+    try { const r = await api('notas', { lead_id: l.id }); S.notas = r.notas || []; }
+    catch (e) { S.notas = []; }
+    const el = document.getElementById('lp-notas-lista'); if (el) el.innerHTML = listaNotas();
+  }
+  async function addNota() {
+    const l = S.lead; if (!l) return;
+    const ta = document.getElementById('lp-nova-nota');
+    const texto = (ta?.value || '').trim();
+    if (!texto) return say('Escreva a anotação.', { tipo:'erro' });
+    try {
+      const r = await api('nota', { lead_id: l.id, texto, por_nome: EU() || undefined });
+      ta.value = '';
+      S.notas = [{ texto, autor_nome: r.autor || EU(), criado_em: new Date().toISOString() }, ...(S.notas || [])];
+      const el = document.getElementById('lp-notas-lista'); if (el) el.innerHTML = listaNotas();
+      say('Anotação registrada · nota no Kommo', { tipo:'ok' });
+    } catch (e) { say(e.message, { tipo:'erro' }); }
+  }
+
   async function salvarDados() {
     const l = S.lead; const g = x => document.getElementById(x).value;
     const d = { lead_id: l.id, fonte: g('lp-fonte'), porta: g('lp-porta'), atendente: g('lp-at'), crianca: g('lp-cri'), idade: g('lp-id'), notas: g('lp-notas') };
@@ -655,5 +691,5 @@
       S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
-  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, diaEscolhido, marcar7, agendarSel7, agendarManual, agendarExtra, extraCampo, enviar, atribuir, trocarAtendente, verHistoricoAtendente, ligar, registrarLigacao, verLigacoes, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, atual: () => S.lead };
+  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, diaEscolhido, marcar7, agendarSel7, agendarManual, agendarExtra, extraCampo, enviar, atribuir, trocarAtendente, verHistoricoAtendente, addNota, ligar, registrarLigacao, verLigacoes, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, atual: () => S.lead };
 })();
