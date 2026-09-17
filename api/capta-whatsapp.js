@@ -98,7 +98,7 @@ module.exports = async function handler(req, res) {
     // sem e-mail no corpo (painel antigo) vale o padrão mais permissivo do dono
     if (!body._papel && token === tenant.dashboard_token) body._papel = 'gestor';
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -112,6 +112,8 @@ module.exports = async function handler(req, res) {
         case 'alunos':   return await acaoAlunos(tenant, body, res);
         case 'aluno':    return await acaoAluno(tenant, body, res);
         case 'aluno_confirmar': return await acaoAlunoConfirmar(tenant, body, res);
+        case 'turmas_vagas':    return await acaoTurmasVagas(tenant, body, res);
+        case 'transferir_aluno': return await acaoTransferirAluno(tenant, body, res);
         case 'experimentais': return await acaoExperimentais(tenant, body, res);
         case 'desfecho': return await acaoDesfecho(tenant, body, res);
         case 'desfazer': return await acaoDesfazer(tenant, body, res);
@@ -1418,7 +1420,7 @@ async function acaoImportarMidia(tenant, body, res) {
 const PAPEIS = {
   gestor:     { nome: 'Gestor',     desc: 'Vê e faz tudo, inclusive equipe e painel.',              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos','eventos','ajustes'], pode: ['*'] },
   atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','ligacao','ligacoes','alunos','eu'] },
-  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','aluno_confirmar','repor','faltas_aluno','vagas_kit','remarcar_aluno','lead','funil','eu'] },
+  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','aluno_confirmar','turmas_vagas','transferir_aluno','repor','faltas_aluno','vagas_kit','remarcar_aluno','lead','funil','eu'] },
   leitura:    { nome: 'Só leitura', desc: 'Vê tudo, não altera nada.',                              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos'],                   pode: ['agenda','funil','lead','experimentais','alunos','conversas','mensagens','midia','eu'] },
 };
 async function usuarioDe(tenantId, email) {
@@ -2072,6 +2074,72 @@ async function acaoFaltasAluno(tenant, body, res) {
     }
   }
   return res.status(200).json({ aluno: al, turma: turma || null, faltas: faltas.reverse(), reposicoes: reposicoes || [] });
+}
+
+// MUDANÇA DEFINITIVA DE TURMA — diferente da reposição, que é só uma aula
+// em outro dia. Aqui o aluno troca o dia/horário fixo dele. Antes de
+// confirmar com a família é preciso saber se cabe: a resposta vem de
+// 'turmas_vagas', que mostra sala e kit de cada turma.
+async function acaoTurmasVagas(tenant, body, res) {
+  const kit = body.kit || null;
+  const [turmas, alunos, kits] = await Promise.all([
+    sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim,capacidade,limite_sala,ativa&order=dia_semana,hora_inicio`).catch(() => []),
+    sb(`capta_alunos?tenant_id=eq.${tenant.id}&status=eq.ativo&select=id,turma_id,kit`).catch(() => []),
+    sb(`capta_kits?tenant_id=eq.${tenant.id}&select=kit,capacidade`).catch(() => [])
+  ]);
+  const capKit = {}; (kits || []).forEach(k => capKit[k.kit] = k.capacidade);
+  const lista = (turmas || []).filter(t => t.ativa !== false).map(t => {
+    const naTurma = (alunos || []).filter(a => a.turma_id === t.id);
+    const sala = t.limite_sala || t.capacidade || 18;
+    const doKit = kit ? naTurma.filter(a => a.kit === kit).length : null;
+    const capacidadeKit = kit ? (capKit[kit] ?? null) : null;
+    return {
+      id: t.id, nome: t.nome, dia_semana: t.dia_semana,
+      hora_inicio: t.hora_inicio, hora_fim: t.hora_fim,
+      na_sala: naTurma.length, limite_sala: sala,
+      sala_livre: Math.max(0, sala - naTurma.length),
+      kit, do_kit: doKit, capacidade_kit: capacidadeKit,
+      kit_livre: capacidadeKit == null ? null : Math.max(0, capacidadeKit - doKit)
+    };
+  });
+  return res.status(200).json({ turmas: lista });
+}
+
+// Move o aluno de turma de vez, checando vaga de sala e de kit.
+async function acaoTransferirAluno(tenant, body, res) {
+  const { aluno_id, turma_id } = body;
+  if (!aluno_id || !turma_id) return res.status(400).json({ erro: 'Informe o aluno e a turma.' });
+  const [al] = await sb(`capta_alunos?id=eq.${aluno_id}&tenant_id=eq.${tenant.id}&select=id,nome,nome_curto,kit,turma_id,observacao&limit=1`);
+  if (!al) return res.status(404).json({ erro: 'Aluno não encontrado.' });
+  if (al.turma_id === turma_id) return res.status(400).json({ erro: 'O aluno já está nessa turma.' });
+  const [t] = await sb(`capta_turmas?id=eq.${turma_id}&tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,capacidade,limite_sala&limit=1`);
+  if (!t) return res.status(404).json({ erro: 'Turma não encontrada.' });
+
+  const naTurma = await sb(`capta_alunos?tenant_id=eq.${tenant.id}&turma_id=eq.${turma_id}&status=eq.ativo&select=id,kit`).catch(() => []);
+  const sala = t.limite_sala || t.capacidade || 18;
+  if ((naTurma || []).length >= sala && !body.forcar) return res.status(409).json({ erro: `Essa turma já está com ${sala} de ${sala} lugares na sala.`, cheio: 'sala' });
+  if (al.kit) {
+    const [k] = await sb(`capta_kits?tenant_id=eq.${tenant.id}&kit=eq.${encodeURIComponent(al.kit)}&select=capacidade&limit=1`).catch(() => []);
+    const cap = k?.capacidade;
+    const usados = (naTurma || []).filter(a => a.kit === al.kit).length;
+    if (cap != null && usados >= cap && !body.forcar) return res.status(409).json({ erro: `Não há kit ${al.kit} livre nesse horário (${usados} de ${cap} em uso).`, cheio: 'kit' });
+  }
+
+  const hoje = hojeManaus();
+  const antiga = al.turma_id ? (await sb(`capta_turmas?id=eq.${al.turma_id}&select=nome,dia_semana,hora_inicio&limit=1`).catch(() => []))?.[0] : null;
+  const DIAS_T = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+  const descr = x => x ? `${DIAS_T[x.dia_semana] || ''} ${String(x.hora_inicio || '').slice(0, 5)}` : 'sem turma';
+  const nota = `Mudou de turma em ${hoje.split('-').reverse().join('/')}: ${descr(antiga)} → ${descr(t)}${body.por_nome ? ` (${body.por_nome})` : ''}`;
+
+  await sb(`capta_alunos?id=eq.${aluno_id}&tenant_id=eq.${tenant.id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ turma_id, atualizado_em: new Date().toISOString(),
+      observacao: al.observacao ? `${al.observacao} · ${nota}` : nota })
+  });
+
+  // As reposições já marcadas continuam valendo; aulas futuras da turma antiga
+  // não existem como registro (a turma é fixa), então não há o que remarcar.
+  return res.status(200).json({ ok: true, de: descr(antiga), para: descr(t) });
 }
 
 // O pedagógico confirma o aluno na grade: turma e kit definitivos.
