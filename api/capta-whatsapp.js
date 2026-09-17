@@ -98,7 +98,7 @@ module.exports = async function handler(req, res) {
     // sem e-mail no corpo (painel antigo) vale o padrão mais permissivo do dono
     if (!body._papel && token === tenant.dashboard_token) body._papel = 'gestor';
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'nota', 'notas', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -113,6 +113,8 @@ module.exports = async function handler(req, res) {
         case 'aluno':    return await acaoAluno(tenant, body, res);
         case 'aluno_confirmar': return await acaoAlunoConfirmar(tenant, body, res);
         case 'turmas_vagas':    return await acaoTurmasVagas(tenant, body, res);
+        case 'nota':            return await acaoNota(tenant, body, res);
+        case 'notas':           return await acaoNotas(tenant, body, res);
         case 'boas_vindas':     return res.status(200).json(await enviarBoasVindas(tenant, body.aluno_id));
         case 'transferir_aluno': return await acaoTransferirAluno(tenant, body, res);
         case 'experimentais': return await acaoExperimentais(tenant, body, res);
@@ -1420,8 +1422,8 @@ async function acaoImportarMidia(tenant, body, res) {
 // ---------------------------------------------------------------------
 const PAPEIS = {
   gestor:     { nome: 'Gestor',     desc: 'Vê e faz tudo, inclusive equipe e painel.',              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos','eventos','ajustes'], pode: ['*'] },
-  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','ligacao','ligacoes','alunos','eu'] },
-  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','aluno_confirmar','turmas_vagas','transferir_aluno','boas_vindas','repor','faltas_aluno','vagas_kit','remarcar_aluno','lead','funil','eu'] },
+  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','ligacao','ligacoes','nota','notas','alunos','eu'] },
+  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','aluno_confirmar','turmas_vagas','transferir_aluno','boas_vindas','nota','notas','repor','faltas_aluno','vagas_kit','remarcar_aluno','lead','funil','eu'] },
   leitura:    { nome: 'Só leitura', desc: 'Vê tudo, não altera nada.',                              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos'],                   pode: ['agenda','funil','lead','experimentais','alunos','conversas','mensagens','midia','eu'] },
 };
 async function usuarioDe(tenantId, email) {
@@ -2080,6 +2082,38 @@ async function acaoFaltasAluno(tenant, body, res) {
     }
   }
   return res.status(200).json({ aluno: al, turma: turma || null, faltas: faltas.reverse(), reposicoes: reposicoes || [] });
+}
+
+// NOTAS — cada anotação é uma linha com autor e data, em vez de um campo
+// único que a próxima pessoa sobrescreve. Vai também para o card do Kommo,
+// já que os dois sistemas rodam em paralelo.
+async function acaoNota(tenant, body, res) {
+  const texto = String(body.texto || '').trim();
+  if (!texto) return res.status(400).json({ erro: 'Escreva a nota.' });
+  if (!body.lead_id && !body.aluno_id) return res.status(400).json({ erro: 'Informe o lead ou o aluno.' });
+  if (body.apagar) {
+    await sb(`capta_notas?id=eq.${body.apagar}&tenant_id=eq.${tenant.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+  const quem = await usuarioDe(tenant.id, body.email_atual).catch(() => null);
+  const autor = quem?.nome || body.por_nome || 'alguém do painel';
+  await sb('capta_notas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    tenant_id: tenant.id, lead_id: body.lead_id || null, aluno_id: body.aluno_id || null,
+    texto: texto.slice(0, 4000), autor_nome: autor, autor_email: quem?.email || body.email_atual || null
+  }) });
+  // espelha no Kommo, para quem trabalha por lá
+  if (body.lead_id) {
+    const [l] = await sb(`capta_leads?id=eq.${body.lead_id}&tenant_id=eq.${tenant.id}&select=kommo_lead_id&limit=1`).catch(() => []);
+    if (l?.kommo_lead_id) notaKommoTexto(tenant.id, l.kommo_lead_id, `Capta · ${autor}: ${texto.slice(0, 600)}`).catch(() => null);
+  }
+  return res.status(200).json({ ok: true, autor });
+}
+
+async function acaoNotas(tenant, body, res) {
+  const filtro = body.lead_id ? `lead_id=eq.${body.lead_id}` : body.aluno_id ? `aluno_id=eq.${body.aluno_id}` : null;
+  if (!filtro) return res.status(400).json({ erro: 'Informe o lead ou o aluno.' });
+  const linhas = await sb(`capta_notas?tenant_id=eq.${tenant.id}&${filtro}&select=id,texto,autor_nome,criado_em&order=criado_em.desc&limit=50`).catch(() => []);
+  return res.status(200).json({ notas: linhas || [] });
 }
 
 // MUDANÇA DEFINITIVA DE TURMA — diferente da reposição, que é só uma aula
