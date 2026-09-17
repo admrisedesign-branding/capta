@@ -612,13 +612,27 @@ async function avisosInternos(canal, resumo) {
   }
 
   if (precisa('fechamento')) {
+    try {
+      const pres = await sb(`capta_presencas?tenant_id=eq.${canal.tenant_id}&data=gte.${ontem}&feedback=lte.3&select=feedback,comentario,agendamento_id`).catch(() => []);
+      if ((pres || []).length) {
+        const ids = pres.map(x => x.agendamento_id).filter(Boolean);
+        const ags = ids.length ? await sb(`capta_agendamentos?tenant_id=eq.${canal.tenant_id}&id=in.(${ids.join(',')})&select=id,crianca_nome,lead:lead_id(nome,contato)`).catch(() => []) : [];
+        const linhas = pres.map(x => {
+          const a = (ags || []).find(y => y.id === x.agendamento_id);
+          return `${'⭐'.repeat(x.feedback || 1)} ${a?.crianca_nome || a?.lead?.nome || 'sem nome'}${a?.lead?.contato ? ` · ${a.lead.contato}` : ''}${x.comentario ? `\n     "${x.comentario}"` : ''}`;
+        }).join('\n');
+        textoFechamento = `*Avaliação baixa na aula* (${pres.length})\n\n${linhas}\n\nLigue antes de convidar para uma nova visita.` + (textoFechamento ? '' : '');
+      }
+    } catch (e) {}
+
     const ags = await sb(`capta_agendamentos?tenant_id=eq.${canal.tenant_id}&data=lte.${ontem}&data=gte.${seteDias}&status=in.(agendado,confirmado,compareceu)&select=data,hora_inicio,crianca_nome,observacao,lead:lead_id(nome)&order=data`).catch(() => []);
     const semBaixa = (ags || []).filter(a => !/desfecho:/i.test(a.observacao || ''));
     if (semBaixa.length) {
-      textoFechamento = `*Aulas sem resultado* (${semBaixa.length})\n\n` + semBaixa.slice(0, 15).map(a =>
+      const semResultado = `*Aulas sem resultado* (${semBaixa.length})\n\n` + semBaixa.slice(0, 15).map(a =>
         `${a.data.slice(8, 10)}/${a.data.slice(5, 7)} ${String(a.hora_inicio || '').slice(0, 5)} · ${a.crianca_nome || a.lead?.nome || 'sem nome'}`
       ).join('\n') + (semBaixa.length > 15 ? `\n… e mais ${semBaixa.length - 15}` : '')
         + `\n\nSem a baixa o lead fica parado em Aula agendada e ninguém retoma. Abra Aula experimental no Capta e marque o resultado.`;
+      textoFechamento = textoFechamento ? `${textoFechamento}\n\n———\n\n${semResultado}` : semResultado;
     }
   }
 
@@ -1790,12 +1804,41 @@ async function acaoFeedback(tenant, body, res) {
   if (paga_hoje === true) return acaoDesfecho(tenant, { agendamento_id, desfecho: 'matriculou', pagamento: pagamento || null, valor: valor || null, atendente: body.atendente, observacao: `desfecho: matriculou · ${pagamento || 'na recepção'}` }, res);
   if (paga_hoje === false && motivo) return acaoDesfecho(tenant, { agendamento_id, desfecho: 'nao', motivo, atendente: body.atendente, observacao: `desfecho: nao · ${motivo}` }, res);
 
+  // Nota baixa: ninguém filtra quem pode avaliar (o Google proíbe), mas o time
+  // precisa saber na hora para ligar antes que a família vá embora chateada.
+  if (nota != null && Number(nota) <= 3) await alertarNotaBaixa(tenant, agendamento_id, Number(nota), comentario).catch(() => null);
+
   // Convite para avaliar no Google, logo depois do check-out — é quando a
   // família ainda está com a experiência fresca. Vai o texto pronto, para a
   // pessoa só colar, e o link direto da avaliação.
   let convite = null;
   if (body.convidar_avaliacao !== false) convite = await convidarAvaliacao(tenant, agendamento_id, { nota, comentario }).catch(e => ({ erro: e.message }));
   return res.status(200).json({ ok: true, convite });
+}
+
+// Nota 3 ou menos no tablet: a conversa volta para a fila como urgente, com a
+// tag ATENDER, e fica a nota do que a família disse. É o caminho legítimo —
+// resolver o problema em vez de esconder a avaliação.
+async function alertarNotaBaixa(tenant, agendamentoId, nota, comentario) {
+  const [ag] = await sb(`capta_agendamentos?id=eq.${agendamentoId}&tenant_id=eq.${tenant.id}&select=id,crianca_nome,lead_id&limit=1`).catch(() => []);
+  if (!ag?.lead_id) return;
+  const texto = `Aula experimental avaliada com ${nota} estrela${nota === 1 ? '' : 's'} no tablet${comentario ? `: ${comentario}` : '.'} Ligar antes de convidar para nova visita.`;
+  await sb('capta_notas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    tenant_id: tenant.id, lead_id: ag.lead_id, texto, autor_nome: 'tablet da recepção'
+  }) }).catch(() => null);
+
+  const l = (await sb(`capta_leads?id=eq.${ag.lead_id}&tenant_id=eq.${tenant.id}&select=tags,kommo_lead_id&limit=1`).catch(() => []))?.[0];
+  const tags = [...new Set([...((l && l.tags) || []), 'ATENDER'])];
+  await sb(`capta_leads?id=eq.${ag.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ tags }) }).catch(() => null);
+  // urgente já: o relógio nasce em 1h30, que é o corte do urgente na inbox
+  await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=eq.${ag.lead_id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ resolvida_em: null, aguardando_desde: new Date(Date.now() - 91 * 60e3).toISOString() })
+  }).catch(() => null);
+  if (l?.kommo_lead_id) {
+    await kommoTag(tenant.id, ag.lead_id, 'feedback baixo').catch(() => null);
+    await notaKommoTexto(tenant.id, l.kommo_lead_id, `Capta · ${texto}`).catch(() => null);
+  }
 }
 
 async function convidarAvaliacao(tenant, agendamentoId, fb) {
