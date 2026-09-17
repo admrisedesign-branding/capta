@@ -469,13 +469,17 @@
     });
     if (!porDia.some(d => d.hs.length)) return `<div class="vaga" style="background:var(--card)"><div class="liv">Nenhuma vaga livre nos próximos 7 dias. Use "outro dia e horário" abaixo.</div></div>`;
     const sel = S.sel7 || {};
+    // Duas colunas: o dia fica numa faixa estreita à esquerda e os horários
+    // ocupam o resto. Antes dia e horários estavam empilhados e a leitura
+    // embaralhava as datas.
     return `<div class="vaga" style="background:var(--card)">
-      ${porDia.map(({ dia, hs }) => `<div style="padding:7px 0;border-bottom:1px solid #F0F2F7">
-        <div style="font-size:12px;font-weight:700;color:#697089;text-transform:uppercase;letter-spacing:.03em">${dia === hoje ? 'hoje' : nomeDia(dia)} ${dataBR(dia)}</div>
-        ${hs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px">${hs.map(h => {
+      ${porDia.map(({ dia, hs }) => `<div style="display:grid;grid-template-columns:62px 1fr;gap:10px;align-items:start;padding:8px 0;border-bottom:1px solid #F0F2F7">
+        <div style="font-size:11.5px;font-weight:800;color:${dia === hoje ? '#2E5BFF' : '#697089'};text-transform:uppercase;letter-spacing:.03em;line-height:1.35;padding-top:5px">
+          ${dia === hoje ? 'hoje' : nomeDia(dia)}<br><span style="font-weight:600;opacity:.75">${dataBR(dia)}</span></div>
+        <div>${hs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${hs.map(h => {
           const marcado = sel.data === dia && sel.turma_id === (h.turma_id || '') && sel.hora === (h.hora_inicio || '');
           return `<button onclick="LeadPainel.marcar7('${dia}','${h.turma_id||''}','${h.hora_inicio||''}')" style="border:1px solid ${marcado ? '#2E5BFF' : '#E9ECF3'};background:${marcado ? 'rgba(46,91,255,.08)' : '#fff'};color:${marcado ? '#2E5BFF' : '#141A2E'};border-radius:9px;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${marcado ? '✓ ' : ''}${hhmm(h.hora_inicio)} <span style="font-weight:500;opacity:.7">${h.vagas} livre${h.vagas > 1 ? 's' : ''}</span></button>`;
-        }).join('')}</div>` : `<div class="liv" style="margin-top:3px">sem vaga</div>`}
+        }).join('')}</div>` : `<div class="liv" style="padding-top:6px">sem vaga</div>`}</div>
       </div>`).join('')}
       <div class="acs" style="margin-top:10px"><button class="btn" onclick="LeadPainel.agendarSel7()" ${sel.data ? '' : 'disabled'}>${sel.data ? `Agendar ${sel.data === hoje ? 'hoje' : nomeDia(sel.data)} ${dataBR(sel.data)} às ${hhmm(sel.hora)}` : 'Marque um horário acima'}</button></div>
     </div>`;
