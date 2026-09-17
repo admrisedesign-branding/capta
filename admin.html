@@ -217,16 +217,15 @@ input,select,textarea{font-family:inherit}
 </head>
 <body>
 
-<!-- LOGIN -->
+<!-- LOGIN — é sempre o mesmo do resto do Capta (/login.html), que tem
+     Google e "esqueci minha senha". Aqui só avisa e manda pra lá. -->
 <div id="login-wrap" class="login-wrap">
   <div class="login-card">
     <div class="login-brand"><span class="brand-c">C</span>capta <span class="login-tag">ADMIN</span></div>
     <h1>Entrar no painel</h1>
-    <p>Acesso exclusivo da equipe RISE</p>
-    <div class="field"><label>E-mail</label><input type="email" id="l-email" placeholder="seu@email.com" autocomplete="email"></div>
-    <div class="field"><label>Senha</label><input type="password" id="l-senha" placeholder="••••••••"></div>
+    <p id="l-msg">Levando você para a tela de login…</p>
     <div class="err" id="l-err"></div>
-    <button class="btn btn-primary btn-full" id="l-btn" style="margin-top:8px">Entrar →</button>
+    <a class="btn btn-primary btn-full" id="l-btn" style="margin-top:8px;display:block;text-align:center;text-decoration:none" href="/login.html">Ir para o login →</a>
   </div>
 </div>
 
@@ -292,18 +291,10 @@ const IC = {
 // ---- AUTH ----
 async function init(){
   const { data:{ session } } = await sb.auth.getSession();
-  if(session) onLogin(session.user);
+  if(session) { onLogin(session.user); return; }
+  // ninguém logado: o login é o mesmo do Capta inteiro
+  location.replace('/login.html?de=admin');
 }
-document.getElementById('l-btn').onclick = async () => {
-  const email = document.getElementById('l-email').value.trim();
-  const senha = document.getElementById('l-senha').value;
-  const btn   = document.getElementById('l-btn');
-  btn.textContent='Entrando…'; btn.disabled=true;
-  const { error } = await sb.auth.signInWithPassword({ email, password:senha });
-  if(error){ document.getElementById('l-err').textContent='E-mail ou senha incorretos.'; btn.textContent='Entrar →'; btn.disabled=false; }
-  else { const { data:{ session } } = await sb.auth.getSession(); onLogin(session.user); }
-};
-document.getElementById('l-senha').onkeydown = e => { if(e.key==='Enter') document.getElementById('l-btn').click(); };
 
 function onLogin(user){
   document.getElementById('login-wrap').style.display='none';
@@ -312,7 +303,7 @@ function onLogin(user){
   document.getElementById('acct').textContent = ini(user.email.split('@')[0].replace('.',' '));
   loadAll();
 }
-window.logout = async () => { await sb.auth.signOut(); location.reload(); };
+window.logout = async () => { await sb.auth.signOut(); location.replace('/login.html?logout=1'); };
 
 // ---- API protegida (service-role no servidor; o navegador não escreve no banco) ----
 async function adminApi(action, params){

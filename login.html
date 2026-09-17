@@ -183,7 +183,16 @@ window.pedirReset = async () => {
   $('err').textContent = ''; $('go').disabled = true;
   try{
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/login.html?recuperar=1' });
-    if(error){ $('err').textContent = 'Não foi possível enviar o link. Confira o e-mail e tente de novo.'; $('go').disabled = false; return; }
+    if(error){
+      // mostra o motivo real: quase sempre é limite de e-mails por hora do Supabase
+      const m = (error.message || '').toLowerCase();
+      $('err').textContent = /rate|too many|segundos|seconds/.test(m)
+        ? 'O Supabase limita os e-mails por hora e esse limite foi atingido. Espere alguns minutos e tente de novo — ou entre pelo Google.'
+        : /not found|invalid/.test(m)
+        ? 'Não achei uma conta com esse e-mail. Confira o endereço.'
+        : `Não foi possível enviar: ${error.message}`;
+      $('go').disabled = false; return;
+    }
     $('rs-email').textContent = email; show('reset-sent-view');
   }catch(e){ $('err').textContent = 'Erro inesperado. Tente de novo.'; $('go').disabled = false; }
 };
@@ -256,6 +265,8 @@ function traduz(m){
 // ao abrir: se já tem sessão (inclusive volta do Google), roteia
 (async () => {
   // logout explícito vindo do dashboard: encerra a sessão e mostra o login limpo
+  // veio do admin.html sem sessão: só mostra o login normal (o roteamento
+  // depois manda pro /admin.html sozinho, se o e-mail for de administrador)
   if(new URLSearchParams(location.search).get('logout')==='1'){
     try{ localStorage.removeItem('capta_dash'); }catch(e){}
     try{ await sb.auth.signOut(); }catch(e){}
