@@ -156,7 +156,10 @@ button{font-family:inherit;cursor:pointer}
 .mini-tag.mt-rasc{background:rgba(46,91,255,.12);color:var(--brand)}
 .mini-tag.mt-ret{background:rgba(31,122,77,.12);color:#1f7a4d}
 .mini-tag.mt-ret-ja{background:rgba(214,69,69,.13);color:#c23b3b}
-.sel-dono{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 10px;font-size:12.5px;font-weight:600;color:var(--muted);font-family:inherit;cursor:pointer;max-width:170px}
+.sel-fil{flex:1 1 46%;min-width:150px;border:1px solid var(--line);background:var(--card);border-radius:11px;padding:9px 10px;font-size:13px;font-weight:700;color:var(--ink);font-family:inherit;cursor:pointer}
+.sel-fil:focus{outline:0;border-color:var(--brand)}
+.sel-fil.ativo{border-color:var(--brand);color:var(--brand);background:rgba(46,91,255,.05)}
+.bt-lid{flex:1 0 100%;border:1px solid var(--brand);background:var(--card);color:var(--brand);border-radius:11px;padding:7px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .sel-dono:focus{outline:0;border-color:var(--brand)}
 .bt-ligar{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
 .bt-ligar:hover{border-color:var(--brand);color:var(--brand)}
@@ -254,7 +257,7 @@ button{font-family:inherit;cursor:pointer}
 
 .lista-ferr{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
 .lista-ferr input{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-family:inherit;font-size:13px;width:100%}
-.filtros{display:flex;gap:4px;flex-wrap:wrap}.filtros button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:4px 10px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer}.filtros button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.filtros{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.filtros button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:4px 10px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer}.filtros button.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .conv-at{font-size:10.5px;color:var(--faint);font-weight:700}
 .conv.res{opacity:.55}
 .painel-acoes{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -436,13 +439,20 @@ function desenharLista(){
     : k==='quentes' ? CONVS.filter(c=>(c.lead?.temperatura||'').toLowerCase()==='quente').length : k==='sem_dono' ? CONVS.filter(c=>!c.atendente&&!c.resolvida_em).length
     : k==='sem_resposta' ? CONVS.filter(c=>c.aguardando_desde&&!c.resolvida_em).length : k==='urgentes' ? CONVS.filter(c=>window.CaptaAlerta&&CaptaAlerta.nivel(c)==='urgente'&&!c.resolvida_em).length : CONVS.filter(c=>!c.resolvida_em).length;
   const orfas = CONVS.filter(c => !c.lead).length;
-  document.getElementById('filtros').innerHTML = [['abertas','Abertas'],['sem_resposta','Sem resposta'],['urgentes','⏰ Urgentes'],['retornos','📞 Retornar'],['nao_lidas','Não lidas'],['minhas','Minhas'],['sem_dono','Sem dono'],['quentes','Quentes'],['resolvidas','Resolvidas']].map(([k,t]) => `<button class="${FI.f===k?'on':''}" onclick="FI.f='${k}';desenharLista()">${t} <span style="opacity:.7">${n(k)}</span></button>`).join('')
-    + `<select class="sel-dono" onchange="FI.dono=this.value;desenharLista()" title="Ver só as conversas de uma pessoa">
-        <option value="">todos os atendentes</option>
-        ${EQUIPE.map(p => `<option value="${esc(p)}" ${FI.dono===p?'selected':''}>${esc(p)}${CONVS.filter(c=>c.atendente===p&&!c.resolvida_em).length ? ` (${CONVS.filter(c=>c.atendente===p&&!c.resolvida_em).length})` : ''}</option>`).join('')}
-        <option value="__sem__" ${FI.dono==='__sem__'?'selected':''}>— sem dono —</option>
-      </select>`
-    + (orfas ? `<button style="border-color:var(--brand);color:var(--brand)" onclick="casarLid()" title="Conversas sem lead: descobre o número pelos leads do Kommo (via @lid) e liga">ligar ${orfas} sem nome</button>` : '');
+  // Dois seletores lado a lado: o que ver e de quem. Antes eram nove chips
+  // que ocupavam meia tela e empurravam as conversas para baixo.
+  const FILTROS = [['abertas','Abertas'],['sem_resposta','Sem resposta'],['urgentes','⏰ Urgentes'],['retornos','📞 Retornar'],['nao_lidas','Não lidas'],['minhas','Minhas'],['sem_dono','Sem dono'],['quentes','Quentes'],['resolvidas','Resolvidas']];
+  const donos = [...new Set([...EQUIPE, ...CONVS.map(c => c.atendente).filter(Boolean)])].sort();
+  document.getElementById('filtros').innerHTML = `
+    <select class="sel-fil${FI.f !== 'abertas' ? ' ativo' : ''}" onchange="FI.f=this.value;desenharLista()">
+      ${FILTROS.map(([k,t]) => `<option value="${k}" ${FI.f===k?'selected':''}>${t} (${n(k)})</option>`).join('')}
+    </select>
+    <select class="sel-fil${FI.dono ? ' ativo' : ''}" onchange="FI.dono=this.value;desenharLista()">
+      <option value="">Atendente: todos</option>
+      ${donos.map(p => `<option value="${esc(p)}" ${FI.dono===p?'selected':''}>${esc(p)} (${CONVS.filter(c=>c.atendente===p&&!c.resolvida_em).length})</option>`).join('')}
+      <option value="__sem__" ${FI.dono==='__sem__'?'selected':''}>Sem dono (${CONVS.filter(c=>!c.atendente&&!c.resolvida_em).length})</option>
+    </select>
+    ${orfas ? `<button class="bt-lid" onclick="casarLid()" title="Conversas sem lead: descobre o número pelos leads do Kommo (via @lid) e liga">ligar ${orfas} sem nome</button>` : ''}`;
   elCont.textContent = lista.length ? `${lista.length} conversa${lista.length > 1 ? 's' : ''}` : 'Nenhuma conversa';
   if (!lista.length) { elConvs.innerHTML = `<div class="vazio">${CONVS.length ? 'Nada com esse filtro.' : 'Nada por aqui ainda.<br>As mensagens aparecem assim que alguém escrever para o seu WhatsApp.'}</div>`; return; }
   // ordem sempre pela hora da última mensagem (mais recente em cima); prioridade é filtro
