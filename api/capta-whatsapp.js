@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -142,6 +142,7 @@ module.exports = async function handler(req, res) {
         case 'feedback':      return await acaoFeedback(tenant, body, res);
         case 'visita_avulsa': return await acaoVisitaAvulsa(tenant, body, res);
         case 'resumo_config': return await acaoResumoConfig(tenant, body, res);
+        case 'avisos':        return await acaoAvisos(tenant, body, res);
         case 'resumo_agora':  { const r = await enviarResumo(tenant.id, true); return res.status(200).json(r); }
         case 'ficha_aluno':   return await acaoFichaAluno(tenant, body, res);
       }
@@ -507,6 +508,11 @@ async function rodarCron(res) {
       catch (e) { console.error('[cron lembretes]', canal.tenant_id, e.message); }
     }
 
+    for (const canal of canais || []) {
+      try { await avisosInternos(canal, resumo); }
+      catch (e) { console.error('[cron avisos]', canal.tenant_id, e.message); }
+    }
+
     try { resumo.sessoes = await rpc('capta_bot_abandonar_paradas', { p_horas: 48 }); }
     catch { /* tabelas do bot ainda não existem em produção */ }
 
@@ -561,6 +567,61 @@ async function lembretes(canal, resumo) {
       resumo.falhas++;
       console.error('[lembrete]', item.agendamento_id, e.message);
     }
+  }
+}
+
+// ---------------------------------------------------------------------
+// AVISOS INTERNOS — cada pessoa da operação recebe só o que é dela.
+// 'aulas_dia'  → as experimentais de hoje (quem vai chegar e a que hora)
+// 'fechamento' → aulas de ontem sem baixa, que é onde o funil trava:
+//                sem desfecho ninguém sabe se matriculou, faltou ou vai pensar.
+// ---------------------------------------------------------------------
+async function avisosInternos(canal, resumo) {
+  const pessoas = await sb(`capta_avisos?tenant_id=eq.${canal.tenant_id}&ativo=is.true&select=nome,telefone,tipos`).catch(() => []);
+  if (!pessoas?.length) return;
+
+  const hoje = hojeManaus();
+  const base = new Date(hoje + 'T12:00:00Z').getTime();
+  const ontem = new Date(base - 864e5).toISOString().slice(0, 10);
+  const seteDias = new Date(base - 7 * 864e5).toISOString().slice(0, 10);
+  const precisa = t => pessoas.some(p => (p.tipos || []).includes(t));
+
+  let textoAulas = null, textoFechamento = null;
+
+  if (precisa('aulas_dia')) {
+    const ags = await sb(`capta_agendamentos?tenant_id=eq.${canal.tenant_id}&data=eq.${hoje}&status=in.(agendado,confirmado)&select=hora_inicio,crianca_nome,crianca_idade,extra,lead:lead_id(nome,contato)&order=hora_inicio`).catch(() => []);
+    textoAulas = (ags || []).length
+      ? `*Experimentais de hoje* (${ags.length})\n\n` + ags.map(a => {
+          const h = String(a.hora_inicio || '').slice(0, 5);
+          const cri = a.crianca_nome || 'sem nome';
+          return `${h} · ${cri}${a.crianca_idade ? `, ${a.crianca_idade} anos` : ''}${a.extra ? ' (extra)' : ''}\n     responsável: ${a.lead?.nome || '—'}${a.lead?.contato ? ' · ' + a.lead.contato : ''}`;
+        }).join('\n') + `\n\nDepois da aula, marque o resultado no Capta: matriculou, em andamento, não matriculou ou faltou.`
+      : `*Experimentais de hoje*\n\nNenhuma aula marcada para hoje.`;
+  }
+
+  if (precisa('fechamento')) {
+    const ags = await sb(`capta_agendamentos?tenant_id=eq.${canal.tenant_id}&data=lte.${ontem}&data=gte.${seteDias}&status=in.(agendado,confirmado,compareceu)&select=data,hora_inicio,crianca_nome,observacao,lead:lead_id(nome)&order=data`).catch(() => []);
+    const semBaixa = (ags || []).filter(a => !/desfecho:/i.test(a.observacao || ''));
+    if (semBaixa.length) {
+      textoFechamento = `*Aulas sem resultado* (${semBaixa.length})\n\n` + semBaixa.slice(0, 15).map(a =>
+        `${a.data.slice(8, 10)}/${a.data.slice(5, 7)} ${String(a.hora_inicio || '').slice(0, 5)} · ${a.crianca_nome || a.lead?.nome || 'sem nome'}`
+      ).join('\n') + (semBaixa.length > 15 ? `\n… e mais ${semBaixa.length - 15}` : '')
+        + `\n\nSem a baixa o lead fica parado em Aula agendada e ninguém retoma. Abra Aula experimental no Capta e marque o resultado.`;
+    }
+  }
+
+  for (const p of pessoas) {
+    const partes = [];
+    if ((p.tipos || []).includes('aulas_dia') && textoAulas) partes.push(textoAulas);
+    if ((p.tipos || []).includes('fechamento') && textoFechamento) partes.push(textoFechamento);
+    if ((p.tipos || []).includes('resumo')) { try { partes.push(await montarResumo(canal.tenant_id)); } catch (e) {} }
+    if (!partes.length) continue;
+    const cab = p.nome ? `Oi, ${String(p.nome).split(' ')[0]}!\n\n` : '';
+    try {
+      await prov.enviarTexto(canal, p.telefone, cab + partes.join('\n\n———\n\n'));
+      resumo.enviados++;
+      await new Promise(r => setTimeout(r, 1500));   // ritmo humano: conexão não oficial pune disparo rápido
+    } catch (e) { resumo.falhas++; console.error('[aviso]', p.telefone, e.message); }
   }
 }
 
@@ -1762,6 +1823,28 @@ async function acaoResumoConfig(tenant, body, res) {
   }
   const [t] = await sb(`capta_tenants?id=eq.${tenant.id}&select=resumo_para,resumo_ativo,resumo_hora&limit=1`);
   return res.status(200).json({ config: t || {} });
+}
+
+// Quem recebe aviso interno, e de quê. Uma linha por pessoa.
+async function acaoAvisos(tenant, body, res) {
+  if (body.apagar) await sb(`capta_avisos?id=eq.${body.apagar}&tenant_id=eq.${tenant.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  if (body.salvar) {
+    const a = body.salvar;
+    const fone = String(a.telefone || '').replace(/\D/g, '');
+    if (!fone) return res.status(400).json({ erro: 'Informe o WhatsApp.' });
+    const dados = { nome: a.nome || null, telefone: fone.startsWith('55') ? fone : `55${fone}`, tipos: Array.isArray(a.tipos) ? a.tipos : [], ativo: a.ativo !== false };
+    if (a.id) await sb(`capta_avisos?id=eq.${a.id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
+    else await sb('capta_avisos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ tenant_id: tenant.id, ...dados }) });
+  }
+  if (body.testar) {
+    const [canal] = await sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&status=eq.conectado&select=*&limit=1`).catch(() => []);
+    if (!canal) return res.status(400).json({ erro: 'WhatsApp não está conectado.' });
+    const r = { enviados: 0, falhas: 0 };
+    await avisosInternos(canal, r);
+    return res.status(200).json({ ok: true, ...r, avisos: await sb(`capta_avisos?tenant_id=eq.${tenant.id}&select=id,nome,telefone,tipos,ativo&order=criado_em`).catch(() => []) });
+  }
+  const lista = await sb(`capta_avisos?tenant_id=eq.${tenant.id}&select=id,nome,telefone,tipos,ativo&order=criado_em`).catch(() => []);
+  return res.status(200).json({ avisos: lista || [] });
 }
 
 function plural(n, um, muitos) { return `${n} ${n === 1 ? um : muitos}`; }
