@@ -169,8 +169,6 @@ const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hh = t => String(t||'').slice(0,5);
 const primeiro = n => String(n||'').trim().split(/\s+/)[0] || '';
-const PAGTOS = ['Pix','Cartão','Boleto','Mensalidade recorrente'];
-const MOTIVOS = ['Precisa conversar em casa','O valor','O horário não bate','A distância','A criança não se adaptou','Só estávamos conhecendo'];
 let D = null, MODO = 'in', SEL = null, F = {}, PASSO = 0, ocioso = null;
 
 // Robô provisório — trocar pelo mascote oficial da My Robot quando tiver o arquivo
@@ -303,7 +301,10 @@ async function salvarVisitante(){
   catch(e){ alert(e.message); }
 }
 
-const PASSOS = ['nota','matricula','detalhe'];
+// A matrícula não é assunto do tablet: quando a criança chega aqui, a família
+// já passou pelo fechamento. O tablet dá o check-out e pergunta como foi a aula.
+const PASSOS = ['nota','detalhe'];
+const GOSTOU = ['Montar o robô','Programar','Trabalhar em dupla','A professora','Os desafios','O kit'];
 function iniciarFeedback(){ PASSO = 0; F = {}; ir('feedback'); pintarPasso(); }
 function pintarPasso(){
   const nome = primeiro(SEL.nome), passo = PASSOS[PASSO], corpo = document.getElementById('fb-corpo'), ok = document.getElementById('fb-ok');
@@ -314,33 +315,31 @@ function pintarPasso(){
     corpo.innerHTML = `<div class="estrelas">${[1,2,3,4,5].map(v => `<button class="${F.nota>=v?'on':''}" onclick="F.nota=${v};pintarPasso()">⭐</button>`).join('')}</div>
       ${F.nota && F.nota <= 3 ? `<div class="campo"><label>O que faltou pra ficar melhor?</label><input value="${esc(F.comentario||'')}" placeholder="Pode escrever aqui" oninput="F.comentario=this.value"></div>` : ''}`;
     ok.disabled = !F.nota;
-  } else if (passo === 'matricula') {
-    document.getElementById('fb-tit').textContent = 'Vamos garantir a vaga?';
-    document.getElementById('fb-sub').textContent = 'A matrícula pode ser feita agora, aqui na recepção';
-    corpo.innerHTML = `<div class="ops duo"><button class="sim ${F.paga===true?'on':''}" onclick="F.paga=true;pintarPasso()">Sim! 🎉</button><button class="nao ${F.paga===false?'on':''}" onclick="F.paga=false;pintarPasso()">Agora não</button></div>`;
-    ok.disabled = F.paga === undefined;
-  } else if (F.paga) {
-    document.getElementById('fb-tit').textContent = 'Que alegria! 🎉';
-    document.getElementById('fb-sub').textContent = 'Como vai ser o pagamento?';
-    corpo.innerHTML = `<div class="ops">${PAGTOS.map(v => `<button class="${F.pagamento===v?'on':''}" onclick="F.pagamento='${v}';pintarPasso()">${v}</button>`).join('')}</div>`;
-    ok.disabled = !F.pagamento;
-  } else {
-    document.getElementById('fb-tit').textContent = 'Tudo bem 😊';
-    document.getElementById('fb-sub').textContent = 'O que pesou pra não fechar hoje?';
-    corpo.innerHTML = `<div class="ops">${MOTIVOS.map(v => `<button class="${F.motivo===v?'on':''}" onclick="F.motivo='${v}';pintarPasso()">${v}</button>`).join('')}</div>`;
-    ok.disabled = !F.motivo;
+  } else if (passo === 'detalhe') {
+    document.getElementById('fb-tit').textContent = F.nota >= 4 ? `Que bom, ${nome}! 🎉` : 'Obrigado por contar 😊';
+    document.getElementById('fb-sub').textContent = F.nota >= 4 ? 'O que você mais gostou hoje?' : 'O que faria a próxima ser melhor?';
+    corpo.innerHTML = `<div class="ops">${GOSTOU.map(v => `<button class="${(F.gostou||[]).includes(v)?'on':''}" onclick="alternarGostou('${v}')">${v}</button>`).join('')}</div>
+      <div class="campo" style="margin-top:14px"><label>Quer contar mais alguma coisa? (opcional)</label>
+        <input value="${esc(F.comentario||'')}" placeholder="Escreva aqui" oninput="F.comentario=this.value"></div>`;
+    ok.disabled = false;   // tudo opcional: ninguém trava a saída da criança
   }
   document.getElementById('fb-passos').innerHTML = PASSOS.map((_,i) => `<i class="${i===PASSO?'on':''}"></i>`).join('');
+}
+function alternarGostou(v){
+  F.gostou = F.gostou || [];
+  F.gostou = F.gostou.includes(v) ? F.gostou.filter(x => x !== v) : [...F.gostou, v];
+  pintarPasso();
 }
 function voltarPasso(){ if (PASSO === 0) return ir('lista'); PASSO--; pintarPasso(); }
 async function proximoPasso(){
   if (PASSO < PASSOS.length - 1) { PASSO++; return pintarPasso(); }
   try {
-    await api('feedback', { agendamento_id: SEL.id, nota: F.nota ?? null, paga_hoje: F.paga, motivo: F.motivo || null,
-      pagamento: F.pagamento || null, comentario: F.comentario || null, atendente: 'recepção' });
+    const gostou = (F.gostou || []).join(', ');
+    const texto = [gostou && (F.nota >= 4 ? `gostou de: ${gostou}` : `melhorar: ${gostou}`), (F.comentario||'').trim()].filter(Boolean).join(' · ');
+    await api('feedback', { agendamento_id: SEL.id, nota: F.nota ?? null, comentario: texto || null, atendente: 'recepção' });
     await carregar();
-    festa(F.paga ? `Bem-vindo à família, ${primeiro(SEL.nome)}! 🎉` : `Obrigado, ${primeiro(SEL.nome)}! 🤖`,
-          F.paga ? 'Sua matrícula foi registrada. Até a próxima aula!' : 'Adorei te conhecer. A gente se fala em breve 😊');
+    festa(`Até a próxima, ${primeiro(SEL.nome)}! 👋`,
+          F.nota >= 4 ? 'Que bom que você curtiu. A gente se fala em breve 😊' : 'Obrigado por contar pra gente — isso ajuda demais 🤖');
   } catch(e){ alert(e.message); }
 }
 relogio(); setInterval(relogio, 20000);
