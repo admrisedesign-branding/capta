@@ -456,6 +456,51 @@
     const hs = (S.agenda && S.agenda.horarios || []).filter(h => (h.vagas ?? 1) > 0);
     return hs.filter(h => { const dow = new Date(h.data+'T12:00:00').getDay(), hi = parseInt(h.hora_inicio); return tipo==='sab' ? dow===6 : tipo==='manha' ? (dow!==6&&hi<12) : (dow!==6&&hi>=12); }).sort((a,b) => (a.data+a.hora_inicio).localeCompare(b.data+b.hora_inicio));
   }
+  // Grade dos próximos 7 dias: cada horário com vaga aparece como opção
+  // marcável. Evita a dança de escolher data, esperar carregar, abrir o
+  // seletor de hora — que era onde o campo de data atrapalhava.
+  function semana7() {
+    const ag = S.agenda;
+    if (!ag) return `<div class="aviso-p">Buscando vagas…</div>`;
+    if (ag.erro) return `<div class="aviso-p">${esc(ag.erro)}</div>`;
+    const hoje = hojeLocal();
+    const dias = [];
+    for (let i = 0; i < 7; i++) { const d = new Date(hoje + 'T12:00'); d.setDate(d.getDate() + i); dias.push(d.toISOString().slice(0, 10)); }
+    const porDia = dias.map(dia => {
+      const hs = (ag.horarios || []).filter(h => h.data === dia && h.vagas > 0)
+        .sort((a, b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+      return { dia, hs };
+    });
+    if (!porDia.some(d => d.hs.length)) return `<div class="vaga" style="background:var(--card)"><div class="liv">Nenhuma vaga livre nos próximos 7 dias. Use "outro dia e horário" abaixo.</div></div>`;
+    const sel = S.sel7 || {};
+    return `<div class="vaga" style="background:var(--card)">
+      ${porDia.map(({ dia, hs }) => `<div style="padding:7px 0;border-bottom:1px solid #F0F2F7">
+        <div style="font-size:12px;font-weight:700;color:#697089;text-transform:uppercase;letter-spacing:.03em">${dia === hoje ? 'hoje' : nomeDia(dia)} ${dataBR(dia)}</div>
+        ${hs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px">${hs.map(h => {
+          const marcado = sel.data === dia && sel.turma_id === (h.turma_id || '') && sel.hora === (h.hora_inicio || '');
+          return `<button onclick="LeadPainel.marcar7('${dia}','${h.turma_id||''}','${h.hora_inicio||''}')" style="border:1px solid ${marcado ? '#2E5BFF' : '#E9ECF3'};background:${marcado ? 'rgba(46,91,255,.08)' : '#fff'};color:${marcado ? '#2E5BFF' : '#141A2E'};border-radius:9px;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${marcado ? '✓ ' : ''}${hhmm(h.hora_inicio)} <span style="font-weight:500;opacity:.7">${h.vagas} livre${h.vagas > 1 ? 's' : ''}</span></button>`;
+        }).join('')}</div>` : `<div class="liv" style="margin-top:3px">sem vaga</div>`}
+      </div>`).join('')}
+      <div class="acs" style="margin-top:10px"><button class="btn" onclick="LeadPainel.agendarSel7()" ${sel.data ? '' : 'disabled'}>${sel.data ? `Agendar ${sel.data === hoje ? 'hoje' : nomeDia(sel.data)} ${dataBR(sel.data)} às ${hhmm(sel.hora)}` : 'Marque um horário acima'}</button></div>
+    </div>`;
+  }
+  function marcar7(data, turma_id, hora) {
+    const igual = S.sel7 && S.sel7.data === data && S.sel7.turma_id === turma_id && S.sel7.hora === hora;
+    S.sel7 = igual ? null : { data, turma_id, hora };   // clicar de novo desmarca
+    desenhar();
+  }
+  function agendarSel7() {
+    const s7 = S.sel7; if (!s7) return;
+    confirmarAgenda(s7.turma_id, s7.data, s7.hora);
+  }
+  // Data digitada: guarda e busca os horários SEM redesenhar a gaveta.
+  // Redesenhar no meio da digitação tirava o foco do campo, e o ano nunca
+  // chegava a ser preenchido (ficava 0001 e o navegador reclamava).
+  async function diaEscolhido(data) {
+    if (!data || data.length !== 10 || data < hojeLocal()) return;
+    await verHorarios(data, true);
+  }
+
   function cardVaga(tipo, rotulo) {
     const lista = vagasPor(tipo); const idx = S.idx[tipo] || 0; const v = lista[idx];
     if (!v) return `<div class="vaga"><div class="sec" style="margin:0 0 4px">${rotulo}</div><div class="liv">Sem vaga livre nos próximos 30 dias.</div></div>`;
@@ -494,28 +539,30 @@
       <div class="sec">2 · Kit</div><div class="chips"><span class="chip on">First</span><span class="chip" style="border:0;color:var(--faint)">a experimental é sempre no First; o nivelamento é no dia</span></div>
       <div class="sec">3 · Ofereça duas opções</div>
       ${!S.agenda ? `<div class="aviso-p">Buscando vagas…</div>` : S.agenda.erro ? `<div class="aviso-p">${esc(S.agenda.erro)}</div>` : cardVaga('manha','Manhã') + cardVaga('tarde','Tarde') + cardVaga('sab','Sábado')}
+      <div class="sec">Próximos 7 dias</div>
+      ${semana7()}
       <div class="sec">Outro dia e horário</div>
       <div class="vaga" style="background:var(--card)">
-        <div class="l2"><div class="campo"><label>Dia</label><input id="lp-a-data" type="date" min="${hojeLocal()}" value="${S.escolhido?.data || ''}" onchange="LeadPainel.verHorarios(this.value)" max="${new Date(Date.now()+120*864e5).toISOString().slice(0,10)}"></div>
+        <div class="l2"><div class="campo"><label>Dia</label><input id="lp-a-data" type="date" min="${hojeLocal()}" value="${S.escolhido?.data || ''}" onchange="LeadPainel.diaEscolhido(this.value)" max="${new Date(Date.now()+120*864e5).toISOString().slice(0,10)}"></div>
           <div class="campo"><label>Horário</label><select id="lp-a-hora" ${S.horarios ? '' : 'disabled'}>${
             !S.horarios ? '<option>escolha o dia</option>' :
             !S.horarios.length ? '<option>sem turma nesse dia</option>' :
             S.horarios.map(h => `<option value="${h.turma_id}" ${h.vagas <= 0 ? 'disabled' : ''}>${hhmm(h.hora_inicio)}–${hhmm(h.hora_fim)} · ${h.vagas > 0 ? h.vagas + ' livre' + (h.vagas > 1 ? 's' : '') : 'sem vaga'}</option>`).join('')
           }</select></div></div>
-        <div class="acs"><button class="btn" onclick="LeadPainel.agendarManual()" ${S.horarios && S.horarios.some(h => h.vagas > 0) ? '' : 'disabled'}>Agendar nesse horário</button></div>
-        <div class="liv" style="margin-top:6px">Use quando a família pedir um dia específico. Só aparecem horários com vaga real.</div>
+        <div class="acs"><button class="btn" id="lp-a-bt" onclick="LeadPainel.agendarManual()" ${S.horarios && S.horarios.some(h => h.vagas > 0) ? '' : 'disabled'}>Agendar nesse horário</button></div>
+        <div class="liv" style="margin-top:6px">Use quando a família pedir um dia fora dos próximos 7. Só aparecem horários com vaga real.</div>
       </div>
       <div class="sec">Agendamento extra</div>
       <div class="vaga" style="background:var(--card)">
         <div class="l2"><div class="campo"><label>Dia</label><input id="lp-x-data" type="date" value="${S.xd || ''}" onchange="LeadPainel.extraCampo('xd',this.value)"></div>
           <div class="campo"><label>Horário</label><input id="lp-x-hora" type="time" step="900" value="${S.xh || ''}" onchange="LeadPainel.extraCampo('xh',this.value)"></div></div>
-        <div class="acs"><button class="btn" onclick="LeadPainel.agendarExtra()" ${S.xd && S.xh ? '' : 'disabled'}>Agendar extra</button></div>
+        <div class="acs"><button class="btn" id="lp-x-bt" onclick="LeadPainel.agendarExtra()" ${S.xd && S.xh ? '' : 'disabled'}>Agendar extra</button></div>
         <div class="liv" style="margin-top:6px">Fora do horário comercial, fim de semana ou feriado. Sem turma e sem consumir vaga — entra na agenda como encaixe.</div>
       </div>
       <div class="aviso-p" style="margin-top:10px;border:0;padding:6px 0;text-align:left">Estoque atualiza sozinho a cada minuto e a cada aula marcada.</div>
       ${historico(l)}</div>`;
   }
-  async function verHorarios(data) {
+  async function verHorarios(data, semRedesenhar) {
     S.escolhido = { data };
     // se a data escolhida está além do que já carregamos, busca mais dias
     const ultimo = (S.agenda && S.agenda.horarios || []).map(h => h.data).sort().pop();
@@ -525,14 +572,38 @@
     }
     const todos = (S.agenda && S.agenda.horarios || []).filter(h => h.data === data)
       .sort((a, b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
-    S.horarios = todos; desenhar();
-    // mantém a data escolhida visível depois de redesenhar
-    const el = document.getElementById('lp-a-data'); if (el) el.value = data;
+    S.horarios = todos;
+    if (!semRedesenhar) { desenhar(); const el = document.getElementById('lp-a-data'); if (el) el.value = data; return; }
+    // troca só o seletor de horário e o botão — o campo de data fica intacto
+    const sel = document.getElementById('lp-a-hora'), bt = document.getElementById('lp-a-bt');
+    if (sel) {
+      sel.disabled = false;
+      sel.innerHTML = !todos.length ? '<option>sem turma nesse dia</option>'
+        : todos.map(h => `<option value="${h.turma_id}" ${h.vagas <= 0 ? 'disabled' : ''}>${hhmm(h.hora_inicio)}–${hhmm(h.hora_fim)} · ${h.vagas > 0 ? h.vagas + ' livre' + (h.vagas > 1 ? 's' : '') : 'sem vaga'}</option>`).join('');
+    }
+    if (bt) bt.disabled = !todos.some(h => h.vagas > 0);
   }
-  function extraCampo(k, v) { S[k] = v; desenhar(); }
+  function extraCampo(k, v) {
+    S[k] = v;   // sem desenhar(): redesenhar no meio da digitação tira o foco do campo
+    const bt = document.getElementById('lp-x-bt'); if (bt) bt.disabled = !(S.xd && S.xh);
+  }
   // Encaixe fora da grade: qualquer dia e hora, sem turma e sem vaga.
+  // Quantos já têm aula marcada naquele dia/hora — serve para avisar antes de
+  // encaixar um extra num horário que já está cheio.
+  function ocupacaoEm(data, hora) {
+    const hs = (S.agenda && S.agenda.horarios || []).filter(h => h.data === data);
+    if (!hs.length) return null;
+    const hh = String(hora || '').slice(0, 2);
+    const aula = hs.find(h => String(h.hora_inicio || '').slice(0, 2) === hh);
+    if (!aula) return { foraDaGrade: true };
+    return { livres: aula.vagas, total: aula.capacidade, hora: aula.hora_inicio };
+  }
   async function agendarExtra() {
     const l = S.lead; if (!l || !S.xd || !S.xh) return;
+    const oc = ocupacaoEm(S.xd, S.xh);
+    if (oc && !oc.foraDaGrade && oc.livres <= 0) {
+      if (!confirm(`Atenção: ${dataBR(S.xd)} às ${hhmm(S.xh)} já está com a turma cheia (${oc.total} de ${oc.total} kits ocupados).\n\nO extra entra de qualquer forma, sem consumir vaga — mas vai ter mais criança que kit nessa hora.\n\nAgendar mesmo assim?`)) return;
+    }
     const crianca = (document.getElementById('lp-a-cri') || {}).value?.trim() || l.crianca || '';
     const idade = (document.getElementById('lp-a-id') || {}).value || l.idade || null;
     if (!crianca) return say('Informe o nome da criança.', { tipo:'erro' });
@@ -551,10 +622,16 @@
     if (!data || !turma) return say('Escolha o dia e o horário.', { tipo:'erro' });
     const h = (S.horarios||[]).find(x => String(x.turma_id) === String(turma)); return confirmarAgenda(turma, data, h ? h.hora_inicio : undefined);
   }
-  async function confirmarAgenda(turmaId, data) {
+  // O terceiro parâmetro (horaIni) não existia: o código usava "hora", que é o
+  // formatador de data lá de cima. Resultado: o horário nunca era enviado e
+  // dependia da turma para ser descoberto — por isso a hora aberta falhava.
+  async function confirmarAgenda(turmaId, data, horaIni) {
     const l = S.lead; const crianca = document.getElementById('lp-a-cri').value.trim(), idade = document.getElementById('lp-a-id').value;
     if (!crianca) { say('Informe o nome da criança.', { tipo:'erro' }); document.getElementById('lp-a-cri').focus(); return; }
-    try { await api('agendar', { turma_id: turmaId || null, data, hora_inicio: hora || undefined, crianca_nome: crianca, crianca_idade: idade || null, lead_id: l.id });
+    // Aviso de turma cheia antes de confirmar (o servidor recusa, mas é melhor avisar aqui)
+    const oc = ocupacaoEm(data, horaIni);
+    if (oc && !oc.foraDaGrade && oc.livres <= 0 && !confirm(`${dataBR(data)} às ${hhmm(horaIni)} está com a turma cheia (${oc.total} de ${oc.total} kits ocupados). Agendar mesmo assim?`)) return;
+    try { await api('agendar', { turma_id: turmaId || null, data, hora_inicio: horaIni || undefined, crianca_nome: crianca, crianca_idade: idade || null, lead_id: l.id });
       if (!l.atendente && EU()) { api('campos', { lead_id: l.id, atendente: EU() }).catch(()=>{}); l.atendente = EU(); }
       l.crianca = crianca; l.idade = idade ? Number(idade) : l.idade; const et = await etapas(); const e = et.find(x => /aula agendada/i.test(x.nome)); if (e) { l.etapa_id = e.id; l.etapa_em = new Date().toISOString(); }
       say(`<b>${esc(crianca)}</b> · aula marcada ${nomeDia(data)} ${dataBR(data)} · lead em Aula agendada · Kommo atualizado`, { tipo:'ok' });
@@ -588,5 +665,5 @@
       S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
-  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, agendarManual, agendarExtra, extraCampo, enviar, atribuir, trocarAtendente, verHistoricoAtendente, ligar, registrarLigacao, verLigacoes, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
+  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, diaEscolhido, marcar7, agendarSel7, agendarManual, agendarExtra, extraCampo, enviar, atribuir, trocarAtendente, verHistoricoAtendente, ligar, registrarLigacao, verLigacoes, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
 })();

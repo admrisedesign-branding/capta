@@ -341,6 +341,19 @@ const AJUDA_ETAPA = {
 const ajudaEtapa = nome => AJUDA_ETAPA[String(nome||'').toLowerCase().trim()] || null;
 const iconeAjuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
 const F = { parado: 0, temp: '', busca: '', ordem: 'recente', esconderFrios: false, resposta: '', dono: '' };
+// A busca redesenha o quadro inteiro, e redesenhar troca o campo de lugar —
+// era por isso que só dava para digitar uma letra. Agora espera a pessoa
+// parar de digitar e devolve o cursor para onde estava.
+let tBusca = null;
+function buscar(v){
+  F.busca = v;
+  clearTimeout(tBusca);
+  tBusca = setTimeout(() => {
+    desenhar();
+    const el = document.getElementById('fb-busca');
+    if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }, 250);
+}
 const nivelLead = l => (window.CaptaAlerta ? CaptaAlerta.nivel({ aguardando_desde: l.aguardando_desde, lead: l }) : '');
 const diasParado = l => Math.floor((Date.now() - new Date(l.etapa_em || l.criado_em).getTime()) / 864e5);
 function filtrar(lista) {
@@ -359,7 +372,7 @@ function filtrar(lista) {
 }
 function barraFiltros(total, vis) {
   return `<div class="filtros-bar">
-    <input class="fb-busca" placeholder="Buscar nome ou telefone" value="${esc(F.busca)}" oninput="F.busca=this.value;desenhar()">
+    <input class="fb-busca" id="fb-busca" placeholder="Buscar nome ou telefone" value="${esc(F.busca)}" oninput="buscar(this.value)">
     <div class="fb-resp">
       <button class="${!F.resposta?'on':''}" onclick="F.resposta='';desenhar()">Todos</button>
       <button class="${F.resposta==='sem_resposta'?'on':''}" onclick="F.resposta='sem_resposta';desenhar()">Sem resposta <b>${leads.filter(l=>l.aguardando_desde).length}</b></button>
