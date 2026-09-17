@@ -142,6 +142,16 @@ tr:hover td{background:var(--brand-softer);cursor:pointer}
   .al{break-inside:avoid}
   a[href]:after{content:''}
 }
+.mud-lista{margin-top:12px;max-height:56vh;overflow-y:auto}
+.mud-li{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-2,#F0F2F7)}
+.mud-li>div:first-child{flex:1 1 130px}
+.mud-li b{font-size:13.5px;display:block}
+.mud-li small{color:var(--muted);font-size:11.5px}
+.mud-li.atual{opacity:.65}
+.mud-vg{display:flex;flex-direction:column;gap:2px;font-size:11.5px;color:var(--muted);font-weight:600;min-width:120px}
+.mud-vg .x{color:#c23b3b}
+.mud-li.cheio b{color:#c23b3b}
+.mud-tag{font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:3px 9px}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -306,6 +316,58 @@ function lista(filtro){
 
 // ---------------- ficha do aluno ----------------
 const DIASF = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+// Mudança definitiva de turma: mostra as vagas de sala e de kit ANTES de
+// confirmar, porque quem fala com o pai precisa saber se cabe.
+let MUD = null;
+async function abrirMudanca(alunoId, kit, turmaAtual){
+  MUD = { alunoId, kit, turmaAtual, turmas: null };
+  desenharMudanca();
+  try { const r = await api('turmas_vagas', { kit: kit || undefined }); MUD.turmas = r.turmas || []; }
+  catch(e){ MUD.erro = e.message; }
+  desenharMudanca();
+}
+function desenharMudanca(){
+  if (!MUD) { document.getElementById('modal').innerHTML = ''; return; }
+  const al = D.alunos.find(a => a.id === MUD.alunoId) || {};
+  const corpo = MUD.erro ? `<div class="aviso">${esc(MUD.erro)}</div>`
+    : !MUD.turmas ? `<div class="aviso">Buscando vagas…</div>`
+    : `<div class="mud-lista">${MUD.turmas.map(t => {
+        const atual = t.id === MUD.turmaAtual;
+        const semSala = t.sala_livre <= 0;
+        const semKit = t.kit_livre != null && t.kit_livre <= 0;
+        const cheio = semSala || semKit;
+        return `<div class="mud-li ${atual?'atual':''} ${cheio?'cheio':''}">
+          <div><b>${DIAS[t.dia_semana]} ${hh(t.hora_inicio)}</b><small>${esc(t.nome||'')}</small></div>
+          <div class="mud-vg">
+            <span class="${semSala?'x':''}">${t.na_sala}/${t.limite_sala} na sala</span>
+            ${t.kit_livre == null ? '' : `<span class="${semKit?'x':''}">kit ${esc(MUD.kit)}: ${t.kit_livre} livre${t.kit_livre===1?'':'s'}</span>`}
+          </div>
+          ${atual ? '<span class="mud-tag">turma atual</span>'
+            : `<button class="btn ${cheio?'g':''}" onclick="confirmarMudanca('${t.id}',${cheio})">${cheio?'sem vaga — forçar':'mudar para esta'}</button>`}
+        </div>`;
+      }).join('')}</div>`;
+  document.getElementById('modal').innerHTML = `<div class="fundo" onclick="if(event.target===this){MUD=null;desenharMudanca()}">
+    <div class="janela" style="max-width:520px"><h3>Mudar ${esc(al.nome_curto || al.nome || 'o aluno')} de turma</h3>
+      <p style="color:var(--muted);font-size:13px;margin:4px 0 0">Confira a vaga antes de confirmar com a família. Turma sem lugar na sala ou sem kit livre aparece em vermelho.</p>
+      ${corpo}
+      <div class="fim" style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn g" onclick="MUD=null;desenharMudanca()">Fechar</button></div>
+    </div></div>`;
+}
+async function confirmarMudanca(turmaId, cheio){
+  const t = (MUD.turmas || []).find(x => x.id === turmaId);
+  const al = D.alunos.find(a => a.id === MUD.alunoId) || {};
+  const rot = t ? `${DIAS[t.dia_semana]} ${hh(t.hora_inicio)}` : 'essa turma';
+  if (!confirm(cheio
+      ? `${rot} está sem vaga.\n\nMudar ${al.nome_curto || al.nome} para lá mesmo assim? Vai ficar mais criança que lugar (ou que kit) nesse horário.`
+      : `Mudar ${al.nome_curto || al.nome} para ${rot}?\n\nEsta é a turma fixa dele a partir de agora.`)) return;
+  try {
+    const r = await api('transferir_aluno', { aluno_id: MUD.alunoId, turma_id: turmaId, forcar: !!cheio, por_nome: (window.CaptaUser && CaptaUser.nome && CaptaUser.nome()) || undefined });
+    MUD = null; desenharMudanca();
+    toast(`Turma alterada: ${esc(r.de||'')} → ${esc(r.para||'')}`, { tipo:'ok' });
+    await carregar();
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
 async function abrirFicha(id){
   document.getElementById('ficha').classList.add('aberto'); document.getElementById('ficha-scrim').classList.add('on');
   document.getElementById('ficha').innerHTML = `<div class="corpo"><div class="aviso">Carregando…</div></div>`;
@@ -323,6 +385,11 @@ async function abrirFicha(id){
         <div class="sub"><span class="st ${esc(a.status)}">${esc(a.status)}</span>${a.trancado_ate?` até ${new Date(a.trancado_ate+'T12:00').toLocaleDateString('pt-BR')}`:''}</div></div>
       <button class="x" onclick="fecharFicha()">×</button></div>
     <div class="corpo">
+      <div class="sec">Turma</div>
+      <div class="linha-f"><span>${t?`${DIASF[t.dia_semana]} ${String(t.hora_inicio).slice(0,5)}–${String(t.hora_fim).slice(0,5)}`:'sem turma'}</span>
+        <b><button class="btn g" onclick="abrirMudanca('${a.id}','${esc(a.kit||'')}','${a.turma_id||''}')">mudar de turma</button></b></div>
+      <div class="obs" style="color:var(--faint);font-size:11.5px;margin-top:4px">Mudança definitiva do dia e horário. Para uma aula só em outro dia, use reposição na Agenda.</div>
+
       <div class="sec">Frequência</div>
       ${freq === null ? '<div class="obs" style="color:var(--faint);font-size:13px">Ainda sem aulas registradas pelo tablet.</div>' : `
       <div class="freq"><div><b>${freq}%</b><small>presença</small></div><div><b>${f.presentes}</b><small>de ${f.previstas} aulas</small></div>
