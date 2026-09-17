@@ -102,7 +102,7 @@
   const hora = iso => new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
   const say = (m, o) => (window.toast ? toast(m, o) : (o && o.tipo === 'erro' ? alert(m.replace(/<[^>]+>/g,'')) : null));
 
-  let cfg = {}, S = { lead: null, aba: 'conversa', info: null, agenda: null, idx: { manha:0, tarde:0, sab:0 }, etapas: [], rapidas: null, timer: null, timerMsg: null };
+  let cfg = {}, S = { lead: null, aba: 'conversa', info: null, agenda: null, sel7: null, etapas: [], rapidas: null, timer: null, timerMsg: null };
 
   async function api(acao, extra = {}) {
     const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, slug: cfg.slug, token: cfg.token, email_atual: (window.CaptaUser && CaptaUser.email && CaptaUser.email()) || undefined, ...extra }) });
@@ -123,7 +123,7 @@
   async function abrir(id, aba) {
     monta();
     const l = cfg.getLead ? cfg.getLead(id) : null; if (!l) return;
-    S = { ...S, lead: l, aba: aba || 'conversa', info: null, agenda: null, idx: { manha:0, tarde:0, sab:0 } };
+    S = { ...S, lead: l, aba: aba || 'conversa', info: null, agenda: null, sel7: null };
     document.getElementById('lp').classList.add('aberto'); document.getElementById('lp-scrim').classList.add('on');
     if (!EQUIPE) carregarEquipe();
     await etapas(); desenhar();
@@ -449,12 +449,8 @@
   // ---------- Agendar ----------
   async function carregarAgenda(silencioso) {
     try { S.agenda = await api('agenda', { dias: 30 }); } catch (e) { if (!silencioso) S.agenda = { erro: e.message }; }
-    if (!silencioso) S.idx = { manha:0, tarde:0, sab:0 }; desenhar();
+    desenhar();
     clearTimeout(S.timer); S.timer = setTimeout(() => { if (S.lead && S.aba === 'agendar') carregarAgenda(true); }, 60000);
-  }
-  function vagasPor(tipo) {
-    const hs = (S.agenda && S.agenda.horarios || []).filter(h => (h.vagas ?? 1) > 0);
-    return hs.filter(h => { const dow = new Date(h.data+'T12:00:00').getDay(), hi = parseInt(h.hora_inicio); return tipo==='sab' ? dow===6 : tipo==='manha' ? (dow!==6&&hi<12) : (dow!==6&&hi>=12); }).sort((a,b) => (a.data+a.hora_inicio).localeCompare(b.data+b.hora_inicio));
   }
   // Grade dos próximos 7 dias: cada horário com vaga aparece como opção
   // marcável. Evita a dança de escolher data, esperar carregar, abrir o
@@ -501,14 +497,6 @@
     await verHorarios(data, true);
   }
 
-  function cardVaga(tipo, rotulo) {
-    const lista = vagasPor(tipo); const idx = S.idx[tipo] || 0; const v = lista[idx];
-    if (!v) return `<div class="vaga"><div class="sec" style="margin:0 0 4px">${rotulo}</div><div class="liv">Sem vaga livre nos próximos 30 dias.</div></div>`;
-    return `<div class="vaga"><div class="sec" style="margin:0 0 4px">${rotulo}</div><b>${v.data === hojeLocal() ? 'hoje' : nomeDia(v.data)} ${dataBR(v.data)} · ${hhmm(v.hora_inicio)}–${hhmm(v.hora_fim)}</b>
-      <div class="liv">${v.vagas} de ${v.capacidade} kits First livres${v.sala_livre!=null?' · sala '+v.sala_livre:''} · opção ${idx+1} de ${lista.length}</div>
-      <div class="acs"><button class="btn" onclick="LeadPainel.confirmarAgenda('${v.turma_id||''}','${v.data}','${v.hora_inicio||''}')">Agendar nessa</button><button class="btn g" onclick="LeadPainel.idx('${tipo}',${idx+1},${lista.length})" ${idx>=lista.length-1?'disabled':''}>Outra →</button>${idx>0?`<button class="btn g" onclick="LeadPainel.idx('${tipo}',${idx-1},${lista.length})">←</button>`:''}</div></div>`;
-  }
-  function idx(t, i, n) { S.idx[t] = Math.max(0, Math.min(i, n-1)); desenhar(); }
   function historico(l) {
     const ags = (S.info && S.info.agendamentos || []).slice().sort((a,b) => (b.data||'').localeCompare(a.data||''));
     const pres = S.info?.presencas || [], mats = S.info?.matriculas || [], al = S.info?.aluno;
@@ -537,9 +525,7 @@
       <div class="sec">1 · Criança</div>
       <div class="l2"><div class="campo"><label>Nome</label><input id="lp-a-cri" value="${esc(l.crianca||'')}" placeholder="Nome da criança"></div><div class="campo"><label>Idade</label><input id="lp-a-id" type="number" min="3" max="17" value="${l.idade||''}"></div></div>
       <div class="sec">2 · Kit</div><div class="chips"><span class="chip on">First</span><span class="chip" style="border:0;color:var(--faint)">a experimental é sempre no First; o nivelamento é no dia</span></div>
-      <div class="sec">3 · Ofereça duas opções</div>
-      ${!S.agenda ? `<div class="aviso-p">Buscando vagas…</div>` : S.agenda.erro ? `<div class="aviso-p">${esc(S.agenda.erro)}</div>` : cardVaga('manha','Manhã') + cardVaga('tarde','Tarde') + cardVaga('sab','Sábado')}
-      <div class="sec">Próximos 7 dias</div>
+      <div class="sec">3 · Ofereça duas opções — próximos 7 dias</div>
       ${semana7()}
       <div class="sec">Outro dia e horário</div>
       <div class="vaga" style="background:var(--card)">
@@ -665,5 +651,5 @@
       S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
-  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, diaEscolhido, marcar7, agendarSel7, agendarManual, agendarExtra, extraCampo, enviar, atribuir, trocarAtendente, verHistoricoAtendente, ligar, registrarLigacao, verLigacoes, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
+  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, diaEscolhido, marcar7, agendarSel7, agendarManual, agendarExtra, extraCampo, enviar, atribuir, trocarAtendente, verHistoricoAtendente, ligar, registrarLigacao, verLigacoes, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, atual: () => S.lead };
 })();
