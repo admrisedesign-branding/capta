@@ -899,7 +899,7 @@ async function remarcar(id, turmaId, data){ return acao('remarcar', async () => 
 // ---- novo agendamento: busca o lead, criança, escolhe a vaga ----
 let NA = { leads: null, lead: null, vagas: null, vaga: null, q: '' };
 async function novoAgendamento(data, turmaId, hora){
-  NA = { leads: null, lead: null, vagas: null, vaga: null, q: '', extra: false, xd: '', xh: '', fixo: data ? { data, turma_id: turmaId, hora } : null }; desenharNA();
+  NA = { leads: null, lead: null, vagas: null, vaga: null, q: '', novo: false, nNome: '', nFone: '', extra: false, xd: '', xh: '', fixo: data ? { data, turma_id: turmaId, hora } : null }; desenharNA();
   try { const [f, ag] = await Promise.all([api('funil'), api('agenda', { dias: 30 })]); NA.leads = f.leads || []; NA.vagas = (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0);
     if (NA.fixo) NA.vaga = NA.vagas.find(h => h.data === NA.fixo.data && hN(h.hora_inicio) === NA.fixo.hora) || null; }
   catch(e){ NA.leads = []; NA.vagas = []; toast(e.message, { tipo:'erro' }); }
@@ -915,6 +915,13 @@ function desenharNA(){
     <div class="campo"><label>Lead</label><input id="na-q" placeholder="Buscar por nome ou telefone" value="${esc(NA.q)}" oninput="NA.q=this.value;NA.lead=null;desenharNA();document.getElementById('na-q').focus();document.getElementById('na-q').setSelectionRange(99,99)">
       ${NA.leads === null ? '<div class="lista-leads"><div class="lead-op"><small>carregando leads…</small></div></div>' : NA.lead ? `<div class="lista-leads"><div class="lead-op on"><span>${esc(NA.lead.nome||'')}</span><small>${esc(NA.lead.contato||'')}</small></div></div>` :
         `<div class="lista-leads">${lista.map(l => `<div class="lead-op" onclick="NA.lead=${JSON.stringify({id:l.id,nome:l.nome,contato:l.contato,crianca:l.crianca,idade:l.idade}).replace(/"/g,'&quot;')};desenharNA()"><span>${esc(l.nome||'Sem nome')}</span><small>${esc(l.contato||'')}${l.temperatura?' · '+esc(l.temperatura):''}</small></div>`).join('') || '<div class="lead-op"><small>nenhum lead encontrado</small></div>'}</div>`}</div>
+    ${NA.lead ? '' : `<button class="btn g sm" style="margin-top:6px" onclick="NA.novo=!NA.novo;desenharNA()">${NA.novo ? '← voltar para a busca' : '+ não está na lista: cadastrar agora'}</button>`}
+    ${NA.novo && !NA.lead ? `<div class="campo" style="margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:11px;background:var(--fundo,#F7F8FC)">
+      <label>Quem procurou a escola</label>
+      <div class="l2"><input id="na-n-nome" placeholder="Nome do responsável" value="${esc(NA.nNome||'')}" oninput="NA.nNome=this.value">
+        <input id="na-n-fone" placeholder="WhatsApp (92 99999-9999)" value="${esc(NA.nFone||'')}" oninput="NA.nFone=this.value"></div>
+      <small style="display:block;color:var(--muted);font-size:11.5px;margin-top:6px">Cria o lead na hora, marcado como "veio direto". Use para quem apareceu na escola ou ligou sem ter passado pelo site.</small>
+    </div>` : ''}
     <div class="l2"><div class="campo"><label>Criança</label><input id="na-cri" value="${esc(NA.lead && NA.lead.crianca || '')}" placeholder="Nome da criança"></div><div class="campo"><label>Idade</label><input id="na-id" type="number" min="3" max="17" value="${NA.lead && NA.lead.idade || ''}"></div></div>
     ${NA.fixo && NA.vaga ? `<div class="campo"><label>Horário escolhido</label>
       <div class="vg on" style="cursor:default"><b>${DIAS[dow(NA.vaga.data)]} ${fmt(NA.vaga.data,{day:'2-digit',month:'2-digit'})} · ${hh(NA.vaga.hora_inicio)}</b><small>${NA.vaga.vagas} kit${NA.vaga.vagas>1?'s':''} First livre${NA.vaga.vagas>1?'s':''}</small></div>
@@ -925,12 +932,23 @@ function desenharNA(){
         <div class="l2"><input type="date" id="na-xd" value="${esc(NA.xd||'')}" onchange="NA.xd=this.value">
         <input type="time" id="na-xh" step="900" value="${esc(NA.xh||'')}" onchange="NA.xh=this.value"></div>
         <small style="color:var(--muted);display:block;margin-top:6px">Sem turma e sem contar vaga: use para encaixe fora do horário comercial, fim de semana ou feriado. A aula dura 1 hora.</small></div>` : ''}`}
-    <div class="fim"><button class="btn g" onclick="fecharModal()">Cancelar</button><button class="btn" onclick="confirmarNA()" ${NA.lead && (NA.vaga || (NA.extra && NA.xd && NA.xh)) ? '' : 'disabled'}>Agendar${NA.extra ? ' extra' : ''}</button></div></div></div>`;
+    <div class="fim"><button class="btn g" onclick="fecharModal()">Cancelar</button><button class="btn" onclick="confirmarNA()" ${(NA.lead || (NA.novo && (NA.nNome||'').trim() && String(NA.nFone||'').replace(/\D/g,'').length >= 10)) && (NA.vaga || (NA.extra && NA.xd && NA.xh)) ? '' : 'disabled'}>Agendar${NA.extra ? ' extra' : ''}</button></div></div></div>`;
   document.getElementById('fundo').onclick = e => { if (e.target.id === 'fundo') fecharModal(); };
 }
 async function confirmarNA(){ return acao('confirmarNA', async () => { const aviso = toast('<span class="mini-pt"></span>agendando…', { ms: 60000 });
   const crianca = document.getElementById('na-cri').value.trim(), idade = document.getElementById('na-id').value;
   if (!crianca) return toast('Informe o nome da criança.', { tipo:'erro' });
+  // Lead que veio direto (apareceu na escola ou ligou): cria na hora, com a
+  // origem marcada, para não ficar aula sem dono nem lead solto no funil.
+  if (!NA.lead && NA.novo) {
+    const nome = (NA.nNome || '').trim(), fone = String(NA.nFone || '').replace(/\D/g, '');
+    if (!nome || fone.length < 10) return toast('Informe o nome e o WhatsApp de quem procurou a escola.', { tipo:'erro' });
+    try {
+      const r = await api('lead_novo', { nome, contato: fone, crianca: (document.getElementById('na-cri')||{}).value?.trim() || undefined, idade: (document.getElementById('na-id')||{}).value || undefined });
+      NA.lead = { id: r.lead_id, nome, contato: fone };
+      if (r.ja_existia) toast('Esse telefone já era um lead — usei o cadastro que existia.', { tipo:'ok', ms: 4000 });
+    } catch(e){ return toast(e.message, { tipo:'erro' }); }
+  }
   const pedido = NA.extra && NA.xd && NA.xh
     ? { data: NA.xd, hora_inicio: NA.xh, extra: true, crianca_nome: crianca, crianca_idade: idade || null, lead_id: NA.lead.id }
     : { turma_id: NA.vaga.turma_id || null, data: NA.vaga.data, hora_inicio: NA.vaga.hora_inicio, crianca_nome: crianca, crianca_idade: idade || null, lead_id: NA.lead.id };
