@@ -152,6 +152,7 @@ tr:hover td{background:var(--brand-softer);cursor:pointer}
 .mud-vg .x{color:#c23b3b}
 .mud-li.cheio b{color:#c23b3b}
 .mud-tag{font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:3px 9px}
+label.be-bv{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap;cursor:pointer}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -262,6 +263,8 @@ function filaEntrada(){
       <div class="be-nome"><b>${esc(a.nome_curto || a.nome)}</b><small>${esc(a.observacao || '')}</small></div>
       <select id="be-t-${a.id}">${opTurmas(a.turma_id)}</select>
       <select id="be-k-${a.id}">${D.kits.map(k => `<option value="${esc(k.kit)}" ${k.kit===a.kit?'selected':''}>${esc(k.kit)}</option>`).join('')}</select>
+      <input id="be-e-${a.id}" type="email" placeholder="e-mail do responsável" value="${esc(a.email_responsavel||'')}" style="flex:1 1 190px;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 8px;font:inherit;font-size:12.5px">
+      <label class="be-bv" title="Manda a matrícula confirmada com turma e horário para o e-mail acima"><input type="checkbox" id="be-bv-${a.id}" checked> boas-vindas</label>
       <button class="btn" onclick="confirmarAluno('${a.id}')">confirmar</button>
       <button class="btn g" onclick="abrirFicha('${a.id}')">ficha</button>
     </div>`).join('')}
@@ -270,12 +273,16 @@ function filaEntrada(){
 async function confirmarAluno(id){
   const turma_id = (document.getElementById('be-t-' + id) || {}).value || null;
   const kit = (document.getElementById('be-k-' + id) || {}).value || null;
+  const email = ((document.getElementById('be-e-' + id) || {}).value || '').trim();
+  const bv = !!(document.getElementById('be-bv-' + id) || {}).checked;
+  if (bv && !email && !confirm('Sem o e-mail do responsável a boas-vindas não sai. Confirmar o aluno sem enviar?')) return;
   try {
-    await api('aluno_confirmar', { aluno_id: id, turma_id, kit, por_nome: (window.CaptaUser && CaptaUser.nome && CaptaUser.nome()) || undefined });
+    const r = await api('aluno_confirmar', { aluno_id: id, turma_id, kit, email: email || undefined, enviar_boas_vindas: bv && !!email, por_nome: (window.CaptaUser && CaptaUser.nome && CaptaUser.nome()) || undefined });
     const a = D.alunos.find(x => x.id === id);
-    if (a) { a.confirmado_em = new Date().toISOString(); a.turma_id = turma_id || a.turma_id; a.kit = kit || a.kit; }
+    if (a) { a.confirmado_em = new Date().toISOString(); a.turma_id = turma_id || a.turma_id; a.kit = kit || a.kit; if (email) a.email_responsavel = email; }
     desenhar();
-    toast('Aluno confirmado na grade', { tipo:'ok' });
+    const bvr = r.boas_vindas;
+    toast('Aluno confirmado na grade' + (bvr?.ok ? ' · boas-vindas enviada' : bvr?.erro ? ` · boas-vindas não saiu: ${esc(bvr.erro)}` : ''), { tipo: bvr?.erro ? 'erro' : 'ok', ms: bvr?.erro ? 6000 : 3000 });
   } catch(e){ toast(e.message, { tipo:'erro' }); }
 }
 
@@ -318,6 +325,12 @@ function lista(filtro){
 const DIASF = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
 // Mudança definitiva de turma: mostra as vagas de sala e de kit ANTES de
 // confirmar, porque quem fala com o pai precisa saber se cabe.
+async function enviarBoasVindas(id){
+  try { const r = await api('boas_vindas', { aluno_id: id });
+    if (r.ok) { toast('Boas-vindas enviada para ' + esc(r.para), { tipo:'ok' }); abrirFicha(id); }
+    else toast(r.erro || (r.ja_enviado ? 'Já tinha sido enviada.' : 'Não foi possível enviar.'), { tipo:'erro' });
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
 let MUD = null;
 async function abrirMudanca(alunoId, kit, turmaAtual){
   MUD = { alunoId, kit, turmaAtual, turmas: null };
@@ -385,6 +398,10 @@ async function abrirFicha(id){
         <div class="sub"><span class="st ${esc(a.status)}">${esc(a.status)}</span>${a.trancado_ate?` até ${new Date(a.trancado_ate+'T12:00').toLocaleDateString('pt-BR')}`:''}</div></div>
       <button class="x" onclick="fecharFicha()">×</button></div>
     <div class="corpo">
+      <div class="sec">Contato da família</div>
+      <div class="linha-f"><span>E-mail</span><b>${a.email_responsavel || (l && l.email) || '<span style="color:var(--faint);font-weight:500">não informado</span>'}</b></div>
+      ${(a.email_responsavel || (l && l.email)) ? `<div class="linha-f"><span>Boas-vindas</span><b>${a.boas_vindas_em ? new Date(a.boas_vindas_em).toLocaleDateString('pt-BR') : `<button class="btn g" onclick="enviarBoasVindas('${a.id}')">enviar agora</button>`}</b></div>` : ''}
+
       <div class="sec">Turma</div>
       <div class="linha-f"><span>${t?`${DIASF[t.dia_semana]} ${String(t.hora_inicio).slice(0,5)}–${String(t.hora_fim).slice(0,5)}`:'sem turma'}</span>
         <b><button class="btn g" onclick="abrirMudanca('${a.id}','${esc(a.kit||'')}','${a.turma_id||''}')">mudar de turma</button></b></div>
