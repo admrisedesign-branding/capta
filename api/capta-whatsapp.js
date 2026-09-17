@@ -1789,7 +1789,40 @@ async function acaoFeedback(tenant, body, res) {
   // fecha o ciclo: paga hoje = matrícula; não paga = motivo registrado, lead segue em remarketing
   if (paga_hoje === true) return acaoDesfecho(tenant, { agendamento_id, desfecho: 'matriculou', pagamento: pagamento || null, valor: valor || null, atendente: body.atendente, observacao: `desfecho: matriculou · ${pagamento || 'na recepção'}` }, res);
   if (paga_hoje === false && motivo) return acaoDesfecho(tenant, { agendamento_id, desfecho: 'nao', motivo, atendente: body.atendente, observacao: `desfecho: nao · ${motivo}` }, res);
-  return res.status(200).json({ ok: true });
+
+  // Convite para avaliar no Google, logo depois do check-out — é quando a
+  // família ainda está com a experiência fresca. Vai o texto pronto, para a
+  // pessoa só colar, e o link direto da avaliação.
+  let convite = null;
+  if (body.convidar_avaliacao !== false) convite = await convidarAvaliacao(tenant, agendamento_id, { nota, comentario }).catch(e => ({ erro: e.message }));
+  return res.status(200).json({ ok: true, convite });
+}
+
+async function convidarAvaliacao(tenant, agendamentoId, fb) {
+  const [t] = await sb(`capta_tenants?id=eq.${tenant.id}&select=nome,link_avaliacao&limit=1`);
+  if (!t?.link_avaliacao) return { pulado: 'sem link de avaliação configurado' };
+  const [canal] = await sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&status=eq.conectado&select=*&limit=1`).catch(() => []);
+  if (!canal) return { pulado: 'WhatsApp não conectado' };
+  const [ag] = await sb(`capta_agendamentos?id=eq.${agendamentoId}&tenant_id=eq.${tenant.id}&select=id,crianca_nome,lead:lead_id(id,nome,contato)&limit=1`).catch(() => []);
+  const fone = ag?.lead?.contato;
+  if (!fone) return { pulado: 'lead sem telefone' };
+
+  const primeiroNome = String(ag.lead.nome || '').trim().split(' ')[0];
+  const crianca = String(ag.crianca_nome || '').trim().split(' ')[0];
+  // O comentário que a família deu no tablet vira o rascunho da avaliação.
+  const dito = String(fb.comentario || '').replace(/^(gostou de|melhorar):\s*/i, '').trim();
+  const rascunho = dito
+    ? `${dito.charAt(0).toUpperCase()}${dito.slice(1)}. ${crianca ? `${crianca} adorou a aula` : 'Adoramos a aula'} na ${t.nome}!`
+    : `${crianca ? `${crianca} adorou` : 'Adoramos'} a aula experimental na ${t.nome}. Equipe atenciosa e crianças envolvidas do começo ao fim.`;
+
+  const texto = `${primeiroNome ? `Oi, ${primeiroNome}! ` : 'Oi! '}Obrigado pela visita de hoje 🤖\n\n` +
+    `Sua opinião ajuda outras famílias a nos encontrar. Se puder avaliar a escola no Google, leva menos de um minuto:\n${t.link_avaliacao}\n\n` +
+    `Se quiser, é só copiar e colar o texto abaixo:\n\n_${rascunho}_`;
+
+  const envio = await prov.enviarTexto(canal, fone, texto);
+  // registra na conversa, para o histórico não ter buraco
+  await registrar(canal, { contato: String(fone).replace(/\D/g, ''), lead_id: ag.lead.id }, texto, envio?.provedor_msg_id).catch(() => null);
+  return { ok: true, para: fone };
 }
 
 
@@ -1833,6 +1866,7 @@ async function acaoResumoConfig(tenant, body, res) {
   if (body.salvar) {
     const c = body.salvar;
     const dados = { resumo_para: (c.telefone || '').replace(/\D/g, '') || null, resumo_ativo: c.ativo !== false, resumo_hora: c.hora || '08:00' };
+    if (c.link_avaliacao !== undefined) dados.link_avaliacao = String(c.link_avaliacao || '').trim() || null;
     if (c.email_remetente !== undefined) {
       const r = String(c.email_remetente || '').trim();
       if (r && !/^[^<]*<[^@]+@[^>]+>$|^[^@\s]+@[^@\s]+$/.test(r)) return res.status(400).json({ erro: 'Use o formato Nome <email@dominio.com> ou só o e-mail.' });
@@ -1840,7 +1874,7 @@ async function acaoResumoConfig(tenant, body, res) {
     }
     await sb(`capta_tenants?id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
   }
-  const [t] = await sb(`capta_tenants?id=eq.${tenant.id}&select=resumo_para,resumo_ativo,resumo_hora,email_remetente&limit=1`);
+  const [t] = await sb(`capta_tenants?id=eq.${tenant.id}&select=resumo_para,resumo_ativo,resumo_hora,email_remetente,link_avaliacao&limit=1`);
   return res.status(200).json({ config: t || {} });
 }
 
