@@ -154,6 +154,10 @@ button{font-family:inherit;cursor:pointer}
 .hist-li b{font-size:13px;display:block}
 .hist-li small{color:var(--muted);font-size:11.5px}
 .mini-tag.mt-rasc{background:rgba(46,91,255,.12);color:var(--brand)}
+.mini-tag.mt-ret{background:rgba(31,122,77,.12);color:#1f7a4d}
+.mini-tag.mt-ret-ja{background:rgba(214,69,69,.13);color:#c23b3b}
+.sel-dono{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 10px;font-size:12.5px;font-weight:600;color:var(--muted);font-family:inherit;cursor:pointer;max-width:170px}
+.sel-dono:focus{outline:0;border-color:var(--brand)}
 .bt-ligar{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
 .bt-ligar:hover{border-color:var(--brand);color:var(--brand)}
 .lig-num{display:block;font-size:22px;font-weight:800;letter-spacing:.5px;margin:2px 0 14px}
@@ -378,7 +382,7 @@ function hora(iso) {
 }
 const iniciais = t => (t || '?').trim().slice(0, 2).toUpperCase();
 
-const FI = { q: '', f: 'abertas', eu: '' };
+const FI = { q: '', f: 'abertas', eu: '', dono: '' };   // dono: filtro por atendente (vale junto com o resto)
 FI.eu = (window.CaptaUser && CaptaUser.nome()) || ''; try { FI.eu = FI.eu || localStorage.getItem('capta_atendente') || ''; } catch(e){}
 // Quem pode atender: a equipe cadastrada em Ajustes (carregada no início),
 // com uma lista de reserva caso a chamada falhe. Quem está logado sempre entra.
@@ -410,9 +414,14 @@ const temRascunho = id => !!(RASCUNHOS[id] && RASCUNHOS[id].trim());
 function nomeLimpo(n){ n = String(n || '').trim(); return (!n || /@lid$/i.test(n) || /^\+?[\d\s()-]{10,}$/.test(n)) ? '' : n; }
 function desenharLista(){
   const q = FI.q.trim().toLowerCase();
+  const fimDoDia = new Date(); fimDoDia.setHours(23, 59, 59, 999);
+  const retornoHoje = c => c.retornar_em && new Date(c.retornar_em) <= fimDoDia;   // hoje ou atrasado
   let lista = CONVS.filter(c => {
     const nome = (c.lead?.nome || '') + ' ' + (nomeLimpo(c.nome) || '') + ' ' + (c.telefone || '') + ' ' + (c.lead?.contato || '') + ' #' + (c.lead?.kommo_lead_id || '');
     if (q && !nome.toLowerCase().includes(q.replace(/^#/, '#'))) return false;
+    // filtro por atendente: vale junto com qualquer outro filtro
+    if (FI.dono === '__sem__' ? !!c.atendente : (FI.dono && c.atendente !== FI.dono)) return false;
+    if (FI.f === 'retornos') return retornoHoje(c) && !c.resolvida_em;
     if (FI.f === 'nao_lidas') return (c.nao_lidas||0) > 0 && !c.resolvida_em;
     if (FI.f === 'minhas') return FI.eu && c.atendente === FI.eu;
     if (FI.f === 'quentes') return (c.lead?.temperatura||'').toLowerCase() === 'quente' && !c.resolvida_em;
@@ -423,11 +432,16 @@ function desenharLista(){
     if (FI.f === 'abertas') return !c.resolvida_em;
     return true;
   });
-  const n = k => k==='nao_lidas' ? CONVS.filter(c=>(c.nao_lidas||0)>0&&!c.resolvida_em).length : k==='minhas' ? CONVS.filter(c=>FI.eu&&c.atendente===FI.eu).length : k==='resolvidas' ? CONVS.filter(c=>c.resolvida_em).length
+  const n = k => k==='retornos' ? CONVS.filter(c=>retornoHoje(c)&&!c.resolvida_em).length : k==='nao_lidas' ? CONVS.filter(c=>(c.nao_lidas||0)>0&&!c.resolvida_em).length : k==='minhas' ? CONVS.filter(c=>FI.eu&&c.atendente===FI.eu).length : k==='resolvidas' ? CONVS.filter(c=>c.resolvida_em).length
     : k==='quentes' ? CONVS.filter(c=>(c.lead?.temperatura||'').toLowerCase()==='quente').length : k==='sem_dono' ? CONVS.filter(c=>!c.atendente&&!c.resolvida_em).length
     : k==='sem_resposta' ? CONVS.filter(c=>c.aguardando_desde&&!c.resolvida_em).length : k==='urgentes' ? CONVS.filter(c=>window.CaptaAlerta&&CaptaAlerta.nivel(c)==='urgente'&&!c.resolvida_em).length : CONVS.filter(c=>!c.resolvida_em).length;
   const orfas = CONVS.filter(c => !c.lead).length;
-  document.getElementById('filtros').innerHTML = [['abertas','Abertas'],['sem_resposta','Sem resposta'],['urgentes','⏰ Urgentes'],['nao_lidas','Não lidas'],['minhas','Minhas'],['sem_dono','Sem dono'],['quentes','Quentes'],['resolvidas','Resolvidas']].map(([k,t]) => `<button class="${FI.f===k?'on':''}" onclick="FI.f='${k}';desenharLista()">${t} <span style="opacity:.7">${n(k)}</span></button>`).join('')
+  document.getElementById('filtros').innerHTML = [['abertas','Abertas'],['sem_resposta','Sem resposta'],['urgentes','⏰ Urgentes'],['retornos','📞 Retornar'],['nao_lidas','Não lidas'],['minhas','Minhas'],['sem_dono','Sem dono'],['quentes','Quentes'],['resolvidas','Resolvidas']].map(([k,t]) => `<button class="${FI.f===k?'on':''}" onclick="FI.f='${k}';desenharLista()">${t} <span style="opacity:.7">${n(k)}</span></button>`).join('')
+    + `<select class="sel-dono" onchange="FI.dono=this.value;desenharLista()" title="Ver só as conversas de uma pessoa">
+        <option value="">todos os atendentes</option>
+        ${EQUIPE.map(p => `<option value="${esc(p)}" ${FI.dono===p?'selected':''}>${esc(p)}${CONVS.filter(c=>c.atendente===p&&!c.resolvida_em).length ? ` (${CONVS.filter(c=>c.atendente===p&&!c.resolvida_em).length})` : ''}</option>`).join('')}
+        <option value="__sem__" ${FI.dono==='__sem__'?'selected':''}>— sem dono —</option>
+      </select>`
     + (orfas ? `<button style="border-color:var(--brand);color:var(--brand)" onclick="casarLid()" title="Conversas sem lead: descobre o número pelos leads do Kommo (via @lid) e liga">ligar ${orfas} sem nome</button>` : '');
   elCont.textContent = lista.length ? `${lista.length} conversa${lista.length > 1 ? 's' : ''}` : 'Nenhuma conversa';
   if (!lista.length) { elConvs.innerHTML = `<div class="vazio">${CONVS.length ? 'Nada com esse filtro.' : 'Nada por aqui ainda.<br>As mensagens aparecem assim que alguém escrever para o seu WhatsApp.'}</div>`; return; }
@@ -441,7 +455,7 @@ function desenharLista(){
     return `<button class="conv ${c.resolvida_em?'res':''} ${nv}" data-id="${c.id}" aria-current="${c.id === atual}" style="${e && e.cor ? `border-left:4px solid ${e.cor}` : ''}">
       <span class="conv-av">${c.foto_url ? `<img src="${esc(c.foto_url)}" alt="" onerror="this.remove()">` : esc(iniciais(nome))}</span>
       <span class="conv-mid"><span class="conv-nome">${esc(nome)}${c.lead?.kommo_lead_id?` <span class="conv-kid">#${c.lead.kommo_lead_id}</span>`:''}</span><span class="conv-prev">${esc(c.ultima_mensagem || 'Sem mensagens')}</span>
-        <span class="conv-tags">${window.CaptaAlerta ? CaptaAlerta.etiqueta(c) : ''}${tagEtapa(c.lead && c.lead.etapa_id)}${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?tagPessoa(at, 'atendendo: ' + at):'<span class="mini-tag sem">sem dono</span>'}${c.resolvida_em?'<span class="mini-tag mt-enc">encerrada</span>':''}${temRascunho(c.id)?'<span class="mini-tag mt-rasc" title="Você tem uma mensagem escrita e não enviada">✎ rascunho</span>':''}</span></span>
+        <span class="conv-tags">${window.CaptaAlerta ? CaptaAlerta.etiqueta(c) : ''}${tagEtapa(c.lead && c.lead.etapa_id)}${temp?`<span class="mini-tag mt-${esc(temp)}">${esc(temp)}</span>`:''}${at?tagPessoa(at, 'atendendo: ' + at):'<span class="mini-tag sem">sem dono</span>'}${c.resolvida_em?'<span class="mini-tag mt-enc">encerrada</span>':''}${temRascunho(c.id)?'<span class="mini-tag mt-rasc" title="Você tem uma mensagem escrita e não enviada">✎ rascunho</span>':''}${c.retornar_em?`<span class="mini-tag ${new Date(c.retornar_em)<=new Date()?'mt-ret-ja':'mt-ret'}" title="Retorno combinado na ligação">📞 ${new Date(c.retornar_em)<=new Date()?'ligar agora':'ligar '+new Date(c.retornar_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>`:''}</span></span>
       <span class="conv-dir"><span class="conv-hora">${hora(c.ultima_mensagem_em)}</span>${c.nao_lidas > 0 ? `<span class="bolha">${c.nao_lidas}</span>` : ''}</span></button>`;
   }).join('');
   elConvs.querySelectorAll('.conv').forEach(b => { b.onclick = () => abrir(b.dataset.id); });
