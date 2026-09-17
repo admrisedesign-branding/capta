@@ -128,6 +128,14 @@ function idadeContato(contato) {
   return Number.isFinite(n) ? n : null;
 }
 
+// O e-mail da família fica no CONTATO do Kommo (o site já manda), não no lead.
+// Sem ele não dá para mandar boas-vindas nem contato formal por e-mail.
+function emailContato(contato) {
+  const f = (contato?.custom_fields_values || []).find(x => x.field_code === 'EMAIL');
+  const v = f?.values?.[0]?.value;
+  return v && String(v).includes('@') ? String(v).trim().toLowerCase() : null;
+}
+
 function telefoneContato(contato) {
   const f = (contato?.custom_fields_values || []).find(x => x.field_code === 'PHONE');
   return f?.values?.[0]?.value?.replace(/\D/g, '') || null;
@@ -184,6 +192,7 @@ async function espelhar(leadId) {
     etapa_em: ts(lead.updated_at) || new Date().toISOString(),
     nome: contato?.name || lead.name || null,
     contato: telefoneContato(contato),
+    email: emailContato(contato),
     origem: valorCampo(lead, CAMPOS.porta) || valorCampo(lead, CAMPOS.origem) || 'kommo',
     score: valorCampo(lead, CAMPOS.score) != null ? Number(valorCampo(lead, CAMPOS.score)) : null,
     temperatura: cap(valorCampo(lead, CAMPOS.categoria)),   // Quente · Morno · Frio
@@ -236,7 +245,7 @@ async function espelhar(leadId) {
   // perdido): a conversa sai da fila de abertas e para de contar como sem
   // resposta. Se a família escrever de novo, o webhook reabre sozinho.
   try {
-    const fecha = /aula agendada|matr[ií]cul|aluno ativo|perdido|remarketing|desist|trancad/i.test(linha.etapa_nome || '');
+    const fecha = /matr[ií]cul|aluno ativo|perdido|desist|trancad/i.test(linha.etapa_nome || '');   // aula agendada NÃO fecha: ainda falta a aula acontecer
     const lr = await fetch(`${SB_URL}/rest/v1/capta_leads?tenant_id=eq.${linha.tenant_id}&kommo_lead_id=eq.${lead.id}&select=id&limit=1`, { headers: H_SB }).then(x => x.json());
     const leadId = lr?.[0]?.id;
     if (leadId) {

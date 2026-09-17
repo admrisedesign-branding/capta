@@ -98,7 +98,7 @@ module.exports = async function handler(req, res) {
     // sem e-mail no corpo (painel antigo) vale o padrão mais permissivo do dono
     if (!body._papel && token === tenant.dashboard_token) body._papel = 'gestor';
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -113,6 +113,7 @@ module.exports = async function handler(req, res) {
         case 'aluno':    return await acaoAluno(tenant, body, res);
         case 'aluno_confirmar': return await acaoAlunoConfirmar(tenant, body, res);
         case 'turmas_vagas':    return await acaoTurmasVagas(tenant, body, res);
+        case 'boas_vindas':     return res.status(200).json(await enviarBoasVindas(tenant, body.aluno_id));
         case 'transferir_aluno': return await acaoTransferirAluno(tenant, body, res);
         case 'experimentais': return await acaoExperimentais(tenant, body, res);
         case 'desfecho': return await acaoDesfecho(tenant, body, res);
@@ -970,7 +971,7 @@ async function acaoCampos(tenant, body, res) {
   const id = (body.lead_id || '').trim();
   if (!id) return res.status(400).json({ erro: 'Informe lead_id.' });
   const patch = {};
-  for (const k of ['fonte', 'porta', 'atendente', 'notas', 'crianca']) if (body[k] !== undefined) patch[k] = body[k] || null;
+  for (const k of ['fonte', 'porta', 'atendente', 'notas', 'crianca', 'email']) if (body[k] !== undefined) patch[k] = body[k] || null;
   if (body.idade !== undefined) patch.idade = body.idade ? Number(body.idade) : null;
   if (!Object.keys(patch).length) return res.status(400).json({ erro: 'Nada para salvar.' });
   await sb(`capta_leads?id=eq.${id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
@@ -1015,7 +1016,7 @@ async function acaoAlunos(tenant, body, res) {
 
   const [turmas, alunos, kits] = await Promise.all([
     sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim,capacidade,limite_sala,kit_experimental,ativa&order=dia_semana,hora_inicio`),
-    sb(`capta_alunos?tenant_id=eq.${tenant.id}&select=id,nome,nome_curto,kit,matricula,turma_id,lead_id,status,trancado_ate,observacao,confirmado_em,confirmado_por,criado_em&order=nome`).catch(() => []),
+    sb(`capta_alunos?tenant_id=eq.${tenant.id}&select=id,nome,nome_curto,kit,matricula,turma_id,lead_id,status,trancado_ate,observacao,confirmado_em,confirmado_por,email_responsavel,boas_vindas_em,criado_em&order=nome`).catch(() => []),
     sb(`capta_kits?tenant_id=eq.${tenant.id}&select=kit,capacidade,cor`).catch(() => [])
   ]);
   return res.status(200).json({ turmas: turmas || [], alunos: alunos || [], kits: kits || [], remarcacoes: remarcacoes || [] });
@@ -1024,7 +1025,7 @@ async function acaoAlunos(tenant, body, res) {
 // cria / edita um aluno (nome, kit, turma, status, observação)
 async function acaoAluno(tenant, body, res) {
   const campos = {};
-  for (const k of ['nome', 'nome_curto', 'kit', 'turma_id', 'status', 'trancado_ate', 'observacao', 'lead_id']) if (body[k] !== undefined) campos[k] = body[k] || null;
+  for (const k of ['nome', 'nome_curto', 'kit', 'turma_id', 'status', 'trancado_ate', 'observacao', 'lead_id', 'email_responsavel']) if (body[k] !== undefined) campos[k] = body[k] || null;
   if (body.matricula !== undefined) campos.matricula = body.matricula ? Number(body.matricula) : null;
   if (body.id) {
     campos.atualizado_em = new Date().toISOString();
@@ -1420,7 +1421,7 @@ async function acaoImportarMidia(tenant, body, res) {
 const PAPEIS = {
   gestor:     { nome: 'Gestor',     desc: 'Vê e faz tudo, inclusive equipe e painel.',              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos','eventos','ajustes'], pode: ['*'] },
   atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','ligacao','ligacoes','alunos','eu'] },
-  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','aluno_confirmar','turmas_vagas','transferir_aluno','repor','faltas_aluno','vagas_kit','remarcar_aluno','lead','funil','eu'] },
+  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','aluno_confirmar','turmas_vagas','transferir_aluno','boas_vindas','repor','faltas_aluno','vagas_kit','remarcar_aluno','lead','funil','eu'] },
   leitura:    { nome: 'Só leitura', desc: 'Vê tudo, não altera nada.',                              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos'],                   pode: ['agenda','funil','lead','experimentais','alunos','conversas','mensagens','midia','eu'] },
 };
 async function usuarioDe(tenantId, email) {
@@ -1922,7 +1923,7 @@ async function acaoFichaAluno(tenant, body, res) {
   const [turmas, presencas, lead, matriculas] = await Promise.all([
     sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim`).catch(() => []),
     sb(`capta_presencas?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&select=data,entrada_em,saida_em,feedback,comentario&order=data.desc&limit=180`).catch(() => []),
-    al.lead_id ? sb(`capta_leads?id=eq.${al.lead_id}&select=id,nome,contato,fonte,porta,origem,criado_em,kommo_lead_id,evento_id,temperatura`).catch(() => []) : [],
+    al.lead_id ? sb(`capta_leads?id=eq.${al.lead_id}&select=id,nome,contato,email,fonte,porta,origem,criado_em,kommo_lead_id,evento_id,temperatura`).catch(() => []) : [],
     al.lead_id ? sb(`capta_matriculas?tenant_id=eq.${tenant.id}&lead_id=eq.${al.lead_id}&select=valor_bruto,fechada_em,fechada_por,status&order=fechada_em.desc`).catch(() => []) : []
   ]);
   // aulas previstas desde a matrícula (uma por semana, no dia da turma)
@@ -2147,14 +2148,67 @@ async function acaoTransferirAluno(tenant, body, res) {
 async function acaoAlunoConfirmar(tenant, body, res) {
   const { aluno_id, turma_id, kit, nome } = body;
   if (!aluno_id) return res.status(400).json({ erro: 'Informe o aluno.' });
+  const email = String(body.email || '').trim().toLowerCase();
+  if (email && !email.includes('@')) return res.status(400).json({ erro: 'E-mail inválido.' });
   const campos = { confirmado_em: new Date().toISOString(), confirmado_por: body.por_nome || null };
   if (turma_id) campos.turma_id = turma_id;
   if (kit) campos.kit = kit;
   if (nome) campos.nome = nome;
+  if (email) campos.email_responsavel = email;
   await sb(`capta_alunos?id=eq.${aluno_id}&tenant_id=eq.${tenant.id}`, {
     method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos)
   });
-  return res.status(200).json({ ok: true });
+  // guarda também no lead, para não perder o e-mail se o aluno for recriado
+  if (email) {
+    const [al] = await sb(`capta_alunos?id=eq.${aluno_id}&select=lead_id&limit=1`).catch(() => []);
+    if (al?.lead_id) await sb(`capta_leads?id=eq.${al.lead_id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ email }) }).catch(() => null);
+  }
+  let boasVindas = null;
+  if (body.enviar_boas_vindas) boasVindas = await enviarBoasVindas(tenant, aluno_id).catch(e => ({ erro: e.message }));
+  return res.status(200).json({ ok: true, boas_vindas: boasVindas });
+}
+
+// Boas-vindas por e-mail para a família, quando o aluno entra na grade.
+// Sai pelo Resend (mesmo serviço do login). Manda uma vez só: se já foi,
+// devolve 'ja_enviado' em vez de repetir.
+async function enviarBoasVindas(tenant, alunoId) {
+  const chave = process.env.RESEND_API_KEY;
+  if (!chave) return { erro: 'RESEND_API_KEY não configurada.' };
+  const [al] = await sb(`capta_alunos?id=eq.${alunoId}&tenant_id=eq.${tenant.id}&select=id,nome,nome_curto,kit,turma_id,email_responsavel,boas_vindas_em,lead_id&limit=1`);
+  if (!al) return { erro: 'Aluno não encontrado.' };
+  if (al.boas_vindas_em) return { ja_enviado: true };
+  let para = al.email_responsavel;
+  if (!para && al.lead_id) para = (await sb(`capta_leads?id=eq.${al.lead_id}&select=email&limit=1`).catch(() => []))?.[0]?.email;
+  if (!para) return { erro: 'Sem e-mail do responsável.' };
+
+  const [turma] = al.turma_id ? await sb(`capta_turmas?id=eq.${al.turma_id}&select=nome,dia_semana,hora_inicio,hora_fim&limit=1`).catch(() => []) : [];
+  const [resp] = al.lead_id ? await sb(`capta_leads?id=eq.${al.lead_id}&select=nome&limit=1`).catch(() => []) : [];
+  const DIAS_E = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+  const quando = turma ? `${DIAS_E[turma.dia_semana] || ''}, das ${String(turma.hora_inicio).slice(0, 5)} às ${String(turma.hora_fim).slice(0, 5)}` : 'a combinar';
+  const primeiro = String(al.nome_curto || al.nome || '').trim().split(' ')[0];
+  const escola = tenant.nome || 'a escola';
+  const de = process.env.CAPTA_FROM_EMAIL || 'Capta <onboarding@resend.dev>';
+
+  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:520px;color:#141A2E;line-height:1.6">
+    <h2 style="margin:0 0 6px">Bem-vindo à ${escola}, ${primeiro}! 🤖</h2>
+    <p style="margin:12px 0">${resp?.nome ? `Oi, ${String(resp.nome).split(' ')[0]}! ` : ''}A matrícula ${primeiro ? 'do ' + primeiro : ''} está confirmada. Já separamos o lugar dele na turma:</p>
+    <table style="border-collapse:collapse;margin:14px 0;font-size:15px">
+      <tr><td style="padding:5px 14px 5px 0;color:#697089">Aluno</td><td style="padding:5px 0"><b>${al.nome || ''}</b></td></tr>
+      <tr><td style="padding:5px 14px 5px 0;color:#697089">Turma</td><td style="padding:5px 0"><b>${quando}</b></td></tr>
+      ${al.kit ? `<tr><td style="padding:5px 14px 5px 0;color:#697089">Kit</td><td style="padding:5px 0"><b>${al.kit}</b></td></tr>` : ''}
+    </table>
+    <p style="margin:12px 0">No primeiro dia, chegue uns 10 minutinhos antes. Não precisa levar material: o kit fica aqui com a gente.</p>
+    <p style="margin:12px 0">Qualquer dúvida, responda este e-mail ou fale com a gente no WhatsApp.</p>
+    <p style="margin:18px 0 0;color:#697089;font-size:13px">Até logo!<br>Equipe ${escola}</p>
+  </div>`;
+
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST', headers: { Authorization: `Bearer ${chave}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: de, to: para, subject: `Matrícula confirmada${primeiro ? ' — ' + primeiro : ''} · ${escola}`, html })
+  });
+  if (!r.ok) return { erro: 'Resend: ' + (await r.text()).slice(0, 160) };
+  await sb(`capta_alunos?id=eq.${alunoId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ boas_vindas_em: new Date().toISOString() }) }).catch(() => null);
+  return { ok: true, para };
 }
 
 async function acaoRepor(tenant, body, res) {
