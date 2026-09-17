@@ -69,6 +69,7 @@ h1{font-size:22px;font-weight:800;margin-bottom:4px}
     <div class="field"><label>E-mail</label><input type="email" id="email" placeholder="voce@email.com" autocomplete="email"></div>
     <div class="field"><label>Senha</label><input type="password" id="senha" placeholder="••••••••" autocomplete="current-password"></div>
     <div class="err" id="err"></div>
+    <p class="foot" id="esqueci" style="margin:-4px 0 12px;text-align:right"><a onclick="pedirReset()">Esqueci minha senha</a></p>
     <button class="btn btn-primary" id="go" onclick="submit()">Entrar</button>
     <div class="divider">ou</div>
     <button class="btn-google" onclick="google()">
@@ -102,6 +103,24 @@ h1{font-size:22px;font-weight:800;margin-bottom:4px}
     <p class="foot">Plano Free · sem cartão · faça upgrade quando quiser</p>
   </div>
 
+  <!-- LINK DE RECUPERAÇÃO ENVIADO -->
+  <div id="reset-sent-view" class="hide center">
+    <h1>Link enviado ✓</h1>
+    <p class="sub">Mandamos um e-mail para <b id="rs-email"></b> com o link pra criar uma senha nova. Ele vale por 1 hora.</p>
+    <p class="sub" style="font-size:13px">Não achou? Olhe no spam ou promoções.</p>
+    <button class="btn btn-primary" onclick="location.replace('/login.html')">Voltar pro login</button>
+  </div>
+
+  <!-- CRIAR SENHA NOVA (chega pelo link do e-mail) -->
+  <div id="nova-senha-view" class="hide">
+    <h1>Criar senha nova</h1>
+    <p class="sub">Escolha uma senha de pelo menos 6 caracteres.</p>
+    <div class="field"><label>Nova senha</label><input type="password" id="ns1" placeholder="••••••••" autocomplete="new-password"></div>
+    <div class="field"><label>Repita a senha</label><input type="password" id="ns2" placeholder="••••••••" autocomplete="new-password"></div>
+    <div class="err" id="ns-err"></div>
+    <button class="btn btn-primary" id="ns-go" onclick="salvarSenha()">Salvar e entrar</button>
+  </div>
+
   <!-- SEM ACESSO -->
   <div id="noaccess-view" class="hide">
     <h1>Conta criada ✓</h1>
@@ -119,7 +138,7 @@ const sb = createClient(SB_URL, SB_KEY);
 
 let MODE = 'in';
 const $ = id => document.getElementById(id);
-const show = v => { ['auth-view','loading-view','confirm-view','onboarding-view','noaccess-view'].forEach(x=>$(x).classList.toggle('hide', x!==v)); };
+const show = v => { ['auth-view','loading-view','confirm-view','onboarding-view','noaccess-view','reset-sent-view','nova-senha-view'].forEach(x=>$(x).classList.toggle('hide', x!==v)); };
 
 window.setMode = m => {
   MODE = m;
@@ -131,6 +150,7 @@ window.setMode = m => {
   $('senha').setAttribute('autocomplete', m==='in' ? 'current-password' : 'new-password');
   $('foot').innerHTML = m==='in' ? 'Ainda não tem conta? <a onclick="setMode(\'up\')">Criar agora</a>' : 'Já tem conta? <a onclick="setMode(\'in\')">Entrar</a>';
   $('err').textContent = '';
+  $('esqueci').style.display = m==='in' ? 'block' : 'none';
 };
 
 window.submit = async () => {
@@ -153,6 +173,33 @@ window.submit = async () => {
   }catch(e){ $('err').textContent = 'Erro inesperado. Tente de novo.'; reset(); }
 };
 function reset(){ $('go').disabled=false; $('go').textContent = MODE==='in'?'Entrar':'Criar conta'; }
+
+// Esqueci a senha: manda o link do Supabase, que volta para esta mesma página
+// com um token na URL. O trecho lá embaixo reconhece esse token e abre a tela
+// de criar senha nova.
+window.pedirReset = async () => {
+  const email = $('email').value.trim();
+  if(!email || !email.includes('@')){ $('err').textContent = 'Escreva seu e-mail no campo acima e clique de novo.'; $('email').focus(); return; }
+  $('err').textContent = ''; $('go').disabled = true;
+  try{
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/login.html?recuperar=1' });
+    if(error){ $('err').textContent = 'Não foi possível enviar o link. Confira o e-mail e tente de novo.'; $('go').disabled = false; return; }
+    $('rs-email').textContent = email; show('reset-sent-view');
+  }catch(e){ $('err').textContent = 'Erro inesperado. Tente de novo.'; $('go').disabled = false; }
+};
+
+window.salvarSenha = async () => {
+  const a = $('ns1').value, b = $('ns2').value;
+  if(a.length < 6){ $('ns-err').textContent = 'A senha precisa ter ao menos 6 caracteres.'; return; }
+  if(a !== b){ $('ns-err').textContent = 'As duas senhas não são iguais.'; return; }
+  $('ns-err').textContent = ''; $('ns-go').disabled = true; $('ns-go').textContent = 'Salvando…';
+  try{
+    const { error } = await sb.auth.updateUser({ password: a });
+    if(error){ $('ns-err').textContent = traduz(error.message); $('ns-go').disabled = false; $('ns-go').textContent = 'Salvar e entrar'; return; }
+    history.replaceState(null,'','/login.html');
+    route();
+  }catch(e){ $('ns-err').textContent = 'Erro inesperado. Tente de novo.'; $('ns-go').disabled = false; $('ns-go').textContent = 'Salvar e entrar'; }
+};
 
 window.google = async () => {
   $('err').textContent='';
@@ -215,6 +262,34 @@ function traduz(m){
     history.replaceState(null,'','/login.html');
     show('auth-view'); return;
   }
+  // Volta do e-mail de recuperação: o Supabase devolve o token no endereço
+  // (#access_token=…&type=recovery) ou como ?code=. Em vez de mandar a pessoa
+  // pro painel, abre a tela de criar senha nova.
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const qs = new URLSearchParams(location.search);
+  const ehRecuperacao = hash.get('type') === 'recovery' || qs.get('recuperar') === '1' || qs.get('type') === 'recovery';
+  if (hash.get('error_description')) {
+    show('auth-view');
+    $('err').textContent = /expired|invalid/i.test(hash.get('error_description')) ? 'Esse link expirou. Peça um novo em "Esqueci minha senha".' : 'Link inválido. Peça um novo.';
+    history.replaceState(null,'','/login.html');
+    return;
+  }
+  if (ehRecuperacao) {
+    show('loading-view'); $('loading-txt').textContent = 'Abrindo o link…';
+    if (qs.get('code')) { try { await sb.auth.exchangeCodeForSession(qs.get('code')); } catch(e){} }
+    // o Supabase troca o token da URL por sessão sozinho, mas leva um instante:
+    // espera até 3 s antes de dizer que o link não vale
+    let s2 = null;
+    for (let i = 0; i < 10 && !s2; i++) {
+      s2 = (await sb.auth.getSession()).data.session;
+      if (!s2) await new Promise(r => setTimeout(r, 300));
+    }
+    if (s2) { show('nova-senha-view'); return; }
+    show('auth-view');
+    $('err').textContent = 'Esse link expirou ou já foi usado. Peça um novo em "Esqueci minha senha".';
+    return;
+  }
+
   const { data:{ session } } = await sb.auth.getSession();
   if(session){
     // sempre roteia pela sessão real (o servidor decide admin/cliente pelo e-mail logado).
