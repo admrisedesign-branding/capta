@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
     }
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -115,6 +115,8 @@ module.exports = async function handler(req, res) {
         case 'importar_midia':     return await acaoImportarMidia(tenant, body, res);
         case 'equipe':   return await acaoEquipe(tenant, body, res);
         case 'atendente_historico': return await acaoAtendenteHistorico(tenant, body, res);
+        case 'ligacao':   return await acaoLigacao(tenant, body, res);
+        case 'ligacoes':  return await acaoLigacoes(tenant, body, res);
         case 'equipe_salvar': return await acaoEquipeSalvar(tenant, body, res);
         case 'eu':       return await acaoEu(tenant, body, res);
         case 'eventos':  return await acaoEventos(tenant, body, res);
@@ -1299,7 +1301,7 @@ async function acaoImportarMidia(tenant, body, res) {
 // ---------------------------------------------------------------------
 const PAPEIS = {
   gestor:     { nome: 'Gestor',     desc: 'Vê e faz tudo, inclusive equipe e painel.',              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos','eventos','ajustes'], pode: ['*'] },
-  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','alunos','eu'] },
+  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','ligacao','ligacoes','alunos','eu'] },
   secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','lead','funil','eu'] },
   leitura:    { nome: 'Só leitura', desc: 'Vê tudo, não altera nada.',                              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos'],                   pode: ['agenda','funil','lead','experimentais','alunos','conversas','mensagens','midia','eu'] },
 };
@@ -1319,6 +1321,69 @@ async function acaoEu(tenant, body, res) {
   const def = PAPEIS[papel] || PAPEIS.gestor;
   return res.status(200).json({ usuario: u ? { nome: u.nome, email: u.email, papel } : null, papel, telas: (u && u.telas && u.telas.length ? u.telas : def.telas), papeis: PAPEIS });
 }
+// ---------------------------------------------------------------------
+// LIGAÇÃO — o Capta não disca: quem liga é o telefone de quem atende.
+// O que ele faz é guardar o que aconteceu. Isso importa porque hoje uma
+// conversa resolvida por telefone continuava marcada como "sem resposta":
+// o lead tinha sido atendido e o painel dizia o contrário.
+// resultado: falou | nao_atendeu | numero_errado | ligar_depois | caixa_postal
+// ---------------------------------------------------------------------
+const RESULTADOS_LIGACAO = {
+  falou:         'falou com o lead',
+  nao_atendeu:   'não atendeu',
+  caixa_postal:  'caiu na caixa postal',
+  numero_errado: 'número errado',
+  ligar_depois:  'pediu para ligar depois'
+};
+async function acaoLigacao(tenant, body, res) {
+  const { resultado, observacao, retornar_em } = body;
+  if (!RESULTADOS_LIGACAO[resultado]) return res.status(400).json({ erro: 'Resultado da ligação inválido.' });
+
+  let conv = null, leadId = (body.lead_id || '').trim() || null;
+  if (body.conversa_id) {
+    conv = (await sb(`capta_conversas?id=eq.${body.conversa_id}&tenant_id=eq.${tenant.id}&select=id,telefone,lead_id,atendente&limit=1`))?.[0];
+    if (!conv) return res.status(404).json({ erro: 'Conversa não encontrada.' });
+    leadId = leadId || conv.lead_id;
+  }
+  if (!conv && !leadId) return res.status(400).json({ erro: 'Informe conversa_id ou lead_id.' });
+
+  const lead = leadId ? (await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenant.id}&select=id,nome,contato,atendente,kommo_lead_id&limit=1`))?.[0] : null;
+  const quem = await usuarioDe(tenant.id, body.email_atual).catch(() => null);
+  const porNome = quem?.nome || body.por_nome || 'alguém do painel';
+
+  await sb('capta_ligacoes', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    tenant_id: tenant.id, lead_id: leadId, conversa_id: conv?.id || null,
+    telefone: conv?.telefone || lead?.contato || null,
+    resultado, observacao: observacao || null, retornar_em: retornar_em || null,
+    por_nome: porNome, por_email: quem?.email || body.email_atual || null
+  }) }).catch(e => { throw e; });
+
+  // Falou = atendido: sai da fila de "sem resposta" e ganha dono, se não tinha.
+  if (resultado === 'falou' && conv) {
+    const patch = { aguardando_desde: null };
+    if (!conv.atendente && porNome !== 'alguém do painel') patch.atendente = porNome;
+    await sb(`capta_conversas?id=eq.${conv.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) }).catch(() => null);
+    if (leadId && patch.atendente) await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ atendente: patch.atendente }) }).catch(() => null);
+  }
+
+  // Nota no card do Kommo, pra quem acompanha por lá ver a ligação.
+  if (lead?.kommo_lead_id) {
+    const quando = retornar_em ? ` · retornar ${new Date(retornar_em).toLocaleString('pt-BR', { timeZone: 'America/Manaus', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '';
+    notaKommoTexto(tenant.id, lead.kommo_lead_id, `Capta · ligação (${porNome}): ${RESULTADOS_LIGACAO[resultado]}${quando}${observacao ? ` — ${observacao}` : ''}`).catch(() => null);
+  }
+  return res.status(200).json({ ok: true });
+}
+
+async function acaoLigacoes(tenant, body, res) {
+  const filtros = [];
+  if (body.conversa_id) filtros.push(`conversa_id=eq.${body.conversa_id}`);
+  if (body.lead_id) filtros.push(`lead_id=eq.${body.lead_id}`);
+  if (!filtros.length) return res.status(400).json({ erro: 'Informe conversa_id ou lead_id.' });
+  const filtro = filtros.length > 1 ? `or=(${filtros.join(',')})` : filtros[0];
+  const linhas = await sb(`capta_ligacoes?tenant_id=eq.${tenant.id}&${filtro}&select=resultado,observacao,retornar_em,por_nome,telefone,criado_em&order=criado_em.desc&limit=30`).catch(() => []);
+  return res.status(200).json({ ligacoes: linhas || [], rotulos: RESULTADOS_LIGACAO });
+}
+
 // Quem já cuidou desta conversa, na ordem: quem passou, para quem, e o
 // login de quem fez a troca.
 async function acaoAtendenteHistorico(tenant, body, res) {
@@ -1332,12 +1397,15 @@ async function acaoAtendenteHistorico(tenant, body, res) {
 
 // Nota no card do Kommo, para quem trabalha lá ver a troca de dono.
 async function notaKommoAtendente(tenantId, leadId, de, para, porQuem) {
-  const token = process.env.KOMMO_TOKEN; if (!token) return;
   const l = (await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id&limit=1`))?.[0];
   if (!l?.kommo_lead_id) return;
+  await notaKommoTexto(tenantId, l.kommo_lead_id, `Capta · quem atende: ${de || 'sem dono'} → ${para || 'sem dono'}${porQuem ? ` (alterado por ${porQuem})` : ''}`);
+}
+
+async function notaKommoTexto(tenantId, kommoLeadId, texto) {
+  const token = process.env.KOMMO_TOKEN; if (!token || !kommoLeadId) return;
   const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
-  const texto = `Capta · quem atende: ${de || 'sem dono'} → ${para || 'sem dono'}${porQuem ? ` (alterado por ${porQuem})` : ''}`;
-  await fetch(`https://${dominio}/api/v4/leads/${l.kommo_lead_id}/notes`, {
+  await fetch(`https://${dominio}/api/v4/leads/${kommoLeadId}/notes`, {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify([{ note_type: 'common', params: { text: texto } }])
   }).catch(() => {});
