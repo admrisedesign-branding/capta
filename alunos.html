@@ -119,6 +119,29 @@ tr:hover td{background:var(--brand-softer);cursor:pointer}
 .kf-leg i{width:9px;height:9px;border-radius:50%;display:inline-block}
 .kf-btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:4px 10px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
 .kf-btn:hover{border-color:var(--brand);color:var(--brand)}
+.bloco-entrada{background:rgba(46,91,255,.05);border:1px solid var(--brand);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.be-tit b{font-size:14.5px}
+.be-tit small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.45}
+.be-li{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid rgba(46,91,255,.12)}
+.be-li:last-child{border-bottom:0;padding-bottom:0}
+.be-nome{flex:1 1 180px;min-width:0}
+.be-nome b{font-size:13.5px;display:block}
+.be-nome small{color:var(--muted);font-size:11.5px}
+.be-li select{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 8px;font:inherit;font-size:12.5px;font-weight:600}
+
+/* Impressão: a grade de alunos cabe numa folha paisagem, sem menu nem botões */
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body{background:#fff}
+  .topbar,.barra,.ferr,.kits-faixa,.bloco-entrada,#ficha,#ficha-scrim,#modal,.btn,.abas{display:none!important}
+  .wrap{max-width:none;padding:0}
+  .scroll{overflow:visible!important}
+  .grade{font-size:9.5pt}
+  .cel{break-inside:avoid}
+  .tally{break-inside:avoid;margin-bottom:6mm}
+  .al{break-inside:avoid}
+  a[href]:after{content:''}
+}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -164,7 +187,7 @@ window.CaptaUser = (function(){
   <h1>Alunos ativos</h1>
 
 </div>
-<div class="wrap"><div class="barra"><input class="busca" id="busca" placeholder="Buscar aluno…" oninput="desenhar()"><div class="abas" style="margin-left:auto"><button class="on" id="ab-grade" onclick="modo('grade')">Grade</button><button id="ab-lista" onclick="modo('lista')">Lista</button></div><button class="btn" onclick="editar(null)">+ Aluno</button></div><div id="raiz"><div class="aviso">Carregando…</div></div></div>
+<div class="wrap"><div class="barra"><input class="busca" id="busca" placeholder="Buscar aluno…" oninput="desenhar()"><div class="abas" style="margin-left:auto"><button class="on" id="ab-grade" onclick="modo('grade')">Grade</button><button id="ab-lista" onclick="modo('lista')">Lista</button></div><button class="btn g" onclick="window.print()" title="Imprime a grade ou a lista como está na tela">🖶 imprimir</button><button class="btn" onclick="editar(null)">+ Aluno</button></div><div id="raiz"><div class="aviso">Carregando…</div></div></div>
 <div id="modal"></div>
 <div id="ficha-scrim" onclick="fecharFicha()"></div>
 <aside id="ficha"></aside>
@@ -210,7 +233,40 @@ function desenhar(){
         <button class="kf-btn" onclick="KITS_ABERTO=false;salvarKits();desenhar()">esconder ↑</button>
       </div></div>`;
   if (!D.alunos.length) { document.getElementById('raiz').innerHTML = kpis + `<div class="aviso">Nenhum aluno cadastrado ainda.<br>Os alunos entram por aqui ou automaticamente quando uma aula experimental vira matrícula.<br><button class="btn" style="margin-top:12px" onclick="editar(null)">+ Cadastrar aluno</button></div>`; return; }
-  document.getElementById('raiz').innerHTML = kpis + lado + `<div class="corpo corpo-cheio"><div>${MODO === 'grade' ? grade(filtro) : lista(filtro)}</div></div>`;
+  document.getElementById('raiz').innerHTML = filaEntrada() + kpis + lado + `<div class="corpo corpo-cheio"><div>${MODO === 'grade' ? grade(filtro) : lista(filtro)}</div></div>`;
+}
+
+// Alunos que vieram do fechamento e ainda não foram colocados na grade.
+// Eles nascem com a turma da aula experimental, que quase nunca é a
+// definitiva — por isso ficam aqui até alguém do pedagógico confirmar.
+function filaEntrada(){
+  const novos = D.alunos.filter(a => !a.confirmado_em && a.status !== 'cancelado');
+  if (!novos.length) return '';
+  const opTurmas = t => D.turmas.filter(x => x.ativa !== false)
+    .sort((a,b) => (a.dia_semana - b.dia_semana) || String(a.hora_inicio).localeCompare(String(b.hora_inicio)))
+    .map(x => `<option value="${x.id}" ${x.id===t?'selected':''}>${DIAS[x.dia_semana]} ${hh(x.hora_inicio)} · ${esc(x.nome||'')}</option>`).join('');
+  return `<div class="bloco-entrada">
+    <div class="be-tit"><b>${novos.length} aluno${novos.length>1?'s':''} novo${novos.length>1?'s':''} da matrícula</b>
+      <small>Confirme a turma e o kit definitivos. Enquanto não confirmar, ${novos.length>1?'eles aparecem':'ele aparece'} na grade com a turma da aula experimental.</small></div>
+    ${novos.map(a => `<div class="be-li">
+      <div class="be-nome"><b>${esc(a.nome_curto || a.nome)}</b><small>${esc(a.observacao || '')}</small></div>
+      <select id="be-t-${a.id}">${opTurmas(a.turma_id)}</select>
+      <select id="be-k-${a.id}">${D.kits.map(k => `<option value="${esc(k.kit)}" ${k.kit===a.kit?'selected':''}>${esc(k.kit)}</option>`).join('')}</select>
+      <button class="btn" onclick="confirmarAluno('${a.id}')">confirmar</button>
+      <button class="btn g" onclick="abrirFicha('${a.id}')">ficha</button>
+    </div>`).join('')}
+  </div>`;
+}
+async function confirmarAluno(id){
+  const turma_id = (document.getElementById('be-t-' + id) || {}).value || null;
+  const kit = (document.getElementById('be-k-' + id) || {}).value || null;
+  try {
+    await api('aluno_confirmar', { aluno_id: id, turma_id, kit, por_nome: (window.CaptaUser && CaptaUser.nome && CaptaUser.nome()) || undefined });
+    const a = D.alunos.find(x => x.id === id);
+    if (a) { a.confirmado_em = new Date().toISOString(); a.turma_id = turma_id || a.turma_id; a.kit = kit || a.kit; }
+    desenhar();
+    toast('Aluno confirmado na grade', { tipo:'ok' });
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
 }
 
 function grade(filtro){
