@@ -123,6 +123,9 @@ async function desenharRecepcao(){
     `<div class="bloco"><h3>Resumo da manhã no WhatsApp</h3><div class="h">Todo dia às 8h, um resumo do dia para o dono: aulas de hoje e quem confirmou, matrículas do mês, conversas esperando resposta e leads parados.</div>
       <div class="l2"><div class="campo"><label>WhatsApp que recebe</label><input id="r-fone" value="${esc(RESUMO.resumo_para||'')}" placeholder="5592999999999"></div>
         <div class="campo"><label>Ativo</label><select id="r-ativo"><option value="1" ${RESUMO.resumo_ativo!==false?'selected':''}>Sim, enviar todo dia</option><option value="0" ${RESUMO.resumo_ativo===false?'selected':''}>Não enviar</option></select></div></div>
+      <div class="campo" style="margin-top:12px"><label>Link de avaliação no Google</label>
+        <input id="r-aval" value="${esc(RESUMO.link_avaliacao||'')}" placeholder="https://g.page/r/..../review">
+        <div class="dica" style="margin-top:4px">Depois do check-out da aula experimental, a família recebe no WhatsApp um convite para avaliar, com este link e um texto pronto para copiar. Em branco, nada é enviado. O link sai no seu perfil do Google Business, em "Peça avaliações".</div></div>
       <div class="campo" style="margin-top:12px"><label>Remetente dos e-mails para as famílias</label>
         <input id="r-de" value="${esc(RESUMO.email_remetente||'')}" placeholder="My Robot Manaus &lt;contato@myrobotmanaus.com&gt;">
         <div class="dica" style="margin-top:4px">Usado na boas-vindas da matrícula. O domínio precisa estar verificado no Resend. Em branco, sai com o remetente padrão do Capta.</div></div>
@@ -174,7 +177,8 @@ async function testarAvisos(){
 async function salvarResumo(){
   const telefone = document.getElementById('r-fone').value.trim(), ativo = document.getElementById('r-ativo').value === '1';
   const email_remetente = (document.getElementById('r-de') || {}).value?.trim() || '';
-  try { const r = await api('resumo_config', { salvar: { telefone, ativo, email_remetente } }); RESUMO = r.config || {}; toast(telefone ? 'Resumo configurado' : 'Resumo desligado', { tipo:'ok' }); }
+  const link_avaliacao = (document.getElementById('r-aval') || {}).value?.trim() || '';
+  try { const r = await api('resumo_config', { salvar: { telefone, ativo, email_remetente, link_avaliacao } }); RESUMO = r.config || {}; toast(telefone ? 'Resumo configurado' : 'Resumo desligado', { tipo:'ok' }); }
   catch(e){ toast(e.message, { tipo:'erro' }); }
 }
 async function testarResumo(){
