@@ -98,7 +98,7 @@ module.exports = async function handler(req, res) {
     // sem e-mail no corpo (painel antigo) vale o padrão mais permissivo do dono
     if (!body._papel && token === tenant.dashboard_token) body._papel = 'gestor';
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'nota', 'notas', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -113,6 +113,7 @@ module.exports = async function handler(req, res) {
         case 'aluno':    return await acaoAluno(tenant, body, res);
         case 'aluno_confirmar': return await acaoAlunoConfirmar(tenant, body, res);
         case 'turmas_vagas':    return await acaoTurmasVagas(tenant, body, res);
+        case 'lead_novo':       return await acaoLeadNovo(tenant, body, res);
         case 'nota':            return await acaoNota(tenant, body, res);
         case 'notas':           return await acaoNotas(tenant, body, res);
         case 'boas_vindas':     return res.status(200).json(await enviarBoasVindas(tenant, body.aluno_id));
@@ -1422,8 +1423,8 @@ async function acaoImportarMidia(tenant, body, res) {
 // ---------------------------------------------------------------------
 const PAPEIS = {
   gestor:     { nome: 'Gestor',     desc: 'Vê e faz tudo, inclusive equipe e painel.',              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos','eventos','ajustes'], pode: ['*'] },
-  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','ligacao','ligacoes','nota','notas','alunos','eu'] },
-  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','aluno_confirmar','turmas_vagas','transferir_aluno','boas_vindas','nota','notas','repor','faltas_aluno','vagas_kit','remarcar_aluno','lead','funil','eu'] },
+  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','ligacao','ligacoes','lead_novo','nota','notas','alunos','eu'] },
+  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','aluno_confirmar','turmas_vagas','transferir_aluno','boas_vindas','lead_novo','nota','notas','repor','faltas_aluno','vagas_kit','remarcar_aluno','lead','funil','eu'] },
   leitura:    { nome: 'Só leitura', desc: 'Vê tudo, não altera nada.',                              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos'],                   pode: ['agenda','funil','lead','experimentais','alunos','conversas','mensagens','midia','eu'] },
 };
 async function usuarioDe(tenantId, email) {
@@ -2087,6 +2088,31 @@ async function acaoFaltasAluno(tenant, body, res) {
 // NOTAS — cada anotação é uma linha com autor e data, em vez de um campo
 // único que a próxima pessoa sobrescreve. Vai também para o card do Kommo,
 // já que os dois sistemas rodam em paralelo.
+// Lead que veio direto: apareceu na escola ou ligou, sem ter passado pelo
+// site nem pelo WhatsApp. Reaproveita o cadastro se o telefone já existir,
+// para não criar o mesmo lead duas vezes.
+async function acaoLeadNovo(tenant, body, res) {
+  const nome = String(body.nome || '').trim();
+  const fone = String(body.contato || '').replace(/\D/g, '');
+  if (!nome || fone.length < 10) return res.status(400).json({ erro: 'Informe o nome e o WhatsApp.' });
+  const comDDI = fone.startsWith('55') ? fone : `55${fone}`;
+  const [ja] = await sb(`capta_leads?tenant_id=eq.${tenant.id}&or=(contato.eq.${fone},contato.eq.${comDDI})&select=id&limit=1`).catch(() => []);
+  if (ja) return res.status(200).json({ lead_id: ja.id, ja_existia: true });
+
+  const etapaId = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Novo%20lead&select=id&limit=1`).catch(() => []))?.[0]?.id || null;
+  const criado = await sb('capta_leads', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+    tenant_id: tenant.id, nome, contato: comDDI,
+    crianca: body.crianca || null, idade: body.idade ? Number(body.idade) : null,
+    origem: 'my robot', fonte: 'direto', porta: 'my robot',
+    temperatura: 'Quente', status: 'contatado', etapa_id: etapaId,
+    atendente: body.por_nome || null,
+    notas: 'Procurou a escola direto (cadastrado no agendamento)'
+  }) });
+  const leadId = criado?.[0]?.id;
+  if (!leadId) return res.status(500).json({ erro: 'Não consegui criar o lead.' });
+  return res.status(200).json({ lead_id: leadId, ja_existia: false });
+}
+
 async function acaoNota(tenant, body, res) {
   const texto = String(body.texto || '').trim();
   if (!texto) return res.status(400).json({ erro: 'Escreva a nota.' });
