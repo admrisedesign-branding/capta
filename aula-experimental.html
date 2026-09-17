@@ -432,12 +432,14 @@ function cartao(a){
   if (a.status === 'faltou' || (D_ && D_.t === 'faltou')) {
     est = ' gone';
     const menu = ABERTO && ABERTO.id === a.id && ABERTO.tipo === 'reagendar' ? menuReagendar(a) : '';
-    pe = `<div class="done neutral"><span><b>Faltou.</b> Continua em Aula agendada no Kommo, com a tag <i>reagendar devido falta</i></span>
+    pe = `<div class="done neutral"><span><b>Faltou.</b> Voltou para o atendimento como <i>urgente</i>, com a tag <i>REAGENDAR</i> no Capta e no Kommo</span>
       <span><button class="undo alt" onclick="abrirMenu('${a.id}','reagendar')">opções</button> <button class="undo" onclick="desfazer('${a.id}')">desfazer</button></span></div>${menu}`;
   } else if (D_) {
     est = D_.t === 'matriculou' ? ' win' : D_.t === 'nao' ? ' lost' : ' hold';
     const txt = D_.t === 'matriculou' ? `<b>Matriculou${D_.obs?' · '+esc(D_.obs.split(' · ')[0]):''}.</b> Baixa no Kommo como ganho: vai para Aluno ativo com a tag <i>pagamento: ${esc((D_.obs.split(' · ')[0]||'').toLowerCase())}</i>`
-      : D_.t === 'nao' ? `<b>Não fechou${D_.obs?' · '+esc(D_.obs):''}.</b> Vai para Remarketing no Kommo com a tag <i>motivo: ${esc(D_.obs.toLowerCase())}</i>`
+      : D_.t === 'nao' ? (/perdido/i.test(a.observacao||'')
+        ? `<b>Perdido${D_.obs?' · '+esc(D_.obs.replace(/\s*·\s*perdido/i,'')):''}.</b> Saiu do funil: etapa Perdido no Capta e no Kommo`
+        : `<b>Não fechou${D_.obs?' · '+esc(D_.obs):''}.</b> Vai para Remarketing no Kommo com a tag <i>motivo: ${esc(D_.obs.toLowerCase())}</i>`)
       : `<b>Em andamento.</b> Continua na coluna de Aula agendada, com a tag <i>em andamento</i>. A observação abaixo vai como nota no Kommo. <i>“${esc(D_.obs||'sem observação')}”</i>`;
     pe = `<div class="done ${D_.t==='matriculou'?'win':D_.t==='nao'?'lost':'hold'}"><span>${txt}</span>${D_.t==='matriculou'?'':`<button class="undo" onclick="desfazer('${a.id}')">desfazer</button>`}</div>`;
   } else {
@@ -463,7 +465,13 @@ function menuDesfecho(a){
   if (tp === 'reagendar') return menuReagendar(a);
   if (tp === 'andamento') return `<div class="menu"><p>Situação da família</p><textarea id="m-obs" placeholder="Ex.: precisa esperar a fatura do cartão virar, falar com o marido"></textarea>
     <div class="acts save"><button class="yes" onclick="registrar('${a.id}','andamento',{observacao:document.getElementById('m-obs').value,situacao:document.getElementById('m-obs').value})">Salvar</button><button onclick="fecharMenu()">cancelar</button></div></div>`;
-  if (tp === 'nao') return `<div class="menu"><p>Motivo</p><div class="chips">${MOTIVOS.map(v=>`<button class="chip" onclick="registrar('${a.id}','nao',{motivo:'${v}'})">${v}</button>`).join('')}</div></div>`;
+  if (tp === 'nao') return `<div class="menu"><p>Motivo</p><div class="chips">${MOTIVOS.map(v=>`<button class="chip ${ESC.motivo===v?'on':''}" onclick="ESC.motivo='${v}';desenhar()">${v}</button>`).join('')}</div>
+    <p style="margin-top:10px">Para onde vai o lead</p>
+    <div class="chips">
+      <button class="chip" onclick="registrar('${a.id}','nao',{motivo:ESC.motivo||'Vai pensar'})" title="Continua no funil para retomada depois">Remarketing</button>
+      <button class="chip" style="border-color:#c23b3b;color:#c23b3b" onclick="if(confirm('Marcar como PERDIDO? O lead sai do funil de vendas e vai para a etapa Perdido, no Capta e no Kommo.'))registrar('${a.id}','nao',{motivo:ESC.motivo||'Vai pensar',perdido:true})" title="Encerra o lead: vai para a etapa Perdido">Perdido</button>
+    </div>
+    <div class="liv" style="margin-top:6px;color:var(--muted);font-size:11.5px">Escolha o motivo e depois o destino. Sem escolher motivo, vai como "Vai pensar".</div></div>`;
   if (tp === 'matriculou') return `<div class="menu"><p>Forma de pagamento</p><div class="chips">${PAGTOS.map(v=>`<button class="chip ${ESC.pagamento===v?'on':''}" onclick="ESC.pagamento='${v}';desenhar()">${v}</button>`).join('')}</div>
     <div class="l2 linha2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><p>Valor (R$)</p><input id="m-valor" type="number" min="0" step="10" placeholder="397" value="${ESC.valor||''}"></div><div><p>Kit</p><select id="m-curso">${KITS.map(k=>`<option ${k===(ESC.curso||'First')?'selected':''}>${k}</option>`).join('')}</select></div></div>
     <div class="l2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><p>Turma do aluno</p><select id="m-turma">${D.turmas.map(t=>`<option value="${t.id}" ${t.id===a.turma_id?'selected':''}>${esc(t.nome)}</option>`).join('')}</select></div><div><p>Nome completo</p><input id="m-aluno" value="${esc(a.crianca_nome||'')}"></div></div>
@@ -481,7 +489,7 @@ async function carregarVagas(){ try { VAGAS3 = (await api('agenda', { dias: 30 }
 function abrirMenu(id, tipo){ ABERTO = { id, tipo }; ESC = {}; desenhar(); }
 function fecharMenu(){ ABERTO = null; desenhar(); }
 async function registrar(id, tipo, extra){
-  try { await api('desfecho', { atendente: (window.CaptaUser&&CaptaUser.nome())||undefined, agendamento_id: id, desfecho: tipo, observacao: `desfecho: ${tipo}${extra.motivo?' · '+extra.motivo:''}${extra.observacao?' · '+extra.observacao:''}`, ...extra }); ABERTO = null; await carregar();
+  try { await api('desfecho', { atendente: (window.CaptaUser&&CaptaUser.nome())||undefined, agendamento_id: id, desfecho: tipo, observacao: `desfecho: ${tipo}${extra.motivo?' · '+extra.motivo:''}${extra.perdido?' · perdido':''}${extra.observacao?' · '+extra.observacao:''}`, ...extra }); ABERTO = null; await carregar();
     const nome = (D.agendamentos.find(x=>x.id===id)||{}).crianca_nome || 'Aula';
     toast(`<b>${esc(nome)}</b> · ${({matriculou:'matriculou',nao:'não fechou',andamento:'em andamento',faltou:'faltou'})[tipo]} · Kommo atualizado`, tipo==='matriculou'?{tipo:'ok'}:{ acao:'desfazer', onAcao:() => desfazer(id) }); }
   catch(e){ toast(e.message,{tipo:'erro'}); }
