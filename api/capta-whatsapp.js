@@ -91,9 +91,14 @@ module.exports = async function handler(req, res) {
       const eu = await usuarioDe(tenant.id, body.email_atual);
       if (eu && eu.ativo === false) return res.status(403).json({ erro: 'Seu acesso está desativado. Fale com o gestor.' });
       if (eu && !podeFazer(eu.papel, acao)) return res.status(403).json({ erro: `Seu perfil (${(PAPEIS[eu.papel]||{}).nome || eu.papel}) não pode fazer isso.` });
+      // o papel de quem chamou fica disponível para as ações que mudam de
+      // regra conforme quem está usando (ex.: prazo da reposição)
+      if (eu) body._papel = eu.papel;
     }
+    // sem e-mail no corpo (painel antigo) vale o padrão mais permissivo do dono
+    if (!body._papel && token === tenant.dashboard_token) body._papel = 'gestor';
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -106,6 +111,7 @@ module.exports = async function handler(req, res) {
         case 'campos':   return await acaoCampos(tenant, body, res);
         case 'alunos':   return await acaoAlunos(tenant, body, res);
         case 'aluno':    return await acaoAluno(tenant, body, res);
+        case 'aluno_confirmar': return await acaoAlunoConfirmar(tenant, body, res);
         case 'experimentais': return await acaoExperimentais(tenant, body, res);
         case 'desfecho': return await acaoDesfecho(tenant, body, res);
         case 'desfazer': return await acaoDesfazer(tenant, body, res);
@@ -1007,7 +1013,7 @@ async function acaoAlunos(tenant, body, res) {
 
   const [turmas, alunos, kits] = await Promise.all([
     sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim,capacidade,limite_sala,kit_experimental,ativa&order=dia_semana,hora_inicio`),
-    sb(`capta_alunos?tenant_id=eq.${tenant.id}&select=id,nome,nome_curto,kit,matricula,turma_id,lead_id,status,trancado_ate,observacao&order=nome`).catch(() => []),
+    sb(`capta_alunos?tenant_id=eq.${tenant.id}&select=id,nome,nome_curto,kit,matricula,turma_id,lead_id,status,trancado_ate,observacao,confirmado_em,confirmado_por,criado_em&order=nome`).catch(() => []),
     sb(`capta_kits?tenant_id=eq.${tenant.id}&select=kit,capacidade,cor`).catch(() => [])
   ]);
   return res.status(200).json({ turmas: turmas || [], alunos: alunos || [], kits: kits || [], remarcacoes: remarcacoes || [] });
@@ -1085,6 +1091,8 @@ async function acaoDesfecho(tenant, body, res) {
       if (!ja?.length) await sb('capta_alunos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
         tenant_id: tenant.id, nome: body.aluno_nome || a.crianca_nome || 'Aluno novo', nome_curto: a.crianca_nome || null,
         kit: body.curso || 'First', turma_id: body.turma_id || a.turma_id, lead_id: a.lead_id, status: 'ativo',
+        // confirmado_em fica nulo: entra na fila do pedagógico para definir
+        // turma e kit definitivos (a turma aqui é a da experimental)
         observacao: `Matriculado pela aula experimental de ${a.data}` }) }).catch(() => null);
     }
     // registro comercial (comissão)
@@ -1410,7 +1418,7 @@ async function acaoImportarMidia(tenant, body, res) {
 const PAPEIS = {
   gestor:     { nome: 'Gestor',     desc: 'Vê e faz tudo, inclusive equipe e painel.',              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos','eventos','ajustes'], pode: ['*'] },
   atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','ligacao','ligacoes','alunos','eu'] },
-  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','lead','funil','eu'] },
+  secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','aluno_confirmar','repor','faltas_aluno','vagas_kit','remarcar_aluno','lead','funil','eu'] },
   leitura:    { nome: 'Só leitura', desc: 'Vê tudo, não altera nada.',                              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos'],                   pode: ['agenda','funil','lead','experimentais','alunos','conversas','mensagens','midia','eu'] },
 };
 async function usuarioDe(tenantId, email) {
@@ -2066,6 +2074,21 @@ async function acaoFaltasAluno(tenant, body, res) {
   return res.status(200).json({ aluno: al, turma: turma || null, faltas: faltas.reverse(), reposicoes: reposicoes || [] });
 }
 
+// O pedagógico confirma o aluno na grade: turma e kit definitivos.
+// Enquanto não confirma, ele aparece na fila de entrada da tela de Alunos.
+async function acaoAlunoConfirmar(tenant, body, res) {
+  const { aluno_id, turma_id, kit, nome } = body;
+  if (!aluno_id) return res.status(400).json({ erro: 'Informe o aluno.' });
+  const campos = { confirmado_em: new Date().toISOString(), confirmado_por: body.por_nome || null };
+  if (turma_id) campos.turma_id = turma_id;
+  if (kit) campos.kit = kit;
+  if (nome) campos.nome = nome;
+  await sb(`capta_alunos?id=eq.${aluno_id}&tenant_id=eq.${tenant.id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos)
+  });
+  return res.status(200).json({ ok: true });
+}
+
 async function acaoRepor(tenant, body, res) {
   const { aluno_id, turma_id, data, repoe_data } = body;
   if (!aluno_id || !turma_id || !data) return res.status(400).json({ erro: 'Dados incompletos.' });
@@ -2073,12 +2096,18 @@ async function acaoRepor(tenant, body, res) {
   if (!al) return res.status(404).json({ erro: 'Aluno não encontrado.' });
   const [t] = await sb(`capta_turmas?id=eq.${turma_id}&select=hora_inicio,hora_fim&limit=1`);
   if (!t) return res.status(404).json({ erro: 'Turma não encontrada.' });
-  // limite: 7 dias a partir de hoje
-  const limite = new Date(Date.now() + 7 * 864e5 - 4 * 3600e3).toISOString().slice(0, 10);
-  if (data > limite) return res.status(400).json({ erro: 'A reposição precisa ser em até 7 dias.' });
-  // não repetir reposição no mesmo dia
-  const ja = await sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&aluno_id=eq.${aluno_id}&data=eq.${data}&select=id&limit=1`).catch(() => []);
-  if (ja?.length) return res.status(409).json({ erro: 'Este aluno já tem aula marcada nesse dia.' });
+  // Prazo: 7 dias é o padrão da recepção. Quem cuida do pedagógico (gestor e
+  // secretaria) pode marcar fora disso — reposição de quem ficou doente duas
+  // semanas não cabe em 7 dias. Até 120 dias, para não marcar em 2030 por engano.
+  const semLimite = ['gestor', 'secretaria'].includes(body._papel);
+  const limite = new Date(Date.now() + (semLimite ? 120 : 7) * 864e5 - 4 * 3600e3).toISOString().slice(0, 10);
+  if (data > limite) return res.status(400).json({ erro: semLimite ? 'Escolha uma data nos próximos 120 dias.' : 'A reposição precisa ser em até 7 dias.' });
+  // Duas aulas no mesmo dia: bloqueado para a recepção, permitido no pedagógico
+  // (aluno que faltou muito às vezes repõe duas no mesmo dia, em horários diferentes).
+  const ja = await sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&aluno_id=eq.${aluno_id}&data=eq.${data}&select=id,hora_inicio&limit=5`).catch(() => []);
+  if (ja?.length && !semLimite) return res.status(409).json({ erro: 'Este aluno já tem aula marcada nesse dia.' });
+  if (ja?.length && ja.some(x => String(x.hora_inicio || '').slice(0, 5) === String(t.hora_inicio || '').slice(0, 5)))
+    return res.status(409).json({ erro: 'Já existe reposição desse aluno nesse mesmo horário.' });
   const novo = await sb('capta_agendamentos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
     tenant_id: tenant.id, tipo: 'reposicao', aluno_id, turma_id, data,
     hora_inicio: t.hora_inicio, hora_fim: t.hora_fim,
