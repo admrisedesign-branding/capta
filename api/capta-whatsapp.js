@@ -74,7 +74,7 @@ module.exports = async function handler(req, res) {
   try {
     // ---- valida o negócio e o plano ----
     const tenants = await sb(
-      `capta_tenants?slug=eq.${encodeURIComponent(slug)}&select=id,slug,plano,dashboard_token,recepcao_token&limit=1`
+      `capta_tenants?slug=eq.${encodeURIComponent(slug)}&select=id,slug,nome,plano,dashboard_token,recepcao_token,email_remetente&limit=1`
     );
     const tenant = tenants && tenants[0];
     if (!tenant) return res.status(403).json({ erro: 'Acesso negado.' });
@@ -1830,9 +1830,14 @@ async function acaoResumoConfig(tenant, body, res) {
   if (body.salvar) {
     const c = body.salvar;
     const dados = { resumo_para: (c.telefone || '').replace(/\D/g, '') || null, resumo_ativo: c.ativo !== false, resumo_hora: c.hora || '08:00' };
+    if (c.email_remetente !== undefined) {
+      const r = String(c.email_remetente || '').trim();
+      if (r && !/^[^<]*<[^@]+@[^>]+>$|^[^@\s]+@[^@\s]+$/.test(r)) return res.status(400).json({ erro: 'Use o formato Nome <email@dominio.com> ou só o e-mail.' });
+      dados.email_remetente = r || null;
+    }
     await sb(`capta_tenants?id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
   }
-  const [t] = await sb(`capta_tenants?id=eq.${tenant.id}&select=resumo_para,resumo_ativo,resumo_hora&limit=1`);
+  const [t] = await sb(`capta_tenants?id=eq.${tenant.id}&select=resumo_para,resumo_ativo,resumo_hora,email_remetente&limit=1`);
   return res.status(200).json({ config: t || {} });
 }
 
@@ -2187,7 +2192,9 @@ async function enviarBoasVindas(tenant, alunoId) {
   const quando = turma ? `${DIAS_E[turma.dia_semana] || ''}, das ${String(turma.hora_inicio).slice(0, 5)} às ${String(turma.hora_fim).slice(0, 5)}` : 'a combinar';
   const primeiro = String(al.nome_curto || al.nome || '').trim().split(' ')[0];
   const escola = tenant.nome || 'a escola';
-  const de = process.env.CAPTA_FROM_EMAIL || 'Capta <onboarding@resend.dev>';
+  // Remetente: o da própria escola (Ajustes) na frente do global, porque o
+  // e-mail vai para a família — tem que chegar com o nome de quem ela conhece.
+  const de = tenant.email_remetente || process.env.CAPTA_FROM_EMAIL || 'Capta <onboarding@resend.dev>';
 
   const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:520px;color:#141A2E;line-height:1.6">
     <h2 style="margin:0 0 6px">Bem-vindo à ${escola}, ${primeiro}! 🤖</h2>
