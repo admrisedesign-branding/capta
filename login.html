@@ -33,6 +33,20 @@ h1{font-size:22px;font-weight:800;margin-bottom:4px}
 .field label{display:block;font-size:12.5px;font-weight:600;color:var(--dm);margin-bottom:6px}
 .field input{width:100%;background:var(--card);border:1px solid var(--line);border-radius:11px;color:var(--tx);font-size:15px;padding:12px 13px;font-family:inherit}
 .field input:focus{outline:none;border-color:var(--brand)}
+.senha-box{position:relative}
+.senha-box input{padding-right:44px}
+.olho{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;padding:8px;cursor:pointer;color:var(--dm);display:grid;place-items:center;border-radius:8px}
+.olho:hover{color:var(--brand);background:var(--line-2)}
+.olho svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* envelope saindo enquanto o e-mail é disparado */
+.envio{display:grid;place-items:center;gap:14px;padding:10px 0 4px}
+.envio svg{width:58px;height:58px;stroke:var(--brand);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.envio .env-ico{animation:voa 1.6s ease-in-out infinite}
+@keyframes voa{0%{transform:translate(0,0)}45%{transform:translate(7px,-7px)}55%{transform:translate(7px,-7px)}100%{transform:translate(0,0)}}
+.envio .tracos line{stroke:var(--brand);opacity:.35;animation:risca 1.6s ease-in-out infinite}
+.envio .tracos line:nth-child(2){animation-delay:.18s}
+.envio .tracos line:nth-child(3){animation-delay:.36s}
+@keyframes risca{0%,100%{opacity:0;transform:translateX(6px)}50%{opacity:.5;transform:translateX(-2px)}}
 .btn{width:100%;border:0;font-family:inherit;font-weight:700;font-size:15px;padding:13px;border-radius:12px;cursor:pointer;transition:.15s}
 .btn-primary{background:var(--brand);color:#fff}
 .btn-primary:hover{background:var(--brand-deep)}
@@ -67,7 +81,7 @@ h1{font-size:22px;font-weight:800;margin-bottom:4px}
       <button class="tab" id="tab-up" onclick="setMode('up')">Criar conta</button>
     </div>
     <div class="field"><label>E-mail</label><input type="email" id="email" placeholder="voce@email.com" autocomplete="email"></div>
-    <div class="field"><label>Senha</label><input type="password" id="senha" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="field"><label>Senha</label><div class="senha-box"><input type="password" id="senha" placeholder="••••••••" autocomplete="current-password"><button type="button" class="olho" onclick="verSenha('senha',this)" aria-label="Mostrar senha" title="Mostrar senha"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
     <div class="err" id="err"></div>
     <p class="foot" id="esqueci" style="margin:-4px 0 12px;text-align:right"><a onclick="pedirReset()">Esqueci minha senha</a></p>
     <button class="btn btn-primary" id="go" onclick="submit()">Entrar</button>
@@ -103,6 +117,18 @@ h1{font-size:22px;font-weight:800;margin-bottom:4px}
     <p class="foot">Plano Free · sem cartão · faça upgrade quando quiser</p>
   </div>
 
+  <!-- ENVIANDO O LINK -->
+  <div id="enviando-view" class="hide center">
+    <h1>Enviando o link…</h1>
+    <p class="sub">Estamos mandando o e-mail para <b id="ev-email"></b>. Leva alguns segundos.</p>
+    <div class="envio">
+      <svg viewBox="0 0 24 24">
+        <g class="tracos"><line x1="1" y1="7" x2="5" y2="7"/><line x1="0" y1="11" x2="4" y2="11"/><line x1="1" y1="15" x2="5" y2="15"/></g>
+        <g class="env-ico"><rect x="7" y="5" width="16" height="13" rx="2.5"/><path d="M7.6 6.3 15 12l7.4-5.7"/></g>
+      </svg>
+    </div>
+  </div>
+
   <!-- LINK DE RECUPERAÇÃO ENVIADO -->
   <div id="reset-sent-view" class="hide center">
     <h1>Link enviado ✓</h1>
@@ -115,8 +141,8 @@ h1{font-size:22px;font-weight:800;margin-bottom:4px}
   <div id="nova-senha-view" class="hide">
     <h1>Criar senha nova</h1>
     <p class="sub">Escolha uma senha de pelo menos 6 caracteres.</p>
-    <div class="field"><label>Nova senha</label><input type="password" id="ns1" placeholder="••••••••" autocomplete="new-password"></div>
-    <div class="field"><label>Repita a senha</label><input type="password" id="ns2" placeholder="••••••••" autocomplete="new-password"></div>
+    <div class="field"><label>Nova senha</label><div class="senha-box"><input type="password" id="ns1" placeholder="••••••••" autocomplete="new-password"><button type="button" class="olho" onclick="verSenha('ns1',this)" aria-label="Mostrar senha" title="Mostrar senha"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div class="field"><label>Repita a senha</label><div class="senha-box"><input type="password" id="ns2" placeholder="••••••••" autocomplete="new-password"><button type="button" class="olho" onclick="verSenha('ns2',this)" aria-label="Mostrar senha" title="Mostrar senha"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
     <div class="err" id="ns-err"></div>
     <button class="btn btn-primary" id="ns-go" onclick="salvarSenha()">Salvar e entrar</button>
   </div>
@@ -138,7 +164,7 @@ const sb = createClient(SB_URL, SB_KEY);
 
 let MODE = 'in';
 const $ = id => document.getElementById(id);
-const show = v => { ['auth-view','loading-view','confirm-view','onboarding-view','noaccess-view','reset-sent-view','nova-senha-view'].forEach(x=>$(x).classList.toggle('hide', x!==v)); };
+const show = v => { ['auth-view','loading-view','confirm-view','onboarding-view','noaccess-view','enviando-view','reset-sent-view','nova-senha-view'].forEach(x=>$(x).classList.toggle('hide', x!==v)); };
 
 window.setMode = m => {
   MODE = m;
@@ -181,9 +207,13 @@ window.pedirReset = async () => {
   const email = $('email').value.trim();
   if(!email || !email.includes('@')){ $('err').textContent = 'Escreva seu e-mail no campo acima e clique de novo.'; $('email').focus(); return; }
   $('err').textContent = ''; $('go').disabled = true;
+  $('ev-email').textContent = email; show('enviando-view');
+  const t0 = Date.now();
   try{
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/login.html?recuperar=1' });
-    if(error){
+    // segura a animação por pelo menos 1,2 s pra não piscar na tela
+    await new Promise(r => setTimeout(r, Math.max(0, 1200 - (Date.now() - t0))));
+    if(error){ show('auth-view');
       // mostra o motivo real: quase sempre é limite de e-mails por hora do Supabase
       const m = (error.message || '').toLowerCase();
       $('err').textContent = /rate|too many|segundos|seconds/.test(m)
@@ -194,7 +224,7 @@ window.pedirReset = async () => {
       $('go').disabled = false; return;
     }
     $('rs-email').textContent = email; show('reset-sent-view');
-  }catch(e){ $('err').textContent = 'Erro inesperado. Tente de novo.'; $('go').disabled = false; }
+  }catch(e){ show('auth-view'); $('err').textContent = 'Erro inesperado. Tente de novo.'; $('go').disabled = false; }
 };
 
 window.salvarSenha = async () => {
@@ -208,6 +238,18 @@ window.salvarSenha = async () => {
     history.replaceState(null,'','/login.html');
     route();
   }catch(e){ $('ns-err').textContent = 'Erro inesperado. Tente de novo.'; $('ns-go').disabled = false; $('ns-go').textContent = 'Salvar e entrar'; }
+};
+
+// mostrar/esconder a senha digitada
+window.verSenha = (id, bt) => {
+  const c = $(id); if (!c) return;
+  const ver = c.type === 'password';
+  c.type = ver ? 'text' : 'password';
+  bt.title = bt.ariaLabel = ver ? 'Esconder senha' : 'Mostrar senha';
+  bt.innerHTML = ver
+    ? '<svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.2A9.6 9.6 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.3 4"/><path d="M6.6 7.4A16.7 16.7 0 0 0 2 12s3.6 6.5 10 6.5a9.9 9.9 0 0 0 4.2-.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  c.focus();
 };
 
 window.google = async () => {
