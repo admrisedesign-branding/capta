@@ -45,6 +45,13 @@ td{padding:10px;border-bottom:1px solid var(--line-2);vertical-align:middle}tr:l
 .fim{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
 .aviso{border:1px dashed var(--line);border-radius:12px;padding:24px;text-align:center;color:var(--faint);line-height:1.7}
 .dica{font-size:12.5px;color:var(--muted);background:var(--line-2);border-radius:10px;padding:10px 12px;line-height:1.55;margin-top:10px}
+.li-aviso{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-2,#F0F2F7);flex-wrap:wrap}
+.li-aviso small{color:var(--muted);font-size:12px;margin-left:4px}
+.li-aviso .tipos{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.li-aviso .tipos span{font-size:11px;font-weight:700;border:1px solid var(--line);border-radius:99px;padding:2px 8px;color:var(--faint,#9aa0b4)}
+.li-aviso .tipos span.on{border-color:var(--brand);color:var(--brand);background:rgba(46,91,255,.06)}
+label.chk{display:flex;align-items:flex-start;gap:7px;font-size:13px;font-weight:500;color:var(--ink);margin:5px 0;cursor:pointer}
+label.chk input{margin-top:2px}
 </style>
 <style>body.embed .voltar,body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -104,7 +111,8 @@ let TOKEN_REC = null, RESUMO = {};
 async function desenharRecepcao(){
   if (TOKEN_REC === null) { document.getElementById('raiz').innerHTML = '<div class="aviso">Carregando…</div>';
     try { const d = await cfg('recepcao_token'); TOKEN_REC = d.token || ''; } catch(e){ TOKEN_REC = ''; }
-    try { const r = await api('resumo_config'); RESUMO = r.config || {}; } catch(e){} }
+    try { const r = await api('resumo_config'); RESUMO = r.config || {}; } catch(e){}
+    try { const r = await api('avisos'); AVISOS = r.avisos || []; } catch(e){} }
   const base = location.origin, qs = `?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN_REC || TOKEN)}`;
   const link = (url, titulo, texto) => `<div class="bloco"><h3>${titulo}</h3><div class="h">${texto}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input readonly value="${url}" style="flex:1;min-width:260px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:12.5px;color:var(--muted)" onclick="this.select()">
@@ -117,10 +125,49 @@ async function desenharRecepcao(){
         <div class="campo"><label>Ativo</label><select id="r-ativo"><option value="1" ${RESUMO.resumo_ativo!==false?'selected':''}>Sim, enviar todo dia</option><option value="0" ${RESUMO.resumo_ativo===false?'selected':''}>Não enviar</option></select></div></div>
       <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" onclick="salvarResumo()">Salvar</button><button class="btn g" onclick="testarResumo()">Enviar agora (teste)</button></div>
       <div class="dica">Sai do próprio WhatsApp da unidade, então precisa estar conectado. Se o número mudar, é só trocar aqui.</div></div>` +
+    `<div class="bloco"><h3>Avisos no WhatsApp da equipe</h3><div class="h">Todo dia às 8h, cada pessoa recebe no WhatsApp só o que é da conta dela. Sai do WhatsApp da unidade, que precisa estar conectado.</div>
+      ${(AVISOS||[]).map(a => `<div class="li-aviso">
+        <div><b>${esc(a.nome||'sem nome')}</b> <small>${esc(a.telefone)}</small>
+          <div class="tipos">${[['aulas_dia','experimentais do dia'],['fechamento','aulas sem resultado'],['resumo','resumo completo']].map(([k,t]) => `<span class="${(a.tipos||[]).includes(k)?'on':''}">${t}</span>`).join('')}</div></div>
+        <div style="display:flex;gap:6px"><button class="btn g" onclick="editarAviso('${a.id}')">editar</button><button class="btn g" onclick="apagarAviso('${a.id}')">remover</button></div>
+      </div>`).join('') || '<div class="dica">Ninguém cadastrado ainda.</div>'}
+      <div class="l2" style="margin-top:12px"><div class="campo"><label>Nome</label><input id="av-nome" value="${esc(AV_ED.nome||'')}" placeholder="Karyne"></div>
+        <div class="campo"><label>WhatsApp</label><input id="av-fone" value="${esc(AV_ED.telefone||'')}" placeholder="5592999999999"></div></div>
+      <div class="campo"><label>O que recebe</label>
+        <label class="chk"><input type="checkbox" id="av-t1" ${(AV_ED.tipos||[]).includes('aulas_dia')?'checked':''}> Experimentais do dia — hora, criança e contato do responsável</label>
+        <label class="chk"><input type="checkbox" id="av-t2" ${(AV_ED.tipos||[]).includes('fechamento')?'checked':''}> Aulas sem resultado — as que ninguém deu baixa nos últimos 7 dias</label>
+        <label class="chk"><input type="checkbox" id="av-t3" ${(AV_ED.tipos||[]).includes('resumo')?'checked':''}> Resumo completo do dia — o mesmo que o dono recebe</label>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" onclick="salvarAviso()">${AV_ED.id?'Salvar alterações':'Adicionar'}</button>
+        ${AV_ED.id?`<button class="btn g" onclick="AV_ED={};desenhar()">cancelar</button>`:''}
+        <button class="btn g" onclick="testarAvisos()">Enviar agora (teste)</button></div>
+      <div class="dica">O de aulas do dia é pra quem recebe as famílias (recepção). O de aulas sem resultado é pra quem cobra o fechamento — sem a baixa, o lead fica parado em Aula agendada e ninguém retoma.</div></div>` +
     `<div class="bloco"><h3>Segurança destes links</h3><div class="h">Eles usam uma chave separada, que só permite check-in e check-out — não abre leads, conversas nem o painel. Se um tablet sumir, gere uma chave nova: os links antigos param de funcionar na hora.</div>
       <button class="btn g" onclick="novaChaveRecepcao()">Gerar nova chave</button></div>` +
     `<div class="bloco"><h3>Como deixar em tela cheia</h3><div class="h">No tablet: abra o link no Chrome, toque em ⋮ → <b>Adicionar à tela inicial</b>. Na TV/monitor: abra no navegador e aperte <b>F11</b>. Os dois links não pedem senha — quem tiver o link entra, então use só nos aparelhos da escola.</div></div>`;
 }
+let AVISOS = [], AV_ED = {};
+async function carregarAvisos(){ try { const r = await api('avisos'); AVISOS = r.avisos || []; desenhar(); } catch(e){} }
+function editarAviso(id){ AV_ED = { ...(AVISOS.find(a => a.id === id) || {}) }; desenhar(); }
+async function apagarAviso(id){
+  if (!confirm('Remover essa pessoa dos avisos?')) return;
+  try { const r = await api('avisos', { apagar: id }); AVISOS = r.avisos || []; AV_ED = {}; desenhar(); toast('Removido', { tipo:'ok' }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function salvarAviso(){
+  const tipos = [['av-t1','aulas_dia'],['av-t2','fechamento'],['av-t3','resumo']].filter(([el]) => document.getElementById(el).checked).map(([,k]) => k);
+  const salvar = { id: AV_ED.id, nome: document.getElementById('av-nome').value.trim(), telefone: document.getElementById('av-fone').value.trim(), tipos };
+  if (!salvar.telefone) return toast('Informe o WhatsApp.', { tipo:'erro' });
+  if (!tipos.length) return toast('Marque ao menos um tipo de aviso.', { tipo:'erro' });
+  try { const r = await api('avisos', { salvar }); AVISOS = r.avisos || []; AV_ED = {}; desenhar(); toast('Aviso salvo', { tipo:'ok' }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function testarAvisos(){
+  if (!AVISOS.length) return toast('Cadastre alguém primeiro.', { tipo:'erro' });
+  try { const r = await api('avisos', { testar: true }); toast(`${r.enviados||0} aviso(s) enviado(s)${r.falhas?` · ${r.falhas} falharam`:''}`, { tipo: r.falhas?'erro':'ok' }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
 async function salvarResumo(){
   const telefone = document.getElementById('r-fone').value.trim(), ativo = document.getElementById('r-ativo').value === '1';
   try { const r = await api('resumo_config', { salvar: { telefone, ativo } }); RESUMO = r.config || {}; toast(telefone ? 'Resumo configurado' : 'Resumo desligado', { tipo:'ok' }); }
