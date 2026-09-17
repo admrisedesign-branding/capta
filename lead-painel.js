@@ -176,6 +176,7 @@
             <option value="" ${!l.atendente?'selected':''}>— sem dono —</option>
           </select>
           <button class="bt-assumir" onclick="LeadPainel.verHistoricoAtendente()" title="Quem já cuidou deste lead">histórico</button>
+          ${l.contato ? `<button class="bt-assumir" onclick="LeadPainel.ligar()" title="Ligar e registrar o que aconteceu">📞 ligar</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -268,6 +269,65 @@
       if (window.parent !== window) window.parent.postMessage({ capta:'mudou', o:'atendente' }, '*');
     } catch (e) { if (sel) sel.value = antes; say(e.message, { tipo:'erro' }); }
   }
+  // Ligação: abre o discador e registra o resultado (o Capta não disca).
+  function ligar() {
+    const l = S.lead; if (!l || !l.contato) return;
+    const num = String(l.contato).replace(/\D/g, '');
+    const box = document.createElement('div'); box.id = 'lp-lig';
+    box.style.cssText = 'position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:95';
+    const op = (r, t, sub) => `<button onclick="LeadPainel.registrarLigacao('${r}')" style="text-align:left;border:1px solid #E9ECF3;background:#fff;border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:700;color:#141A2E;cursor:pointer;font-family:inherit">${t}${sub ? `<small style="display:block;font-weight:500;color:#697089;font-size:11.5px;margin-top:2px">${sub}</small>` : ''}</button>`;
+    box.innerHTML = `<div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:420px;font-family:inherit">
+      <h3 style="font-size:16px;font-weight:700;margin:0">Ligar para ${esc(l.nome || 'o lead')}</h3>
+      <a href="tel:+${num}" style="display:block;font-size:22px;font-weight:800;color:#2E5BFF;text-decoration:none;margin:6px 0 12px">${esc(l.contato)}</a>
+      <p style="color:#697089;font-size:13px;margin:0 0 10px">Toque no número para discar. Depois marque o que aconteceu.</p>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        ${op('falou','Falei com a pessoa','conta como atendida')}
+        ${op('nao_atendeu','Não atendeu')}
+        ${op('caixa_postal','Caiu na caixa postal')}
+        ${op('ligar_depois','Pediu para ligar depois','vou perguntar quando')}
+        ${op('numero_errado','Número errado')}
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+        <button style="border:1px solid #E9ECF3;background:#fff;color:#697089;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="document.getElementById('lp-lig').remove()">Fechar</button>
+        <button style="border:1px solid #E9ECF3;background:#fff;color:#697089;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="LeadPainel.verLigacoes()">ver ligações</button>
+      </div></div>`;
+    document.body.appendChild(box);
+    box.onclick = e => { if (e.target.id === 'lp-lig') box.remove(); };
+  }
+  async function registrarLigacao(resultado) {
+    const l = S.lead; if (!l) return;
+    let retornar_em = null, observacao = null;
+    if (resultado === 'ligar_depois') {
+      const q = prompt('Quando ligar de novo? (ex.: hoje 16:00, amanhã 09:30)'); if (q === null) return;
+      const t = q.toLowerCase().trim(); const h = t.match(/(\d{1,2})\s*(?::|h)\s*(\d{2})?/);
+      if (h) { const d = new Date(); d.setHours(Number(h[1]), Number(h[2] || 0), 0, 0); if (/amanh/.test(t)) d.setDate(d.getDate()+1); else if (!/hoje/.test(t) && d < new Date()) d.setDate(d.getDate()+1); retornar_em = d.toISOString(); }
+      else if (t) observacao = `retornar: ${q.trim()}`;
+    }
+    if (resultado === 'falou') { const o = prompt('O que ficou combinado? (opcional)'); if (o === null) return; observacao = o.trim() || null; }
+    try {
+      await api('ligacao', { lead_id: l.id, conversa_id: S.info?.conversa?.id, resultado, observacao, retornar_em, por_nome: EU() || undefined });
+      document.getElementById('lp-lig')?.remove();
+      say('Ligação registrada', { tipo:'ok' });
+      S.info = await api('lead', { lead_id: l.id }); desenhar();
+      if (window.parent !== window) window.parent.postMessage({ capta:'mudou', o:'ligacao' }, '*');
+    } catch (e) { say(e.message, { tipo:'erro' }); }
+  }
+  async function verLigacoes() {
+    const l = S.lead; if (!l) return;
+    try {
+      const r = await api('ligacoes', { lead_id: l.id }); const rot = r.rotulos || {};
+      const linhas = (r.ligacoes || []).length
+        ? r.ligacoes.map(x => `<div style="padding:8px 0;border-bottom:1px solid #F0F2F7"><b style="font-size:13px;display:block">${esc(rot[x.resultado] || x.resultado)}</b><small style="color:#697089;font-size:11.5px">${new Date(x.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${esc(x.por_nome || '')}${x.retornar_em ? ` · retornar ${new Date(x.retornar_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}` : ''}</small>${x.observacao ? `<small style="display:block;color:#697089;font-size:11.5px;margin-top:3px">${esc(x.observacao)}</small>` : ''}</div>`).join('')
+        : '<small style="color:#697089">Nenhuma ligação registrada.</small>';
+      document.getElementById('lp-lig')?.remove();
+      const box = document.createElement('div'); box.id = 'lp-lig';
+      box.style.cssText = 'position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:95';
+      box.innerHTML = `<div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:420px;font-family:inherit"><h3 style="font-size:16px;font-weight:700;margin:0 0 10px">Ligações</h3><div style="max-height:320px;overflow-y:auto">${linhas}</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button style="border:1px solid #E9ECF3;background:#fff;color:#697089;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="document.getElementById('lp-lig').remove()">Fechar</button><button style="border:0;background:#2E5BFF;color:#fff;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="document.getElementById('lp-lig').remove();LeadPainel.ligar()">nova ligação</button></div></div>`;
+      document.body.appendChild(box);
+      box.onclick = e => { if (e.target.id === 'lp-lig') box.remove(); };
+    } catch (e) { say(e.message, { tipo:'erro' }); }
+  }
+
   async function verHistoricoAtendente() {
     const l = S.lead; if (!l) return;
     try {
@@ -524,5 +584,5 @@
       S.info = await api('lead', { lead_id: S.lead.id }); desenhar(); }
     catch (e) { say(e.message, { tipo:'erro' }); }
   }
-  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, agendarManual, agendarExtra, extraCampo, enviar, atribuir, trocarAtendente, verHistoricoAtendente, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
+  window.LeadPainel = { init: c => { cfg = c || {}; monta(); }, abrir, fechar, aba, transcrever, assumir, sugerir, usarSugestao, mudarEtapa, verHorarios, agendarManual, agendarExtra, extraCampo, enviar, atribuir, trocarAtendente, verHistoricoAtendente, ligar, registrarLigacao, verLigacoes, resolver, rapidas, usarRapida, novaRapida, anexo, importarTxt, salvarDados, excluir, confirmarAgenda, cancelarAula, idx, atual: () => S.lead };
 })();

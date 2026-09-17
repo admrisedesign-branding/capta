@@ -154,6 +154,14 @@ button{font-family:inherit;cursor:pointer}
 .hist-li b{font-size:13px;display:block}
 .hist-li small{color:var(--muted);font-size:11.5px}
 .mini-tag.mt-rasc{background:rgba(46,91,255,.12);color:var(--brand)}
+.bt-ligar{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
+.bt-ligar:hover{border-color:var(--brand);color:var(--brand)}
+.lig-num{display:block;font-size:22px;font-weight:800;letter-spacing:.5px;margin:2px 0 14px}
+.lig-op{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.lig-op button{text-align:left;border:1px solid var(--line);background:var(--card);border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
+.lig-op button:hover{border-color:var(--brand);color:var(--brand)}
+.lig-op button small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:2px}
+.mini-tag.mt-lig{background:rgba(31,122,77,.12);color:#1f7a4d}
 .bt-resp{border:1px solid var(--verde,#1f7a4d);background:rgba(31,122,77,.08);color:#1f7a4d;border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .bt-resp:hover{background:#1f7a4d;color:#fff}
 .bt-transcrever{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:4px 9px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
@@ -509,6 +517,7 @@ async function abrir(id) {
                 <option value="" ${!conversa.atendente?'selected':''}>— sem dono —</option>
               </select>
               <button class="bt-hist" onclick="verHistoricoAtendente('${conversa.id}')" title="Quem já cuidou desta conversa">histórico</button>
+              ${ehLidC ? '' : `<button class="bt-ligar" onclick="abrirLigacao('${conversa.id}')" title="Ligar e registrar o que aconteceu">📞 ligar</button>`}
             </div>
           </div>
           <div class="robo ${conversa.agente_ativo ? 'on' : 'off'}" title="${conversa.agente_ativo ? 'O robô ainda responde nesta conversa' : 'Uma pessoa assumiu: o robô parou de responder aqui'}"><span class="ponto"></span>${conversa.agente_ativo ? 'Robô' : 'Humano'}</div>
@@ -679,6 +688,85 @@ async function trocarAtendente(id, quem, sel){
     if (window.parent !== window) window.parent.postMessage({ capta:'mudou', o:'atendente' }, '*');
   } catch(e){ if (sel) sel.value = antes; toast(e.message, { tipo:'erro' }); }
 }
+// ---- Ligação -------------------------------------------------------
+// O Capta não disca: abre o discador do aparelho (tel:) e depois pergunta
+// o que aconteceu. É o registro que faz a ligação virar atendimento.
+function abrirLigacao(id){
+  const c = CONVS.find(x => x.id === id); if (!c) return;
+  const num = String(c.telefone || (c.lead && c.lead.contato) || '').replace(/\D/g, '');
+  if (!num) return toast('Essa conversa não tem número — o WhatsApp esconde o telefone.', { tipo:'erro' });
+  const nome = (c.lead && c.lead.nome) || nomeLimpo(c.nome) || fone(c.telefone);
+  const box = document.createElement('div'); box.className = 'fundo'; box.id = 'lig-fundo';
+  box.innerHTML = `<div class="janela"><h3>Ligar para ${esc(nome)}</h3>
+    <a class="lig-num" href="tel:+${num}">${esc(fone(num))}</a>
+    <p style="color:var(--muted);font-size:13px;margin:0">Toque no número para discar no celular. Depois marque o que aconteceu — é isso que tira a conversa da fila de “sem resposta”.</p>
+    <div class="lig-op">
+      <button onclick="registrarLigacao('${id}','falou')">Falei com a pessoa<small>conta como atendida e assume a conversa, se estiver sem dono</small></button>
+      <button onclick="registrarLigacao('${id}','nao_atendeu')">Não atendeu<small>fica registrado; a conversa continua na fila</small></button>
+      <button onclick="registrarLigacao('${id}','caixa_postal')">Caiu na caixa postal</button>
+      <button onclick="registrarLigacao('${id}','ligar_depois')">Pediu para ligar depois<small>vou perguntar quando</small></button>
+      <button onclick="registrarLigacao('${id}','numero_errado')">Número errado</button>
+    </div>
+    <div class="fim"><button class="btn g" onclick="document.getElementById('lig-fundo').remove()">Fechar</button>
+      <button class="btn g" onclick="verLigacoes('${id}')">ver ligações</button></div></div>`;
+  document.body.appendChild(box);
+  box.onclick = e => { if (e.target.id === 'lig-fundo') box.remove(); };
+}
+async function registrarLigacao(id, resultado){
+  let retornar_em = null, observacao = null;
+  if (resultado === 'ligar_depois') {
+    const q = prompt('Quando ligar de novo? (ex.: hoje 16:00, amanhã 09:30)\nDeixe em branco se não combinou hora.');
+    if (q === null) return;
+    retornar_em = interpretarQuando(q);
+    if (q.trim() && !retornar_em) observacao = `retornar: ${q.trim()}`;
+  }
+  if (resultado === 'falou') {
+    const o = prompt('O que ficou combinado? (opcional)');
+    if (o === null) return;
+    observacao = o.trim() || null;
+  }
+  try {
+    await api('ligacao', { conversa_id: id, resultado, observacao, retornar_em, por_nome: (window.CaptaUser && CaptaUser.nome()) || FI.eu || undefined });
+    document.getElementById('lig-fundo')?.remove();
+    const c = CONVS.find(x => x.id === id);
+    if (c && resultado === 'falou') { c.aguardando_desde = null; if (!c.atendente) c.atendente = (window.CaptaUser && CaptaUser.nome()) || c.atendente; }
+    if (c) c.ligacao_em = new Date().toISOString();
+    desenharLista();
+    toast('Ligação registrada' + (retornar_em ? ` · retorno ${new Date(retornar_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}` : ''), { tipo:'ok' });
+    if (atual === id) abrir(id);
+    carregarLista();
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+// entende "hoje 16:00", "amanhã 9h", "segunda 14:30" ou só "16:00"
+function interpretarQuando(txt){
+  const t = String(txt || '').toLowerCase().trim(); if (!t) return null;
+  const h = t.match(/(\d{1,2})\s*(?::|h)\s*(\d{2})?/);
+  if (!h) return null;
+  const d = new Date();
+  d.setHours(Number(h[1]), Number(h[2] || 0), 0, 0);
+  if (/amanh/.test(t)) d.setDate(d.getDate() + 1);
+  else if (!/hoje/.test(t) && d < new Date()) d.setDate(d.getDate() + 1);
+  return d.toISOString();
+}
+async function verLigacoes(id){
+  try {
+    const r = await api('ligacoes', { conversa_id: id });
+    const rot = r.rotulos || {};
+    const linhas = (r.ligacoes || []).length
+      ? r.ligacoes.map(x => `<div class="hist-li"><b>${esc(rot[x.resultado] || x.resultado)}</b>
+          <small>${new Date(x.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${esc(x.por_nome || '')}${x.retornar_em ? ` · retornar ${new Date(x.retornar_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}` : ''}</small>
+          ${x.observacao ? `<small style="display:block;margin-top:3px">${esc(x.observacao)}</small>` : ''}</div>`).join('')
+      : '<div class="hist-li"><small>Nenhuma ligação registrada nesta conversa.</small></div>';
+    document.getElementById('lig-fundo')?.remove();
+    const box = document.createElement('div'); box.className = 'fundo'; box.id = 'lig-fundo';
+    box.innerHTML = `<div class="janela"><h3>Ligações</h3><div class="hist">${linhas}</div>
+      <div class="fim"><button class="btn g" onclick="document.getElementById('lig-fundo').remove()">Fechar</button>
+        <button class="btn" onclick="document.getElementById('lig-fundo').remove();abrirLigacao('${id}')">nova ligação</button></div></div>`;
+    document.body.appendChild(box);
+    box.onclick = e => { if (e.target.id === 'lig-fundo') box.remove(); };
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
 async function verHistoricoAtendente(id){
   try {
     const r = await api('atendente_historico', { conversa_id: id });
