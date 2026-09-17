@@ -157,7 +157,15 @@ button{font-family:inherit;cursor:pointer}
 .bt-ligar{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
 .bt-ligar:hover{border-color:var(--brand);color:var(--brand)}
 .lig-num{display:block;font-size:22px;font-weight:800;letter-spacing:.5px;margin:2px 0 14px}
-.lig-op{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.lig-vias{display:flex;flex-direction:column;gap:7px;margin:12px 0 0}
+.lig-vias .via{display:block;text-align:left;text-decoration:none;border:1px solid var(--line);background:var(--card);border-radius:11px;padding:11px 13px;cursor:pointer;font-family:inherit;color:var(--ink);width:100%}
+.lig-vias .via b{font-size:13.5px;font-weight:700;display:block}
+.lig-vias .via small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:2px}
+.lig-vias .via:hover{border-color:var(--brand)}
+.lig-vias .via-wpp{border-color:#25D366;background:rgba(37,211,102,.07)}
+.lig-vias .via-wpp b::before{content:'💬 '}
+.lig-op{display:flex;flex-direction:column;gap:7px;margin-top:14px}
+.lig-op::before{content:'O que aconteceu?';display:block;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
 .lig-op button{text-align:left;border:1px solid var(--line);background:var(--card);border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
 .lig-op button:hover{border-color:var(--brand);color:var(--brand)}
 .lig-op button small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:2px}
@@ -234,7 +242,7 @@ button{font-family:inherit;cursor:pointer}
 .mt-at{background:var(--line-2);color:var(--muted);text-transform:none;letter-spacing:0}
 
 .fundo{position:fixed;inset:0;background:rgba(20,26,46,.42);display:grid;place-items:center;padding:20px;z-index:70}
-.janela{background:var(--card);border-radius:16px;padding:22px;width:100%;max-width:440px;box-shadow:0 20px 50px rgba(20,26,46,.2)}
+.janela{background:var(--card);border-radius:16px;padding:22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 50px rgba(20,26,46,.2)}
 .janela h3{font-size:16px;font-weight:700}.janela p{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.5}
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 11px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit}.chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .campo label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}.campo input{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit}
@@ -499,7 +507,7 @@ async function abrir(id) {
           <button class="voltar-lista" id="volta">←</button>
           <div style="min-width:0">
             <div class="painel-nome">${esc(nome)}</div>
-            <div class="painel-fone">${ehLidC ? 'número oculto pelo WhatsApp' : fone(conversa.telefone)}${conversa.lead?.kommo_lead_id ? ` · <a href="https://roboticanorte.kommo.com/leads/detail/${conversa.lead.kommo_lead_id}" target="_blank" rel="noopener" style="color:inherit">Kommo #${conversa.lead.kommo_lead_id}</a>` : ''}</div>
+            <div class="painel-fone">${ehLidC ? 'número oculto pelo WhatsApp' : `<a href="tel:+${String(conversa.telefone||'').replace(/\D/g,'')}" title="Ligar" style="color:inherit">📞 ${fone(conversa.telefone)}</a>`}${conversa.lead?.kommo_lead_id ? ` · <a href="https://roboticanorte.kommo.com/leads/detail/${conversa.lead.kommo_lead_id}" target="_blank" rel="noopener" style="color:inherit">Kommo #${conversa.lead.kommo_lead_id}</a>` : ''}</div>
           </div>
         </div>
         <button class="voltar-chat" onclick="document.body.classList.remove('chat-aberto')">← conversas</button>
@@ -699,7 +707,15 @@ function abrirLigacao(id){
   const box = document.createElement('div'); box.className = 'fundo'; box.id = 'lig-fundo';
   box.innerHTML = `<div class="janela"><h3>Ligar para ${esc(nome)}</h3>
     <a class="lig-num" href="tel:+${num}">${esc(fone(num))}</a>
-    <p style="color:var(--muted);font-size:13px;margin:0">Toque no número para discar no celular. Depois marque o que aconteceu — é isso que tira a conversa da fila de “sem resposta”.</p>
+    <div class="lig-vias">
+      <a class="via via-wpp" href="https://web.whatsapp.com/send?phone=${num}" target="_blank" rel="noopener">
+        <b>Ligar pelo WhatsApp</b><small>abre a conversa no WhatsApp Web — clique no ☎ de lá. O lead vê o número da escola.</small></a>
+      <a class="via" href="tel:+${num}">
+        <b>Ligar pelo telefone</b><small>abre o discador do aparelho. No celular da escola, sai o número dela.</small></a>
+      <button class="via" onclick="copiarNumero('${num}')">
+        <b>Copiar o número</b><small>pra discar em outro aparelho</small></button>
+    </div>
+    <p style="color:var(--muted);font-size:13px;margin:14px 0 0">Depois da ligação, marque o que aconteceu — é isso que tira a conversa da fila de “sem resposta”.</p>
     <div class="lig-op">
       <button onclick="registrarLigacao('${id}','falou')">Falei com a pessoa<small>conta como atendida e assume a conversa, se estiver sem dono</small></button>
       <button onclick="registrarLigacao('${id}','nao_atendeu')">Não atendeu<small>fica registrado; a conversa continua na fila</small></button>
@@ -711,6 +727,12 @@ function abrirLigacao(id){
       <button class="btn g" onclick="verLigacoes('${id}')">ver ligações</button></div></div>`;
   document.body.appendChild(box);
   box.onclick = e => { if (e.target.id === 'lig-fundo') box.remove(); };
+}
+function copiarNumero(n){
+  const t = '+' + n;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject())
+    .then(() => toast('Número copiado: ' + t, { tipo:'ok', ms: 2500 }))
+    .catch(() => { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); toast('Número copiado: ' + t, { tipo:'ok', ms: 2500 }); });
 }
 async function registrarLigacao(id, resultado){
   let retornar_em = null, observacao = null;

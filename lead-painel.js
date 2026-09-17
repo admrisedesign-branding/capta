@@ -278,8 +278,12 @@
     const op = (r, t, sub) => `<button onclick="LeadPainel.registrarLigacao('${r}')" style="text-align:left;border:1px solid #E9ECF3;background:#fff;border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:700;color:#141A2E;cursor:pointer;font-family:inherit">${t}${sub ? `<small style="display:block;font-weight:500;color:#697089;font-size:11.5px;margin-top:2px">${sub}</small>` : ''}</button>`;
     box.innerHTML = `<div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:420px;font-family:inherit">
       <h3 style="font-size:16px;font-weight:700;margin:0">Ligar para ${esc(l.nome || 'o lead')}</h3>
-      <a href="tel:+${num}" style="display:block;font-size:22px;font-weight:800;color:#2E5BFF;text-decoration:none;margin:6px 0 12px">${esc(l.contato)}</a>
-      <p style="color:#697089;font-size:13px;margin:0 0 10px">Toque no número para discar. Depois marque o que aconteceu.</p>
+      <div style="font-size:20px;font-weight:800;margin:6px 0 12px">${esc(l.contato)}</div>
+      <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
+        <a href="https://web.whatsapp.com/send?phone=${num}" target="_blank" rel="noopener" style="display:block;text-decoration:none;border:1px solid #25D366;background:rgba(37,211,102,.07);border-radius:11px;padding:11px 13px;color:#141A2E"><b style="font-size:13.5px;display:block">💬 Ligar pelo WhatsApp</b><small style="display:block;color:#697089;font-size:11.5px;margin-top:2px">abre a conversa no WhatsApp Web — clique no ☎ de lá</small></a>
+        <a href="tel:+${num}" style="display:block;text-decoration:none;border:1px solid #E9ECF3;border-radius:11px;padding:11px 13px;color:#141A2E"><b style="font-size:13.5px;display:block">Ligar pelo telefone</b><small style="display:block;color:#697089;font-size:11.5px;margin-top:2px">abre o discador do aparelho</small></a>
+      </div>
+      <p style="color:#697089;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin:0 0 8px">O que aconteceu?</p>
       <div style="display:flex;flex-direction:column;gap:7px">
         ${op('falou','Falei com a pessoa','conta como atendida')}
         ${op('nao_atendeu','Não atendeu')}
