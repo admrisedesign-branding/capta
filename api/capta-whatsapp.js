@@ -396,6 +396,23 @@ async function acaoConversas(tenant, res) {
     `lead:lead_id(id,nome,temperatura,status,etapa_id,atendente,notas,contato,crianca,idade,kommo_lead_id)` +
     `&order=ultima_mensagem_em.desc.nullslast&limit=300`
   );
+
+  // Retorno combinado na última ligação ("pediu pra ligar depois").
+  // Vale só o registro mais recente de cada conversa: se alguém ligou de novo
+  // e não marcou retorno, o compromisso anterior já foi cumprido.
+  try {
+    const desde = new Date(Date.now() - 30 * 864e5).toISOString();
+    const ligs = await sb(`capta_ligacoes?tenant_id=eq.${tenant.id}&criado_em=gte.${desde}&select=conversa_id,retornar_em,criado_em&order=criado_em.desc&limit=400`);
+    const vistas = new Set();
+    const porConversa = {};
+    for (const l of ligs || []) {
+      if (!l.conversa_id || vistas.has(l.conversa_id)) continue;
+      vistas.add(l.conversa_id);
+      if (l.retornar_em) porConversa[l.conversa_id] = l.retornar_em;
+    }
+    for (const c of rows || []) if (porConversa[c.id]) c.retornar_em = porConversa[c.id];
+  } catch (e) { /* sem tabela de ligações ainda: segue sem retornos */ }
+
   return res.status(200).json({ conversas: rows || [] });
 }
 
@@ -696,11 +713,11 @@ async function acaoAgendar(tenant, body, res) {
         await moverLead(tenant.id, leadId, e[0].id, null);
         await empurrarKommo(tenant.id, leadId, e[0].id, null).catch(() => null);
       }
-      // Aula marcada = assunto resolvido: a conversa sai da fila de abertas
-      // e para de contar como "sem resposta". Volta sozinha se o lead escrever.
+      // Aula marcada tira a conversa de "sem resposta" (o assunto foi tratado),
+      // mas ela CONTINUA aberta: ainda falta confirmar presença e lembrar a família.
       await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=eq.${leadId}&resolvida_em=is.null`, {
         method: 'PATCH', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ resolvida_em: new Date().toISOString(), nao_lidas: 0, aguardando_desde: null })
+        body: JSON.stringify({ aguardando_desde: null })
       }).catch(() => null);
       const tt = turma_id ? await sb(`capta_turmas?id=eq.${turma_id}&select=dia_semana&limit=1`).catch(() => []) : [];
       const campos = { data_aula: `${data}T${String(hIni).slice(0,5)}:00-04:00`, bloco: blocoKommo(tt?.[0]?.dia_semana ?? new Date(data + 'T12:00:00').getDay(), hIni, hFim), crianca: crianca_nome || null, idade: crianca_idade ? Number(crianca_idade) : null };
@@ -973,19 +990,28 @@ async function acaoDesfecho(tenant, body, res) {
   const a = (await sb(`capta_agendamentos?id=eq.${agendamento_id}&tenant_id=eq.${tenant.id}&select=id,lead_id,turma_id,data,crianca_nome,crianca_idade,status&limit=1`))?.[0];
   if (!a) return res.status(404).json({ erro: 'Aula não encontrada.' });
   const agora = new Date().toISOString();
-  const etapa = async nome => (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.${encodeURIComponent(nome)}&select=id&limit=1`))?.[0]?.id || null;
+  const etapa = async nome => {
+    const exata = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.${encodeURIComponent(nome)}&select=id&limit=1`))?.[0]?.id;
+    if (exata) return exata;
+    // nome pode diferir no funil do cliente ("Perdido" vs "Perdidos")
+    const parecida = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=ilike.*${encodeURIComponent(nome.slice(0, 6))}*&select=id&limit=1`).catch(() => []))?.[0]?.id;
+    return parecida || null;
+  };
   const patchAg = { observacao: body.observacao || null };
   let etapaNome = null, kommoExtra = {}, leadPatch = {};
 
   if (desfecho === 'faltou') { Object.assign(patchAg, { status: 'faltou' }); etapaNome = 'Aula agendada'; }
+  // Perdido: "não matriculou" com o lead encerrado de vez, em vez de Remarketing
+  const vaiPerdido = desfecho === 'nao' && body.perdido === true;
   if (desfecho === 'compareceu') { Object.assign(patchAg, { status: 'compareceu', compareceu_em: agora }); }
   // Em andamento: continua em Aula agendada, ganha a tag "em andamento" e a observação vira nota no Kommo
   if (desfecho === 'andamento') { Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora }); }
   // Não fechou: vai pra Remarketing com a tag "motivo: …"
   if (desfecho === 'nao') {
     Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora });
-    etapaNome = 'Remarketing';
+    etapaNome = vaiPerdido ? 'Perdido' : 'Remarketing';
     leadPatch.motivo_perda = body.motivo || null;
+    if (vaiPerdido) leadPatch.status = 'perdido';
   }
   if (desfecho === 'matriculou') {
     Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora });
@@ -1022,9 +1048,30 @@ async function acaoDesfecho(tenant, body, res) {
       await kommoTag(tenant.id, a.lead_id, 'em andamento').catch(() => null);
       if (body.situacao) await kommoNota(tenant.id, a.lead_id, 'Aula experimental · em andamento: ' + body.situacao).catch(() => null);
     }
-    if (desfecho === 'faltou') await kommoTag(tenant.id, a.lead_id, 'reagendar devido falta').catch(() => null);
+    if (desfecho === 'faltou') {
+      await kommoTag(tenant.id, a.lead_id, 'REAGENDAR').catch(() => null);
+      await reabrirParaReagendar(tenant.id, a.lead_id, a.data).catch(() => null);
+    }
+    if (vaiPerdido && body.motivo) await kommoTag(tenant.id, a.lead_id, 'perdido: ' + String(body.motivo).toLowerCase()).catch(() => null);
   }
-  return res.status(200).json({ ok: true, kommo });
+  return res.status(200).json({ ok: true, kommo, perdido: vaiPerdido });
+}
+
+// Faltou na experimental: o lead volta para a fila de atendimento com a tag
+// REAGENDAR e já entra como URGENTE — ninguém pode esperar mais um dia para
+// falar com quem não apareceu. O relógio de "sem resposta" nasce em 1h30
+// (o corte do urgente) em vez de zero, senão a conversa demoraria a subir.
+async function reabrirParaReagendar(tenantId, leadId, dataDaAula) {
+  const l = (await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=tags&limit=1`))?.[0];
+  const tags = [...new Set([...((l && l.tags) || []), 'REAGENDAR'])];
+  await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ tags })
+  }).catch(() => null);
+  const urgenteDesde = new Date(Date.now() - 91 * 60e3).toISOString();
+  await sb(`capta_conversas?tenant_id=eq.${tenantId}&lead_id=eq.${leadId}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ resolvida_em: null, aguardando_desde: urgenteDesde })
+  }).catch(() => null);
 }
 
 async function kommoNota(tenantId, leadId, texto) {
@@ -2415,7 +2462,9 @@ async function moverLead(tenantId, leadId, etapaId, motivo) {
 // Etapas que encerram o atendimento: matriculado, aula marcada, perdido,
 // desistiu. A conversa sai das abertas e para de contar como "sem resposta";
 // se o lead escrever de novo, o webhook reabre sozinho.
-const ETAPA_ENCERRA = /aula agendada|matr[ií]cul|aluno ativo|perdido|remarketing|desist|trancad/i;
+// "Aula agendada" NÃO entra: entre marcar e dar a aula é justamente quando o
+// time confirma presença, lembra e remarca. Fecha só o que acabou mesmo.
+const ETAPA_ENCERRA = /matr[ií]cul|aluno ativo|perdido|desist|trancad/i;
 async function fecharConversaPorEtapa(tenantId, leadId, etapaId) {
   if (!leadId || !etapaId) return;
   try {
