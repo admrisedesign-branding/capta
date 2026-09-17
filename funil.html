@@ -340,7 +340,7 @@ const AJUDA_ETAPA = {
 };
 const ajudaEtapa = nome => AJUDA_ETAPA[String(nome||'').toLowerCase().trim()] || null;
 const iconeAjuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
-const F = { parado: 0, temp: '', busca: '', ordem: 'recente', esconderFrios: false, resposta: '' };
+const F = { parado: 0, temp: '', busca: '', ordem: 'recente', esconderFrios: false, resposta: '', dono: '' };
 const nivelLead = l => (window.CaptaAlerta ? CaptaAlerta.nivel({ aguardando_desde: l.aguardando_desde, lead: l }) : '');
 const diasParado = l => Math.floor((Date.now() - new Date(l.etapa_em || l.criado_em).getTime()) / 864e5);
 function filtrar(lista) {
@@ -349,7 +349,8 @@ function filtrar(lista) {
     && (!F.temp || (l.temperatura||'').toLowerCase() === F.temp)
     && (!q || (l.nome||'').toLowerCase().includes(q) || (l.contato||'').includes(q))
     && !(F.esconderFrios && (l.temperatura||'').toLowerCase() === 'frio' && diasParado(l) >= 30)
-    && (!F.resposta || (F.resposta === 'sem_resposta' ? !!l.aguardando_desde : nivelLead(l) === 'urgente')));
+    && (!F.resposta || (F.resposta === 'sem_resposta' ? !!l.aguardando_desde : nivelLead(l) === 'urgente'))
+    && (F.dono === '__sem__' ? !l.atendente : (!F.dono || l.atendente === F.dono)));
   const peso = { quente: 0, morno: 1, frio: 2 };
   if (F.ordem === 'temperatura') out.sort((a,b) => (peso[(a.temperatura||'').toLowerCase()] ?? 3) - (peso[(b.temperatura||'').toLowerCase()] ?? 3) || diasParado(b) - diasParado(a));
   else if (F.ordem === 'parado') out.sort((a,b) => diasParado(b) - diasParado(a));
@@ -365,6 +366,11 @@ function barraFiltros(total, vis) {
       <button class="urg ${F.resposta==='urgentes'?'on':''}" onclick="F.resposta='urgentes';desenhar()">⏰ Urgentes <b>${leads.filter(l=>nivelLead(l)==='urgente').length}</b></button>
     </div>
     <select class="fb-sel" onchange="F.parado=+this.value;desenhar()"><option value="0" ${F.parado===0?'selected':''}>Parado: qualquer</option><option value="3" ${F.parado===3?'selected':''}>Parado há 3+ dias</option><option value="7" ${F.parado===7?'selected':''}>7+ dias</option><option value="30" ${F.parado===30?'selected':''}>30+ dias</option></select>
+    <select class="fb-sel" onchange="F.dono=this.value;desenhar()" title="Ver só os leads de uma pessoa">
+      <option value="" ${!F.dono?'selected':''}>Atendente: todos</option>
+      ${[...new Set(leads.map(l => l.atendente).filter(Boolean))].sort().map(a => `<option value="${esc(a)}" ${F.dono===a?'selected':''}>${esc(a)} (${leads.filter(l=>l.atendente===a).length})</option>`).join('')}
+      <option value="__sem__" ${F.dono==='__sem__'?'selected':''}>Sem dono (${leads.filter(l=>!l.atendente).length})</option>
+    </select>
     <select class="fb-sel" onchange="F.temp=this.value;desenhar()"><option value="" ${!F.temp?'selected':''}>Temperatura: todas</option><option value="quente" ${F.temp==='quente'?'selected':''}>Quer fechar</option><option value="morno" ${F.temp==='morno'?'selected':''}>Considerando</option><option value="frio" ${F.temp==='frio'?'selected':''}>Só conhecendo</option></select>
     <select class="fb-sel" onchange="F.ordem=this.value;desenhar()"><option value="recente" ${F.ordem==='recente'?'selected':''}>Mais recente primeiro</option><option value="temperatura" ${F.ordem==='temperatura'?'selected':''}>Quentes primeiro</option><option value="parado" ${F.ordem==='parado'?'selected':''}>Mais parado primeiro</option></select>
     <label class="fb-chk"><input type="checkbox" ${F.esconderFrios?'checked':''} onchange="F.esconderFrios=this.checked;desenhar()"> esconder frios parados há 30+ dias</label>
