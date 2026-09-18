@@ -358,10 +358,12 @@ async function marcarDuplicados(req, res) {
   if (soTeste) return res.status(200).json({ teste: true, neste_lote: ids.length, faltam, ids });
   if (!ids.length) return res.status(200).json({ ok: true, nada: 'todos já arrumados', faltam: 0 });
 
-  // etapa de perdido no Kommo (id 143 é o padrão "Closed - lost")
-  await carregarMeta();
-  const perdido = Object.values(cache.statuses || {}).find(st => ehPerda(st));
-  const statusPerdido = perdido?.id || 143;
+  // Etapa de perdido no Kommo. Não dá para perguntar ao Kommo (a listagem
+  // devolve 403 para este token), mas o Capta já guarda o mapeamento das
+  // etapas em capta_etapas.kommo_status_id. 143 é o padrão "Closed - lost".
+  const et = await fetch(`${SB_URL}/rest/v1/capta_etapas?tenant_id=eq.${tenant}&nome=ilike.perdido*&select=kommo_status_id&limit=1`, { headers: H_SB })
+    .then(x => x.json()).catch(() => []);
+  const statusPerdido = Number(req.query.status) || Number(et?.[0]?.kommo_status_id) || 143;
 
   let ok = 0, falhas = [];
   for (const id of ids) {
