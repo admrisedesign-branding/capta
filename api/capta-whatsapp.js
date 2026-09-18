@@ -821,10 +821,33 @@ async function acaoAgendar(tenant, body, res) {
 
 async function acaoRemarcar(tenant, body, res) {
   const { agendamento_id, data, turma_id } = body;
-  if (!agendamento_id || !data || !turma_id) return res.status(400).json({ erro: 'Dados incompletos.' });
+  if (!agendamento_id || !data) return res.status(400).json({ erro: 'Dados incompletos.' });
 
-  const a = await sb(`capta_agendamentos?id=eq.${agendamento_id}&tenant_id=eq.${tenant.id}&select=id&limit=1`);
+  const a = await sb(`capta_agendamentos?id=eq.${agendamento_id}&tenant_id=eq.${tenant.id}&select=id,lead_id&limit=1`);
   if (!a?.[0]) return res.status(404).json({ erro: 'Agendamento não encontrado.' });
+
+  // Sem turma: a família pediu um dia/hora fora da grade. Vira encaixe — muda
+  // data e hora no próprio agendamento, sem consumir vaga de turma nenhuma.
+  if (!turma_id) {
+    const hi = String(body.hora_inicio || '').slice(0, 5);
+    if (!/^\d{2}:\d{2}$/.test(hi)) return res.status(400).json({ erro: 'Informe o horário.' });
+    const [h, m] = hi.split(':').map(Number);
+    const fim = `${String(Math.min(h + 1, 23)).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+    await sb(`capta_agendamentos?id=eq.${agendamento_id}&tenant_id=eq.${tenant.id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ data, hora_inicio: `${hi}:00`, hora_fim: fim, turma_id: null, extra: true, status: 'agendado' })
+    });
+    const leadId = a[0].lead_id;
+    if (leadId) {
+      const e = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Aula%20agendada&select=id&limit=1`))?.[0];
+      if (e) { await moverLead(tenant.id, leadId, e.id, null); await empurrarKommo(tenant.id, leadId, e.id, null).catch(() => null); }
+      const campos = { data_aula: `${data}T${hi}:00-04:00` };
+      await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos) }).catch(() => null);
+      await kommoCampos(tenant.id, leadId, campos).catch(() => null);
+      await kommoTag(tenant.id, leadId, 'reagendado').catch(() => null);
+    }
+    return res.status(200).json({ ok: true, encaixe: true });
+  }
 
   try {
     const novo = await rpc('capta_remarcar', {
