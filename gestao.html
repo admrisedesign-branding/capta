@@ -159,7 +159,20 @@ const rotulo = k => { const [a,m] = k.split('-'); return `${MESES[+m-1]}/${a}`; 
 // Ordem canônica das etapas (as do Kommo); qualquer outra vai depois, na ordem em que aparecer
 const ORDEM = ['Incoming leads','Novo Lead','Em Contato','Qualificado','Aula Agendada','Matrícula em Andamento','Venda ganha','Aluno Ativo (matriculado)','Remarketing','Venda perdida','Closed - lost'];
 
-let TODOS = [], TENANT = {}, INVEST = [];
+let TODOS = [], TENANT = {}, INVEST = [], HOJE_AULAS = null;
+
+// Aulas de hoje: o Bento perguntou "quantas agendamos hoje?" e a resposta
+// não estava em lugar nenhum do painel. Vem da agenda, não dos leads.
+async function carregarAulasHoje(){
+  try {
+    const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ acao:'agenda', slug: SLUG, token: TOKEN, dias: 1 }) });
+    const j = await r.json();
+    const hoje = new Date(Date.now() - 4*3600e3).toISOString().slice(0,10);
+    HOJE_AULAS = (j.agendamentos || []).filter(a => a.data === hoje && !['cancelado','remarcado'].includes(a.status));
+  } catch(e){ HOJE_AULAS = []; }
+  render();
+}
 
 async function carregar(){
   try{
@@ -170,7 +183,7 @@ async function carregar(){
     fetch('/api/capta-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'investimento',slug:SLUG,token:TOKEN})})
       .then(r=>r.json()).then(j=>{ INVEST = j.investimento || []; render(); }).catch(()=>{});
     document.title = `Painel Gestão — ${TENANT.nome || 'Capta'}`;
-    montarMeses(); render();
+    montarMeses(); render(); carregarAulasHoje();
   }catch(e){
     document.getElementById('raiz').innerHTML = `<div class="aviso">Não consegui carregar os leads.<br>${esc(e.message)}</div>`;
   }
@@ -214,7 +227,12 @@ function render(){
   const rec   = doMes.filter(ganhou).reduce((s,l) => s + (Number(l.valor)||0), 0);
   const delta = (a,b) => { if(!ant) return ''; const d = a - b; if(!d) return '<span class="d">igual ao mês anterior</span>'; return `<span class="d ${d>0?'up':'down'}">${d>0?'+':''}${d} vs. mês anterior</span>`; };
 
+  const nHoje = HOJE_AULAS === null ? null : HOJE_AULAS.length;
+  const feitas = HOJE_AULAS === null ? 0 : HOJE_AULAS.filter(a => a.status === 'compareceu' || /desfecho:/i.test(a.observacao || '')).length;
   const kpis = `
+    <div class="kpi" style="border-color:var(--brand)"><div class="l">Aulas hoje</div>
+      <div class="v">${nHoje === null ? '…' : nHoje}</div>
+      <span class="d">${nHoje === null ? 'buscando na agenda' : nHoje ? `${feitas} já ${feitas === 1 ? 'aconteceu' : 'aconteceram'}` : 'nenhuma marcada'}</span></div>
     <div class="kpi"><div class="l">Leads</div><div class="v">${leads}</div>${delta(leads, ant?ant.length:0)}</div>
     <div class="kpi"><div class="l">Aulas experimentais</div><div class="v">${aulas}</div>${delta(aulas, ant?ant.filter(agendou).length:0)}</div>
     <div class="kpi"><div class="l">Matrículas</div><div class="v">${mat}</div><span class="d">${leads?Math.round(mat/leads*100):0}% dos leads</span></div>

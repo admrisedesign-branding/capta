@@ -5,8 +5,8 @@
       "schedule": "0 12 * * *"
     },
     {
-      "path": "/api/capta-config?sync=diario",
-      "schedule": "0 11 * * *"
+      "path": "/api/capta-whatsapp?turno=tarde",
+      "schedule": "0 19 * * *"
     }
   ]
 }

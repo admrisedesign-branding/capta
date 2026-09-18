@@ -148,6 +148,12 @@ async function desenharRecepcao(){
       <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" onclick="salvarAviso()">${AV_ED.id?'Salvar alterações':'Adicionar'}</button>
         ${AV_ED.id?`<button class="btn g" onclick="AV_ED={};desenhar()">cancelar</button>`:''}
         <button class="btn g" onclick="testarAvisos()">Enviar agora (teste)</button></div>
+      <div class="dica" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+        <b>Lembretes das famílias</b> — saem sozinhos duas vezes por dia: às 8h para quem tem aula hoje à tarde, e às 15h para quem tem aula amanhã de manhã.
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn g" onclick="testarLembretes('manha')">Rodar agora: aulas de hoje à tarde</button>
+          <button class="btn g" onclick="testarLembretes('tarde')">Rodar agora: aulas de amanhã de manhã</button>
+        </div></div>
       <div class="dica">O de aulas do dia é pra quem recebe as famílias (recepção). O de aulas sem resultado é pra quem cobra o fechamento — sem a baixa, o lead fica parado em Aula agendada e ninguém retoma.</div></div>` +
     `<div class="bloco"><h3>Segurança destes links</h3><div class="h">Eles usam uma chave separada, que só permite check-in e check-out — não abre leads, conversas nem o painel. Se um tablet sumir, gere uma chave nova: os links antigos param de funcionar na hora.</div>
       <button class="btn g" onclick="novaChaveRecepcao()">Gerar nova chave</button></div>` +
@@ -253,6 +259,15 @@ async function salvarAviso(){
   try { const r = await api('avisos', { salvar }); AVISOS = r.avisos || []; AV_ED = {}; desenhar(); toast('Aviso salvo', { tipo:'ok' }); }
   catch(e){ toast(e.message, { tipo:'erro' }); }
 }
+async function testarLembretes(turno){
+  if (!confirm(turno === 'tarde'
+    ? 'Enviar agora o lembrete para quem tem aula AMANHÃ DE MANHÃ?\n\nAs mensagens vão de verdade para as famílias.'
+    : 'Enviar agora o lembrete para quem tem aula HOJE À TARDE?\n\nAs mensagens vão de verdade para as famílias.')) return;
+  try { const r = await api('lembretes_agora', { turno });
+    toast(`${r.enviados||0} lembrete(s) enviado(s)${r.falhas?` · ${r.falhas} falharam`:''}`, { tipo: r.falhas?'erro':'ok', ms: 5000 }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
 async function testarAvisos(){
   if (!AVISOS.length) return toast('Cadastre alguém primeiro.', { tipo:'erro' });
   try { const r = await api('avisos', { testar: true }); toast(`${r.enviados||0} aviso(s) enviado(s)${r.falhas?` · ${r.falhas} falharam`:''}`, { tipo: r.falhas?'erro':'ok' }); }
