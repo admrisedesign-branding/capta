@@ -6,29 +6,38 @@
 <title>Aulas de hoje — My Robot</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{--brand:#2E5BFF;--bg:#0E1220;--card:#171C2E;--line:#252B42;--ink:#FFFFFF;--muted:#9AA3BF;--faint:#6B7392;
---verde:#3DDC84;--exp:#FF8A5B;--morno:#FFC24B}
+/* Identidade da escola: as cores vêm do site da My Robot (laranja #FF4D00,
+   roxo #6C3FFF, verde #00C566, amarelo #FFD233), num fundo escuro arroxeado
+   para a TV. O azul do Capta não aparece aqui: quem olha essa tela é a
+   família na entrada, não quem opera o painel. */
+:root{--brand:#FF4D00;--brand-2:#6C3FFF;--bg:#0A0614;--card:#16102A;--line:#2A1F4D;
+--ink:#FFFFFF;--muted:#B4A9D6;--faint:#7E74A3;
+--verde:#00C566;--exp:#FF7A3D;--morno:#FFD233}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;overflow:hidden}
 .topo{display:flex;align-items:center;gap:20px;padding:26px 40px 14px}
+.topo .marca{height:46px;width:auto;object-fit:contain}
+.topo h1{background:linear-gradient(92deg,var(--brand),var(--brand-2));-webkit-background-clip:text;background-clip:text;color:transparent}
 .topo h1{font-size:34px;font-weight:900;letter-spacing:-.02em}
 .topo .dia{color:var(--muted);font-size:20px;text-transform:capitalize}
 .topo .rel{margin-left:auto;font-size:52px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .wrap{padding:0 40px 40px;height:calc(100vh - 108px);overflow:hidden}
 .faixa{display:flex;gap:14px;align-items:stretch;margin-bottom:16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px 26px;flex:1;min-width:0}
-.card.exp{border-color:rgba(255,138,91,.45);background:linear-gradient(180deg,rgba(255,138,91,.09),rgba(23,28,46,1))}
+.card{box-shadow:0 1px 0 rgba(255,255,255,.03) inset}
+.card.exp{border-color:rgba(255,77,0,.5);background:linear-gradient(180deg,rgba(255,77,0,.12),rgba(22,16,42,1))}
+.card:not(.exp){border-color:rgba(108,63,255,.32)}
 .card h2{font-size:15px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
 .card .hora{font-size:30px;font-weight:900;letter-spacing:-.02em}
 .card .hora small{font-size:16px;font-weight:700;color:var(--muted);margin-left:10px}
 .nomes{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
-.n{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px;padding:10px 16px;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px}
-.n.dentro{background:rgba(61,220,132,.14);border-color:rgba(61,220,132,.4);color:var(--verde)}
+.n{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:10px 16px;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px}
+.n.dentro{background:rgba(0,197,102,.16);border-color:rgba(0,197,102,.45);color:var(--verde)}
 .n.saiu{opacity:.4}
 .n small{font-size:13px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
 .n.dentro small{color:var(--verde)}
-.exp .n{background:rgba(255,138,91,.14);border-color:rgba(255,138,91,.35);color:var(--exp)}
-.exp .n.dentro{background:rgba(61,220,132,.16);border-color:rgba(61,220,132,.45);color:var(--verde)}
+.exp .n{background:rgba(255,77,0,.16);border-color:rgba(255,122,61,.4);color:var(--exp)}
+.exp .n.dentro{background:rgba(0,197,102,.18);border-color:rgba(0,197,102,.5);color:var(--verde)}
 .rodape{position:fixed;left:40px;right:40px;bottom:22px;display:flex;gap:26px;align-items:center;color:var(--faint);font-size:16px;font-weight:600}
 .rodape b{color:var(--ink);font-size:20px;margin-right:6px}
 .vazio{display:grid;place-items:center;height:60vh;color:var(--faint);font-size:26px;text-align:center;line-height:1.5}
@@ -36,7 +45,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--i
 </style>
 </head>
 <body>
-<div class="topo"><h1>Aulas de hoje</h1><span class="dia" id="dia"></span><span class="rel" id="rel"></span></div>
+<div class="topo"><img src="/logo-monitor.png" alt="" class="marca" onerror="this.remove()"><h1>Aulas de hoje</h1><span class="dia" id="dia"></span><span class="rel" id="rel"></span></div>
 <div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
 <div class="rodape" id="rodape"></div>
 
