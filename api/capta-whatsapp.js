@@ -99,7 +99,7 @@ module.exports = async function handler(req, res) {
     // sem e-mail no corpo (painel antigo) vale o padrão mais permissivo do dono
     if (!body._papel && token === tenant.dashboard_token) body._papel = 'gestor';
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'acesso', 'lgpd', 'lgpd_config', 'expurgar', 'pedido_titular', 'lembretes_agora', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'acesso', 'lgpd', 'lgpd_config', 'expurgar', 'pedido_titular', 'lembretes_agora', 'metas', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -118,6 +118,7 @@ module.exports = async function handler(req, res) {
         case 'acesso':          return await acaoAcesso(tenant, body, res);
         case 'lgpd':            return await acaoLgpd(tenant, body, res);
         case 'lembretes_agora': return await acaoLembretesAgora(tenant, body, res);
+        case 'metas':           return await acaoMetas(tenant, body, res);
         case 'lgpd_config':     return await acaoLgpdConfig(tenant, body, res);
         case 'expurgar':        return await acaoExpurgar(tenant, body, res);
         case 'pedido_titular':  return await acaoPedidoTitular(tenant, body, res);
@@ -2164,6 +2165,113 @@ async function acaoFaltasAluno(tenant, body, res) {
 // acessou os dados (art. 37), pedidos do titular com prazo de 15 dias
 // (art. 18) e expurgo do que não precisa mais ser guardado (art. 15/16).
 // =====================================================================
+
+// =====================================================================
+// METAS — o quadro da parede virando painel.
+// O Capta mede sozinho o que passa por ele (matrículas, leads, mensagens,
+// ligações, aulas marcadas e "falar efetivamente"). Avaliações no Google e
+// eventos ninguém consegue medir por API: esses são lançados à mão.
+// =====================================================================
+const PRAZO_TEMP = { quente: 120, morno: 480, frio: 1440 };   // minutos, igual ao alerta da inbox
+
+async function acaoMetas(tenant, body, res) {
+  if (body.salvar) {
+    const m = body.salvar;
+    await sb(`capta_metas?tenant_id=eq.${tenant.id}&chave=eq.${encodeURIComponent(m.chave)}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ dia: m.dia ?? null, semana: m.semana ?? null, mes: m.mes ?? null })
+    });
+  }
+  if (body.lancar) {
+    const l = body.lancar;
+    const quem = await usuarioDe(tenant.id, body.email_atual).catch(() => null);
+    await sb('capta_metas_lancamentos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+      tenant_id: tenant.id, chave: l.chave, valor: Number(l.valor) || 1,
+      data: l.data || hojeManaus(), por_nome: quem?.nome || body.por_nome || null
+    }) });
+  }
+
+  const hoje = hojeManaus();
+  const base = new Date(hoje + 'T12:00:00Z');
+  const diaSemana = base.getUTCDay();                       // 0 domingo
+  const seg = new Date(base.getTime() - ((diaSemana + 6) % 7) * 864e5).toISOString().slice(0, 10);
+  const mes1 = hoje.slice(0, 8) + '01';
+
+  const metas = await sb(`capta_metas?tenant_id=eq.${tenant.id}&select=*&order=ordem`).catch(() => []);
+
+  // tudo em uma passada, com os períodos que interessam
+  const [leads, ags, msgs, ligs, lanc] = await Promise.all([
+    sb(`capta_leads?tenant_id=eq.${tenant.id}&criado_em=gte.${mes1}T00:00:00&select=id,criado_em,etapa_id,temperatura`).catch(() => []),
+    sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&criado_em=gte.${mes1}T00:00:00&select=id,criado_em,status,observacao`).catch(() => []),
+    sb(`capta_mensagens?tenant_id=eq.${tenant.id}&direcao=eq.saida&criado_em=gte.${mes1}T00:00:00&select=id,criado_em,conversa_id`).catch(() => []),
+    sb(`capta_ligacoes?tenant_id=eq.${tenant.id}&criado_em=gte.${mes1}T00:00:00&select=id,criado_em`).catch(() => []),
+    sb(`capta_metas_lancamentos?tenant_id=eq.${tenant.id}&data=gte.${mes1}&select=chave,data,valor`).catch(() => [])
+  ]);
+
+  // matrículas: agendamento com desfecho "matriculou"
+  const matric = (ags || []).filter(a => /desfecho:\s*matriculou/i.test(a.observacao || ''));
+
+  // "falar efetivamente": conversa em que o lead esperava e alguém respondeu
+  // dentro do prazo da temperatura dele. Vem das respostas do período.
+  const falar = await contarFalarEfetivo(tenant.id, mes1);
+
+  const noPeriodo = (lista, campo, desde) => (lista || []).filter(x => String(x[campo] || '').slice(0, 10) >= desde).length;
+  const feito = {
+    matriculas: [ noPeriodo(matric, 'criado_em', hoje), noPeriodo(matric, 'criado_em', seg), matric.length ],
+    leads:      [ noPeriodo(leads, 'criado_em', hoje), noPeriodo(leads, 'criado_em', seg), (leads||[]).length ],
+    mensagens:  [ noPeriodo(msgs, 'criado_em', hoje), noPeriodo(msgs, 'criado_em', seg), (msgs||[]).length ],
+    ligacoes:   [ noPeriodo(ligs, 'criado_em', hoje), noPeriodo(ligs, 'criado_em', seg), (ligs||[]).length ],
+    aulas:      [ noPeriodo(ags, 'criado_em', hoje), noPeriodo(ags, 'criado_em', seg), (ags||[]).length ],
+    falar:      [ falar.hoje, falar.semana, falar.mes ]
+  };
+  for (const ch of ['avaliacoes', 'eventos']) {
+    const l = (lanc || []).filter(x => x.chave === ch);
+    const soma = arr => arr.reduce((t, x) => t + Number(x.valor || 0), 0);
+    feito[ch] = [ soma(l.filter(x => x.data === hoje)), soma(l.filter(x => x.data >= seg)), soma(l) ];
+  }
+
+  return res.status(200).json({ metas: metas || [], feito, desde: { hoje, semana: seg, mes: mes1 } });
+}
+
+// Conta as respostas que saíram dentro do prazo da temperatura do lead.
+// Uma conversa conta uma vez por dia — o que se mede é atendimento feito,
+// não mensagem enviada (isso já é outro indicador).
+async function contarFalarEfetivo(tenantId, desde) {
+  const msgs = await sb(`capta_mensagens?tenant_id=eq.${tenantId}&criado_em=gte.${desde}T00:00:00` +
+    `&select=conversa_id,direcao,criado_em&order=conversa_id,criado_em&limit=4000`).catch(() => []);
+  if (!msgs?.length) return { hoje: 0, semana: 0, mes: 0 };
+  const convIds = [...new Set(msgs.map(m => m.conversa_id))].slice(0, 300);
+  const convs = convIds.length
+    ? await sb(`capta_conversas?id=in.(${convIds.join(',')})&select=id,lead:lead_id(temperatura)`).catch(() => [])
+    : [];
+  const temp = {}; (convs || []).forEach(c => temp[c.id] = String(c.lead?.temperatura || '').toLowerCase());
+
+  const porConversa = {};
+  for (const m of msgs) (porConversa[m.conversa_id] = porConversa[m.conversa_id] || []).push(m);
+
+  const dias = new Set();   // "conversa|dia" que contou
+  for (const [cid, lista] of Object.entries(porConversa)) {
+    const prazo = PRAZO_TEMP[temp[cid]] || 240;
+    let esperandoDesde = null;
+    for (const m of lista) {
+      if (m.direcao === 'entrada') { if (!esperandoDesde) esperandoDesde = new Date(m.criado_em); continue; }
+      if (esperandoDesde) {
+        const min = (new Date(m.criado_em) - esperandoDesde) / 60000;
+        if (min <= prazo) dias.add(`${cid}|${String(m.criado_em).slice(0, 10)}`);
+        esperandoDesde = null;
+      }
+    }
+  }
+  const hoje = hojeManaus();
+  const base = new Date(hoje + 'T12:00:00Z');
+  const seg = new Date(base.getTime() - ((base.getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10);
+  const lista = [...dias].map(x => x.split('|')[1]);
+  return {
+    hoje: lista.filter(d => d === hoje).length,
+    semana: lista.filter(d => d >= seg).length,
+    mes: lista.length
+  };
+}
 
 // Dispara a rodada de lembretes na hora, sem esperar o cron. Serve para
 // testar o texto e para o dia em que o cron falhar.
