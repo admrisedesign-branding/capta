@@ -215,6 +215,22 @@ body.embed .filtros-bar{width:calc(100vw - 130px)}
 .lead-espera .al-tag{background:var(--line-2);color:var(--muted)}
 .lead.atrasada{border-left:3px solid var(--morno)}
 .lead.urgente{border-left:3px solid var(--quente)}
+.org-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:rgba(46,91,255,.06);border:1px solid var(--brand);
+  border-radius:12px;padding:12px 16px;margin-bottom:10px}
+.org-bar b{font-size:14px}
+.org-bar span{color:var(--muted);font-size:12.5px;margin-right:auto}
+.agd-lista{border:1px solid var(--line);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.agd-li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line-2,#F0F2F7);flex-wrap:wrap}
+.agd-li:last-child{border-bottom:0}
+.agd-li.on{background:rgba(46,91,255,.04)}
+.agd-nome{flex:1 1 200px;min-width:0}
+.agd-nome b{font-size:13.5px;display:block}
+.agd-nome small{color:var(--muted);font-size:11.5px}
+.agd-li input{border:1px solid var(--line);border-radius:9px;padding:6px 8px;font:inherit;font-size:12.5px;font-weight:600}
+.agd-conf{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;border-radius:99px;padding:3px 9px;border:1px solid var(--line);color:var(--muted)}
+.agd-conf.q{color:#1f7a4d;border-color:rgba(31,122,77,.4)}
+.agd-conf.m{color:#b8860b;border-color:rgba(184,134,11,.4)}
+.agd-tr{flex:1 1 100%;color:var(--muted);font-size:11.5px;font-style:italic}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -390,7 +406,9 @@ function barraFiltros(total, vis) {
     <span class="fb-n">${vis} de ${total}</span>
     ${ORG.ligado
       ? `<button class="btn g" onclick="sairOrganizar()">sair de organizar</button>`
-      : `<button class="btn g" onclick="organizar()" title="A IA lê as conversas e sugere em que etapa cada lead deveria estar">✨ Organizar</button>`}
+      : `<button class="btn g" onclick="organizar()" title="A IA lê as conversas e sugere em que etapa cada lead deveria estar">✨ Organizar</button>
+         ${AGD.ligado ? `<button class="btn g" onclick="sairAgendas()">sair de agendas</button>`
+           : `<button class="btn g" onclick="acharAgendas()" title="Leads em Aula agendada sem data no Capta: a IA lê o Kommo e a conversa e descobre o dia e a hora combinados">🔎 Descobrir agendas</button>`}`}
     </div>`;
 }
 function desenhar() {
@@ -413,7 +431,7 @@ function desenhar() {
       <button class="btn g" onclick="sairOrganizar()">sair</button>
     </div>
     <div class="org-aviso">Mover para <b>Qualificado</b> ou <b>Aula agendada</b> envia um evento de conversão para a Meta. Esses dois saem um de cada vez, pelo botão laranja do card.</div>` : '';
-  raiz.innerHTML = barraFiltros(leads.length, vis.length) + barraOrg + `<div class="raias">${colunas.map((c, ci) => `
+  raiz.innerHTML = barraFiltros(leads.length, vis.length) + barraOrg + painelAgendas() + `<div class="raias">${colunas.map((c, ci) => `
     <section class="raia ${mob && (ci > 0 || !c.itens.length) ? 'fechada' : ''}" data-etapa="${c.e.id}" ${mob ? 'onclick="if(event.target.closest(\'.raia-cab\'))this.classList.toggle(\'fechada\')"' : ''}>
       <div class="raia-cab">
         <span class="raia-cor" style="background:${esc(c.e.cor || '#2E5BFF')}"></span>
@@ -455,6 +473,69 @@ async function organizar(){
   ORG.rodando = false; desenhar();
 }
 function sairOrganizar(){ ORG = { ligado: false, rodando: false, sug: [], marcados: new Set() }; desenhar(); }
+
+// ---- Descobrir agendas -------------------------------------------------
+// Lead parado em "Aula agendada" sem agendamento no Capta: a IA lê o campo
+// do Kommo e a conversa do WhatsApp e traz o dia e a hora combinados. É o
+// mesmo motor da tela de Aula experimental, aqui no Pipeline porque é onde
+// o time olha o funil todo dia.
+let AGD = { ligado: false, rodando: '', sem: [], achado: {} };
+function sairAgendas(){ AGD = { ligado: false, rodando: '', sem: [], achado: {} }; desenhar(); }
+async function acharAgendas(){
+  AGD.ligado = true; AGD.rodando = 'procurando leads sem data…'; desenhar();
+  try {
+    const r = await api('sem_data');
+    AGD.sem = r.leads || [];
+    if (!AGD.sem.length) { AGD.rodando = ''; desenhar(); return toast('Nenhum lead em Aula agendada sem data. Agenda em dia!', { tipo:'ok' }); }
+    const ids = AGD.sem.map(l => l.id);
+    for (let i = 0; i < ids.length; i += 6) {
+      AGD.rodando = `lendo ${Math.min(i + 6, ids.length)} de ${ids.length}…`; desenhar();
+      const m = await api('mapear_aulas', { lead_ids: ids.slice(i, i + 6) });
+      for (const x of m.leads || []) AGD.achado[x.lead_id] = { ...x, ok: !!(x.data && x.hora && ['alta','media'].includes(x.confianca)) };
+    }
+  } catch(e){ toast(e.message, { tipo:'erro' }); }
+  AGD.rodando = ''; desenhar();
+  const n = Object.values(AGD.achado).filter(x => x.ok).length;
+  toast(`${AGD.sem.length} leads sem data · ${n} com dia e hora encontrados — confira e agende`, { tipo:'ok', ms: 6000 });
+}
+function marcarAgenda(id, campo, valor){
+  const a = AGD.achado[id]; if (!a) return;
+  a[campo] = valor; a.ok = !!(a.data && a.hora);
+  desenhar();
+}
+async function agendarAchadas(){
+  const alvo = AGD.sem.filter(l => AGD.achado[l.id] && AGD.achado[l.id].ok);
+  if (!alvo.length) return toast('Nenhuma marcada com dia e hora.', { tipo:'erro' });
+  if (!confirm(`Agendar ${alvo.length} aula${alvo.length>1?'s':''} experimental no Capta?`)) return;
+  let ok = 0, falhas = 0;
+  for (const l of alvo) {
+    const a = AGD.achado[l.id];
+    try { await api('agendar', { lead_id: l.id, data: a.data, hora_inicio: a.hora, crianca_nome: l.crianca || a.crianca || undefined, crianca_idade: l.idade || a.idade || undefined }); ok++; delete AGD.achado[l.id]; AGD.sem = AGD.sem.filter(x => x.id !== l.id); }
+    catch(e){ falhas++; }
+  }
+  desenhar(); carregar();
+  toast(`${ok} aula${ok!==1?'s':''} agendada${ok!==1?'s':''}${falhas?` · ${falhas} falharam`:''}`, { tipo: falhas?'erro':'ok', ms: 6000 });
+}
+function painelAgendas(){
+  if (!AGD.ligado) return '';
+  if (AGD.rodando) return `<div class="org-bar"><b>🔎 Descobrindo agendas</b><span>${esc(AGD.rodando)}</span></div>`;
+  if (!AGD.sem.length) return `<div class="org-bar"><b>🔎 Descobrindo agendas</b><span>Nenhum lead sem data.</span><button class="btn g" onclick="sairAgendas()">fechar</button></div>`;
+  const prontos = AGD.sem.filter(l => AGD.achado[l.id] && AGD.achado[l.id].ok).length;
+  return `<div class="org-bar"><b>🔎 ${AGD.sem.length} leads em Aula agendada sem data no Capta</b>
+      <span>${prontos} com dia e hora encontrados na conversa</span>
+      <button class="btn" onclick="agendarAchadas()" ${prontos ? '' : 'disabled'}>agendar ${prontos}</button>
+      <button class="btn g" onclick="sairAgendas()">sair</button></div>
+    <div class="agd-lista">${AGD.sem.map(l => {
+      const a = AGD.achado[l.id] || {};
+      return `<div class="agd-li ${a.ok ? 'on' : ''}">
+        <div class="agd-nome"><b>${esc(l.crianca || l.nome || 'sem nome')}</b><small>${esc(l.nome || '')}${l.contato ? ' · ' + esc(l.contato) : ''}</small></div>
+        <input type="date" value="${a.data || ''}" onchange="marcarAgenda('${l.id}','data',this.value)">
+        <input type="time" value="${a.hora || ''}" step="3600" onchange="marcarAgenda('${l.id}','hora',this.value)">
+        <span class="agd-conf ${a.confianca === 'alta' ? 'q' : a.confianca === 'media' ? 'm' : 'f'}">${esc(a.confianca || '—')}</span>
+        <div class="agd-tr">${a.trecho ? `“${esc(a.trecho)}”` : esc(a.fonte || '')}</div>
+      </div>`;
+    }).join('')}</div>`;
+}
 function marcarSug(id, on){ on ? ORG.marcados.add(id) : ORG.marcados.delete(id); desenhar(); }
 function ignorarSug(id){ ORG.sug = ORG.sug.filter(s => s.lead_id !== id); ORG.marcados.delete(id); desenhar(); }
 function marcarTodasSug(on){ ORG.marcados = new Set(on ? ORG.sug.filter(s => !s.avisa_meta).map(s => s.lead_id) : []); desenhar(); }
