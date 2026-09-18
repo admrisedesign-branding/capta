@@ -329,10 +329,9 @@ function idsDoWebhook(body) {
 // Kommo — e sem etiqueta o espelho o traria de volta. A regra se sustenta
 // sozinha: card cujo id NÃO existe mais no Capta, mas cujo telefone bate
 // com um lead que existe, é justamente o duplicado que foi absorvido.
-// Chamada: GET /api/capta-kommo?marcar_duplicados=<MIG_SECRET>&de=1&ate=3
-//   &teste=1  → só lista, não etiqueta
-//   &de/&ate  → intervalo de páginas (50 leads cada); vá avançando de 3 em 3
-//               até a resposta dizer que a página veio vazia.
+// Chamada: GET /api/capta-kommo?marcar_duplicados=<MIG_SECRET>
+//   &teste=1  → só mostra o que faria
+//   &lote=20  → quantos cards por chamada (máximo 40); repita até faltam=0
 // ---------------------------------------------------------------------
 async function marcarDuplicados(req, res) {
   const esperado = (process.env.MIG_SECRET || process.env.CRON_SECRET || '').trim();
@@ -340,64 +339,50 @@ async function marcarDuplicados(req, res) {
     return res.status(401).json({ erro: 'Segredo inválido.' });
   }
   const soTeste = String(req.query.teste || '') === '1';
-  // Em pedaços: o Kommo bloqueia o IP (403 do nginx) quando passa de 7
-  // requisições por segundo. Cada chamada varre poucas páginas, devagar.
-  const de  = Math.max(1, Number(req.query.de) || 1);
-  const ate = Math.max(de, Number(req.query.ate) || de + 2);
+  const lote = Math.min(Math.max(Number(req.query.lote) || 20, 1), 40);
   const pausa = ms => new Promise(r => setTimeout(r, ms));
-  const fim8 = v => String(v || '').replace(/\D/g, '').slice(-8);
-
-  // o que o Capta conhece hoje
   const tenant = await tenantId();
-  const r = await fetch(`${SB_URL}/rest/v1/capta_leads?tenant_id=eq.${tenant}&select=kommo_lead_id,contato&limit=5000`, { headers: H_SB });
-  const leads = await r.json().catch(() => []);
-  const idsVivos = new Set((leads || []).map(l => Number(l.kommo_lead_id)).filter(Boolean));
-  const fonesVivos = new Set((leads || []).map(l => fim8(l.contato)).filter(x => x.length === 8));
 
-  const achados = [];
-  const diag = { paginas: 0, leadsVistos: 0, semContato: 0, jaNoCapta: 0, jaEtiquetado: 0, foneNaoBate: 0,
-                 leadsCapta: (leads || []).length, fonesVivos: fonesVivos.size };
-  for (let pagina = de; pagina <= ate; pagina++) {
-    // limit 250 é recusado por algumas contas; 50 é o valor seguro
-    const url = `${KOMMO}/api/v4/leads?with=contacts&page=${pagina}&limit=50`;
-    await pausa(400);
-    const resp = await fetch(url, { headers: H_KOMMO }).catch(e => ({ ok: false, status: 0, erro: e.message }));
-    if (!resp.ok) { diag.erroKommo = { status: resp.status, corpo: (await resp.text?.().catch(() => '') || '').slice(0, 200) }; break; }
-    const lote = await resp.json().catch(() => null);
-    const linhas = lote?._embedded?.leads || [];
-    if (!linhas.length) { diag.fim = `página ${pagina} sem leads`; break; }
-    diag.paginas++; diag.leadsVistos += linhas.length;
+  // A listagem de leads da API devolve 403 para este token, então a lista
+  // dos cards absorvidos vem do Capta (capta_kommo_ignorados). Cada card
+  // recebe a etiqueta "duplicado" e vai para Perdido, para sair da frente
+  // de quem trabalha o funil. A API do Kommo não exclui leads.
+  const r = await fetch(`${SB_URL}/rest/v1/capta_kommo_ignorados?tenant_id=eq.${tenant}` +
+    `&arrumado_em=is.null&select=kommo_lead_id&order=kommo_lead_id&limit=${lote}`, { headers: H_SB });
+  const linhas = await r.json().catch(() => []);
+  const ids = (linhas || []).map(x => Number(x.kommo_lead_id)).filter(Boolean);
 
-    for (const lead of linhas) {
-      if (idsVivos.has(Number(lead.id))) { diag.jaNoCapta++; continue; }
-      if ((lead._embedded?.tags || []).some(t => /^duplicad/i.test(t.name || ''))) { diag.jaEtiquetado++; continue; }
-      const cId = lead._embedded?.contacts?.[0]?.id;
-      if (!cId) { diag.semContato++; continue; }
-      const contato = await kget(`/api/v4/contacts/${cId}`).catch(() => null);
-      const fones = (contato?.custom_fields_values || [])
-        .filter(f => f.field_code === 'PHONE' || /phone/i.test(f.field_name || ''))
-        .flatMap(f => (f.values || []).map(v => fim8(v.value)));
-      if (!fones.some(f => f.length === 8 && fonesVivos.has(f))) { diag.foneNaoBate++; continue; }
-      achados.push({ id: lead.id, nome: lead.name });
-      await pausa(400);                                                    // bem abaixo do teto de 7/s
-    }
-    if (linhas.length < 50) break;
-  }
+  const faltam = await fetch(`${SB_URL}/rest/v1/capta_kommo_ignorados?tenant_id=eq.${tenant}&arrumado_em=is.null&select=kommo_lead_id`,
+    { headers: { ...H_SB, Prefer: 'count=exact' } }).then(x => Number(x.headers.get('content-range')?.split('/')?.[1] || 0)).catch(() => null);
 
-  if (soTeste) return res.status(200).json({ teste: true, paginas: `${de}-${ate}`, total: achados.length, diag, cards: achados.slice(0, 200) });
+  if (soTeste) return res.status(200).json({ teste: true, neste_lote: ids.length, faltam, ids });
+  if (!ids.length) return res.status(200).json({ ok: true, nada: 'todos já arrumados', faltam: 0 });
 
-  let ok = 0, falhas = 0;
-  for (const c of achados) {
+  // etapa de perdido no Kommo (id 143 é o padrão "Closed - lost")
+  await carregarMeta();
+  const perdido = Object.values(cache.statuses || {}).find(st => ehPerda(st));
+  const statusPerdido = perdido?.id || 143;
+
+  let ok = 0, falhas = [];
+  for (const id of ids) {
     try {
-      const resp = await fetch(`${KOMMO}/api/v4/leads/${c.id}`, {
+      const resp = await fetch(`${KOMMO}/api/v4/leads/${id}`, {
         method: 'PATCH', headers: { ...H_KOMMO, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ _embedded: { tags: [{ name: 'duplicado' }] } })
+        body: JSON.stringify({ status_id: statusPerdido, _embedded: { tags: [{ name: 'duplicado' }] } })
       });
-      resp.ok ? ok++ : falhas++;
-    } catch (e) { falhas++; }
-    await pausa(400);
+      if (resp.ok) {
+        ok++;
+        await fetch(`${SB_URL}/rest/v1/capta_kommo_ignorados?tenant_id=eq.${tenant}&kommo_lead_id=eq.${id}`, {
+          method: 'PATCH', headers: { ...H_SB, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ arrumado_em: new Date().toISOString() })
+        }).catch(() => null);
+      } else {
+        falhas.push({ id, status: resp.status });
+      }
+    } catch (e) { falhas.push({ id, erro: e.message }); }
+    await pausa(400);   // bem abaixo do teto de 7 requisições por segundo
   }
-  return res.status(200).json({ etiquetados: ok, falhas, total: achados.length, paginas: `${de}-${ate}` });
+  return res.status(200).json({ etiquetados: ok, falhas, faltam: Math.max(0, (faltam || 0) - ok) });
 }
 
 async function espelho(req, res) {
