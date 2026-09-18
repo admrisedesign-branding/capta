@@ -379,6 +379,7 @@ button .mini-pt{border-color:rgba(0,0,0,.15);border-top-color:currentColor}
 @keyframes gira{to{transform:rotate(360deg)}}
 .acts button:disabled,.hcol-mais.ocupado{cursor:default}
 .emb-fech{width:100%;height:calc(100vh - 210px);min-height:520px;border:0;border-radius:14px;background:var(--fundo,#F7F8FC)}
+.sep-visao{width:1px;align-self:stretch;background:var(--line);margin:0 4px}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -870,7 +871,11 @@ function desenhar(){ setTimeout(() => { if (AULA_ABERTA) pintarAula(); }, 0);
   // aba Fechamento: mostra o acompanhamento das experimentais, sem o calendário
   if (TIPO === 'fechamento') {
     document.getElementById('raiz').innerHTML = `
-      <div class="filtro-linha">${barraTipo(nAlunos, nExp, nRep)}</div>
+      <div class="filtro-linha" style="justify-content:flex-start">
+        <button class="btn g" onclick="mudarTipo('todos')">← voltar ao calendário</button>
+        <b style="margin-left:6px;font-size:14px">Fechamento das aulas experimentais</b>
+        <span style="color:var(--muted);font-size:12.5px">resultado de cada aula, leads sem data e descobrir agendas</span>
+      </div>
       ${telaFechamento()}`;
     return;
   }
@@ -1145,9 +1150,10 @@ function barraTipo(nAl, nEx, nRe){
     ${b('todos','Tudo','Turmas, aulas experimentais e reposições')}
     ${b('experimental','Aulas experimentais','Quem vem conhecer a escola — trabalho do comercial', nEx)}
     ${b('alunos','Alunos e reposições','Quem já estuda aqui — trabalho da secretaria', nAl + nRe)}
-    ${b('fechamento','Fechamento','Resultado de cada aula experimental, leads sem data e descobrir agendas')}
   </div>
-  <button class="btn g" style="margin-left:auto" onclick="listaAlunos()">Lista de matriculados</button>`;
+  <div class="sep-visao"></div>
+  <button class="btn ${TIPO==='fechamento'?'':'g'}" onclick="mudarTipo('${TIPO==='fechamento'?'todos':'fechamento'}')" title="Resultado de cada aula experimental, leads sem data e descobrir agendas">${TIPO==='fechamento'?'← voltar ao calendário':'Fechamento das aulas'}</button>
+  ${TIPO==='fechamento'?'':`<button class="btn g" style="margin-left:auto" onclick="listaAlunos()">Lista de matriculados</button>`}`;
 }
 
 // lista de quem está matriculado, agrupada por turma

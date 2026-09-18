@@ -2962,7 +2962,7 @@ function montarTabbar(){
     aula:'<svg viewBox="0 0 24 24"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>',
     menu:'<svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>'
   };
-  const itens = [['/atendimento.html','Hoje','hoje'],['/inbox.html','Conversas','chat'],['/funil.html','Pipeline','pipe'],['/aula-experimental.html','Aulas','aula']];
+  const itens = [['/atendimento.html','Hoje','hoje'],['/inbox.html','Conversas','chat'],['/funil.html','Pipeline','pipe'],['/agendamentos.html','Agenda','cal']];
   const bar = document.createElement('nav'); bar.className = 'tabbar';
   bar.innerHTML = itens.map(([pg,t,ic]) => `<button data-pg="${pg}">${I[ic]}${t}</button>`).join('')
     + `<button onclick="side.classList.add('open');sideScrim.classList.add('on')">${I.menu}Menu</button>`;
