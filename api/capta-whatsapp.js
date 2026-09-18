@@ -98,7 +98,7 @@ module.exports = async function handler(req, res) {
     // sem e-mail no corpo (painel antigo) vale o padrão mais permissivo do dono
     if (!body._papel && token === tenant.dashboard_token) body._papel = 'gestor';
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'acesso', 'lgpd', 'lgpd_config', 'expurgar', 'pedido_titular', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -114,6 +114,11 @@ module.exports = async function handler(req, res) {
         case 'aluno_confirmar': return await acaoAlunoConfirmar(tenant, body, res);
         case 'turmas_vagas':    return await acaoTurmasVagas(tenant, body, res);
         case 'lead_novo':       return await acaoLeadNovo(tenant, body, res);
+        case 'acesso':          return await acaoAcesso(tenant, body, res);
+        case 'lgpd':            return await acaoLgpd(tenant, body, res);
+        case 'lgpd_config':     return await acaoLgpdConfig(tenant, body, res);
+        case 'expurgar':        return await acaoExpurgar(tenant, body, res);
+        case 'pedido_titular':  return await acaoPedidoTitular(tenant, body, res);
         case 'nota':            return await acaoNota(tenant, body, res);
         case 'notas':           return await acaoNotas(tenant, body, res);
         case 'boas_vindas':     return res.status(200).json(await enviarBoasVindas(tenant, body.aluno_id));
@@ -1460,7 +1465,7 @@ async function acaoImportarMidia(tenant, body, res) {
 // ---------------------------------------------------------------------
 const PAPEIS = {
   gestor:     { nome: 'Gestor',     desc: 'Vê e faz tudo, inclusive equipe e painel.',              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos','eventos','ajustes'], pode: ['*'] },
-  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','ligacao','ligacoes','lead_novo','nota','notas','alunos','eu'] },
+  atendente:  { nome: 'Atendente',  desc: 'Atende, agenda e dá baixa nas aulas. Não vê o painel.',  telas: ['atendimento','pipeline','conversas','leads','agenda','aula'],                                   pode: ['agenda','agendar','remarcar','presenca','funil','mover','lead','campos','experimentais','desfecho','desfazer','conversas','mensagens','midia','enviar','enviar_midia','conversa_atualizar','respostas','importar_historico','importar_midia','atendente_historico','ligacao','ligacoes','lead_novo','nota','notas','acesso','alunos','eu'] },
   secretaria: { nome: 'Secretaria', desc: 'Cuida dos alunos e da agenda. Não atende no WhatsApp.',  telas: ['atendimento','agenda','aula','alunos'],                                                          pode: ['agenda','agendar','remarcar','presenca','experimentais','desfecho','desfazer','alunos','aluno','aluno_confirmar','turmas_vagas','transferir_aluno','boas_vindas','lead_novo','nota','notas','repor','faltas_aluno','vagas_kit','remarcar_aluno','lead','funil','eu'] },
   leitura:    { nome: 'Só leitura', desc: 'Vê tudo, não altera nada.',                              telas: ['atendimento','painel','pipeline','conversas','leads','agenda','aula','alunos'],                   pode: ['agenda','funil','lead','experimentais','alunos','conversas','mensagens','midia','eu'] },
 };
@@ -2191,6 +2196,111 @@ async function acaoFaltasAluno(tenant, body, res) {
 // Lead que veio direto: apareceu na escola ou ligou, sem ter passado pelo
 // site nem pelo WhatsApp. Reaproveita o cadastro se o telefone já existir,
 // para não criar o mesmo lead duas vezes.
+// =====================================================================
+// LGPD
+// Três coisas que a lei pede e que agora vivem no painel: registro de quem
+// acessou os dados (art. 37), pedidos do titular com prazo de 15 dias
+// (art. 18) e expurgo do que não precisa mais ser guardado (art. 15/16).
+// =====================================================================
+
+// Registro de acesso. Chamado pelas telas ao abrir e nas ações sensíveis.
+// Não bloqueia nada: se falhar, a pessoa continua trabalhando.
+async function acaoAcesso(tenant, body, res) {
+  const quem = await usuarioDe(tenant.id, body.email_atual).catch(() => null);
+  await sb('capta_acessos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    tenant_id: tenant.id,
+    usuario_nome: quem?.nome || body.por_nome || null,
+    usuario_email: quem?.email || body.email_atual || null,
+    tela: body.tela || null, acao: body.o || 'abriu',
+    alvo_tipo: body.alvo_tipo || null, alvo_id: body.alvo_id || null,
+    ip: (body._ip || '').slice(0, 45) || null
+  }) }).catch(() => null);
+  return res.status(200).json({ ok: true });
+}
+
+// O que o painel mostra em Ajustes → LGPD: últimos acessos, pedidos abertos
+// e quantos leads já podem ser expurgados.
+async function acaoLgpd(tenant, body, res) {
+  const [t] = await sb(`capta_tenants?id=eq.${tenant.id}&select=retencao_meses&limit=1`);
+  const meses = t?.retencao_meses || null;
+  const [acessos, pedidos, consent] = await Promise.all([
+    sb(`capta_acessos?tenant_id=eq.${tenant.id}&select=usuario_nome,usuario_email,tela,acao,criado_em&order=criado_em.desc&limit=80`).catch(() => []),
+    sb(`capta_pedidos_titular?tenant_id=eq.${tenant.id}&select=*&order=status.asc,prazo.asc&limit=60`).catch(() => []),
+    sb(`capta_consentimentos?tenant_id=eq.${tenant.id}&select=id&limit=1`).catch(() => [])
+  ]);
+  let candidatos = [];
+  if (meses) {
+    const corte = new Date(Date.now() - meses * 30 * 864e5).toISOString();
+    candidatos = await sb(`capta_expurgo_candidatos?tenant_id=eq.${tenant.id}&ultimo_toque=lt.${corte}&select=lead_id,nome,contato,ultimo_toque&order=ultimo_toque&limit=500`).catch(() => []);
+  }
+  return res.status(200).json({
+    retencao_meses: meses, acessos: acessos || [], pedidos: pedidos || [],
+    candidatos: candidatos || [], tem_consentimento: !!(consent || []).length
+  });
+}
+
+async function acaoLgpdConfig(tenant, body, res) {
+  const m = body.retencao_meses === '' || body.retencao_meses == null ? null : Number(body.retencao_meses);
+  if (m != null && (!Number.isFinite(m) || m < 1 || m > 120)) return res.status(400).json({ erro: 'Use um prazo entre 1 e 120 meses.' });
+  await sb(`capta_tenants?id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ retencao_meses: m }) });
+  return await acaoLgpd(tenant, body, res);
+}
+
+// Expurgo: anonimiza os leads que passaram do prazo. Não apaga a linha —
+// tira o que identifica a pessoa e mantém origem, etapa e datas, senão o
+// histórico do negócio some junto.
+async function acaoExpurgar(tenant, body, res) {
+  const ids = Array.isArray(body.lead_ids) ? body.lead_ids.slice(0, 200) : null;
+  let alvos = ids;
+  if (!alvos) {
+    const [t] = await sb(`capta_tenants?id=eq.${tenant.id}&select=retencao_meses&limit=1`);
+    if (!t?.retencao_meses) return res.status(400).json({ erro: 'Defina o prazo de retenção antes de expurgar.' });
+    const corte = new Date(Date.now() - t.retencao_meses * 30 * 864e5).toISOString();
+    const c = await sb(`capta_expurgo_candidatos?tenant_id=eq.${tenant.id}&ultimo_toque=lt.${corte}&select=lead_id&limit=200`).catch(() => []);
+    alvos = (c || []).map(x => x.lead_id);
+  }
+  if (!alvos.length) return res.status(200).json({ ok: true, apagados: 0 });
+  let n = 0;
+  for (const id of alvos) {
+    try { await rpc('capta_anonimizar_lead', { p_lead: id }); n++; }
+    catch (e) { console.error('[expurgo]', id, e.message); }
+  }
+  const quem = await usuarioDe(tenant.id, body.email_atual).catch(() => null);
+  await sb('capta_acessos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    tenant_id: tenant.id, usuario_nome: quem?.nome || null, usuario_email: quem?.email || body.email_atual || null,
+    tela: 'lgpd', acao: `expurgou ${n} leads`
+  }) }).catch(() => null);
+  return res.status(200).json({ ok: true, apagados: n });
+}
+
+// Pedido do titular: abrir, atualizar e concluir. Exclusão concluída
+// dispara a anonimização do lead.
+async function acaoPedidoTitular(tenant, body, res) {
+  if (body.abrir) {
+    const p = body.abrir;
+    if (!p.nome || !p.tipo) return res.status(400).json({ erro: 'Informe o nome e o tipo do pedido.' });
+    const quem = await usuarioDe(tenant.id, body.email_atual).catch(() => null);
+    await sb('capta_pedidos_titular', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+      tenant_id: tenant.id, lead_id: p.lead_id || null, aluno_id: p.aluno_id || null,
+      nome: p.nome, contato: p.contato || null, email: p.email || null,
+      tipo: p.tipo, detalhe: p.detalhe || null, aberto_por: quem?.nome || body.por_nome || null
+    }) });
+  }
+  if (body.atualizar) {
+    const u = body.atualizar;
+    const campos = {};
+    if (u.status) campos.status = u.status;
+    if (u.resposta !== undefined) campos.resposta = u.resposta || null;
+    if (u.status === 'concluido') campos.concluido_em = new Date().toISOString();
+    await sb(`capta_pedidos_titular?id=eq.${u.id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos) });
+    // exclusão concluída = apagar de verdade os dados do titular
+    if (u.status === 'concluido' && u.anonimizar && u.lead_id) {
+      try { await rpc('capta_anonimizar_lead', { p_lead: u.lead_id }); } catch (e) { console.error('[titular]', e.message); }
+    }
+  }
+  return await acaoLgpd(tenant, body, res);
+}
+
 async function acaoLeadNovo(tenant, body, res) {
   const nome = String(body.nome || '').trim();
   const fone = String(body.contato || '').replace(/\D/g, '');
