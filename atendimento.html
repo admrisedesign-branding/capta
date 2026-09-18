@@ -145,10 +145,10 @@ async function api(acao, extra = {}) {
 async function carregar(){
   try {
     const [ex, fu, ag, cv, evp] = await Promise.all([
-      api('experimentais', { de: hoje, ate: hoje }), api('funil'), api('agenda', { dias: 14 }).catch(() => ({ horarios: [] })), api('conversas').catch(() => ({ conversas: [] })), api('evento_leads', { parados: true }).catch(() => ({ leads: [], eventos: [] }))
+      api('experimentais', { de: hoje, ate: hoje }), api('funil'), api('agenda', { dias: 60 }).catch(() => ({ horarios: [] })), api('conversas').catch(() => ({ conversas: [] })), api('evento_leads', { parados: true }).catch(() => ({ leads: [], eventos: [] }))
     ]);
     api('saude').then(x => { SAUDE = x; desenhar(); }).catch(() => {});
-    D = { aulas: ex.agendamentos || [], leadsAula: ex.leads || [], turmas: ex.turmas || [], leads: fu.leads || [], etapas: fu.etapas || [], conversas: cv.conversas || cv || [], vagas: (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0 && h.data > hoje), evParados: evp.leads || [], eventos: evp.eventos || [] };
+    D = { aulas: ex.agendamentos || [], leadsAula: ex.leads || [], turmas: ex.turmas || [], leads: fu.leads || [], etapas: fu.etapas || [], conversas: cv.conversas || cv || [], agendaTudo: ag.agendamentos || [], vagas: (ag.horarios || []).filter(h => (h.vagas ?? 1) > 0 && h.data > hoje), evParados: evp.leads || [], eventos: evp.eventos || [] };
     desenhar();
   } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
@@ -160,6 +160,9 @@ LeadPainel.init({ slug: SLUG, token: TOKEN, getLead: id => D.leads.find(x => x.i
 
 function desenhar(){
   const aulas = D.aulas.filter(a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para).sort((a,b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+  // Quantas aulas o time MARCOU hoje — inclusive para dias futuros. É a
+  // produtividade do dia, diferente de "aulas hoje", que é quem vem hoje.
+  const marcadasHoje = (D.agendaTudo || []).filter(a => String(a.criado_em || '').slice(0, 10) === hoje && !['cancelado','remarcado'].includes(a.status)).length;
   const pend = aulas.filter(a => !desfechoDe(a) && a.status !== 'faltou');
   // conversas sem resposta: última mensagem recebida e não lida
   const semResp = (Array.isArray(D.conversas) ? D.conversas : []).filter(c => (c.nao_lidas||0) > 0).sort((a,b) => new Date(b.ultima_mensagem_em||0) - new Date(a.ultima_mensagem_em||0));
@@ -183,6 +186,7 @@ function desenhar(){
     ${SAUDE && !SAUDE.whatsapp?.conectado ? `<div class="bloco" style="background:#FCF3F2;border-color:#F0C6C3;margin-bottom:14px"><b style="color:var(--quente)">WhatsApp desconectado</b> — mensagens não entram nem saem pelo Capta. Reconecte pelo botão no topo do painel.</div>` : ''}
     <div class="tally">
       <div onclick="document.getElementById('sec-aulas').scrollIntoView({behavior:'smooth'})"><b>${aulas.length}</b><small>aulas hoje</small></div>
+      <div onclick="irPara('/agendamentos.html')" style="cursor:pointer" title="Aulas que o time marcou hoje, para qualquer data"><b>${marcadasHoje}</b><small>marcadas hoje</small></div>
       <div class="hot" onclick="document.getElementById('sec-aulas').scrollIntoView({behavior:'smooth'})"><b>${pend.length}</b><small>sem desfecho</small></div>
       <div class="bad" onclick="document.getElementById('sec-resp').scrollIntoView({behavior:'smooth'})"><b>${semResp.length}</b><small>${urgentes?`<span class="al-tag urgente" style="margin-right:6px">${urgentes} há +1h30</span>`:''}mensagens sem resposta</small></div>
       <div class="bad" onclick="document.getElementById('sec-quentes').scrollIntoView({behavior:'smooth'})"><b>${quentes.length}</b><small>querem fechar sem aula</small></div>
