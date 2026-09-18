@@ -191,7 +191,10 @@ window.submit = async () => {
       if(error){ $('err').textContent = traduz(error.message); reset(); return; }
       route();
     } else {
-      const { data, error } = await sb.auth.signUp({ email, password: senha });
+      // emailRedirectTo: sem isso o link de confirmação cai na raiz do site,
+      // que não sabe o que fazer com o token. Tem que voltar para o login.
+      const { data, error } = await sb.auth.signUp({ email, password: senha,
+        options: { emailRedirectTo: location.origin + '/login.html?confirmado=1' } });
       if(error){ $('err').textContent = traduz(error.message); reset(); return; }
       if(data.session){ route(); }         // confirmação de e-mail desligada -> entra direto
       else { show('confirm-view'); }        // confirmação ligada -> avisa
@@ -319,6 +322,7 @@ function traduz(m){
   // (#access_token=…&type=recovery) ou como ?code=. Em vez de mandar a pessoa
   // pro painel, abre a tela de criar senha nova.
   const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const confirmado = new URLSearchParams(location.search).get('confirmado') === '1';
   const qs = new URLSearchParams(location.search);
   const ehRecuperacao = hash.get('type') === 'recovery' || qs.get('recuperar') === '1' || qs.get('type') === 'recovery';
   if (hash.get('error_description')) {
@@ -341,6 +345,13 @@ function traduz(m){
     show('auth-view');
     $('err').textContent = 'Esse link expirou ou já foi usado. Peça um novo em "Esqueci minha senha".';
     return;
+  }
+
+  if (confirmado) {
+    // o Supabase já trocou o token do endereço por sessão; só limpa a URL
+    show('loading-view'); $('loading-txt').textContent = 'E-mail confirmado, entrando…';
+    for (let i = 0; i < 10; i++) { if ((await sb.auth.getSession()).data.session) break; await new Promise(r => setTimeout(r, 300)); }
+    history.replaceState(null, '', '/login.html');
   }
 
   const { data:{ session } } = await sb.auth.getSession();
