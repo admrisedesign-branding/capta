@@ -3049,6 +3049,47 @@ async function moverLead(tenantId, leadId, etapaId, motivo) {
     method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(campos)
   });
   await fecharConversaPorEtapa(tenantId, leadId, etapaId);
+  avisarMeta(tenantId, leadId, etapaId).catch(() => null);   // nunca segura a fila
+}
+
+// ---------------------------------------------------------------------
+// META ADS — conversão avisada pelo Capta
+// Antes quem avisava era o Kommo, por webhook de etapa. Em 18/set/2026 o
+// Kommo bloqueou o IP da Vercel e o rastreio parou junto — as campanhas
+// deixariam de otimizar por matrícula. Agora o Capta avisa direto.
+// O identificador do evento é o mesmo dos dois caminhos, então se o Kommo
+// voltar a mandar, a Meta reconhece e não conta a conversão duas vezes.
+// ---------------------------------------------------------------------
+const META_ETAPA = [
+  [/qualificado/i,            'lead'],
+  [/aula agendada/i,          'schedule'],
+  [/aluno ativo|matr[ií]cula/i, 'purchase'],
+];
+async function avisarMeta(tenantId, leadId, etapaId) {
+  const segredo = process.env.CAPTA_META_SECRET || process.env.CRON_SECRET;
+  if (!segredo || !leadId || !etapaId) return;
+
+  const [et] = await sb(`capta_etapas?id=eq.${etapaId}&select=nome&limit=1`).catch(() => []);
+  const regra = META_ETAPA.find(([re]) => re.test(et?.nome || ''));
+  if (!regra) return;
+
+  const [l] = await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=contato,email,nome,kommo_lead_id,fonte,curso&limit=1`).catch(() => []);
+  if (!l?.contato && !l?.email) return;
+
+  const base = process.env.MYROBOT_URL || 'https://www.myrobotmanaus.com';
+  await fetch(`${base}/api/meta-capi?event=${regra[1]}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      direto: true, segredo,
+      // mesmo id do caminho antigo, para a Meta juntar os dois
+      lead_id: l.kommo_lead_id || `capta-${leadId}`,
+      telefone: l.contato || undefined,
+      email: l.email || undefined,
+      nome: l.nome || undefined,
+      utm_source: l.fonte || undefined,
+      trilha: l.curso || undefined,
+    })
+  }).catch(() => null);
 }
 
 // Etapas que encerram o atendimento: matriculado, aula marcada, perdido,
