@@ -156,7 +156,10 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .t-pessoa:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
-<script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
+<script>
+// A tarde na My Robot começa às 14h: aula de 13h ainda conta como manhã.
+const CORTE_TARDE = 14;
+if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
 to{opacity:1;transform:none}}
 </style>
@@ -481,7 +484,7 @@ function menuDesfecho(a){
 function menuReagendar(a){
   if (!VAGAS3) { carregarVagas(); return `<div class="menu"><p>Reagendar</p><div class="aviso-p">Buscando vagas…</div></div>`; }
   const hs = VAGAS3.filter(h => (h.vagas ?? 1) > 0 && h.data > hoje).sort((x,y)=>(x.data+x.hora_inicio).localeCompare(y.data+y.hora_inicio));
-  const pick = f => hs.find(h => { const w = new Date(h.data+'T12:00').getDay(), hi = parseInt(h.hora_inicio); return f==='sab'?w===6:f==='manha'?(w!==6&&hi<12):(w!==6&&hi>=12); });
+  const pick = f => hs.find(h => { const w = new Date(h.data+'T12:00').getDay(), hi = parseInt(h.hora_inicio); return f==='sab'?w===6:f==='manha'?(w!==6&&hi<CORTE_TARDE):(w!==6&&hi>=CORTE_TARDE); });
   const vg = (rot, v) => `<div class="vg"><small>${rot}</small>${v?`<b>${DIAS[new Date(v.data+'T12:00').getDay()].slice(0,3)} ${new Date(v.data+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} · ${hh(v.hora_inicio)}</b><small>${v.vagas} First livres</small><button class="btn" onclick="reagendar('${a.id}','${v.turma_id}','${v.data}')">Reagendar</button>`:'<b>—</b><small>sem vaga em 30 dias</small>'}</div>`;
   return `<div class="menu"><p>Reagendar ${esc(a.crianca_nome||'')} — ofereça duas opções</p><div class="vagas3">${vg('Manhã',pick('manha'))}${vg('Tarde',pick('tarde'))}${vg('Sábado',pick('sab'))}</div><div class="acts save"><button onclick="fecharMenu()">cancelar</button></div></div>`;
 }
