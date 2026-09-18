@@ -27,6 +27,11 @@
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://oaezsozoriqnkurxncjs.supabase.co';
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// chama função do banco (usada para achar lead pelo telefone, com e sem o 9)
+async function rpc(nome, args) {
+  return sb(`rpc/${nome}`, { method: 'POST', body: JSON.stringify(args) });
+}
+
 async function sb(path, opts = {}) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...opts,
@@ -188,12 +193,34 @@ module.exports = async function handler(req, res) {
       if (et && et[0]) { lead.etapa_id = et[0].id; lead.etapa_em = new Date().toISOString(); }
     } catch (e) {}
 
-    const created = await sb('capta_leads', {
-      method: 'POST',
-      headers: { Prefer: 'return=representation' },
-      body: JSON.stringify(lead),
-    });
-    const novo = Array.isArray(created) ? created[0] : created;
+    // Mesmo telefone já cadastrado? Atualiza em vez de criar outro. O celular
+    // chega ora com o 9, ora sem — a comparação é pelos 8 últimos dígitos,
+    // que é o que a função do banco faz. Foi assim que nasceram 138 cards
+    // duplicados até setembro de 2026.
+    let novo = null;
+    try {
+      const jaId = await rpc('capta_lead_por_fone', { p_tenant: t.id, p_fone: lead.contato });
+      const existente = Array.isArray(jaId) ? jaId[0] : jaId;
+      if (existente) {
+        const patch = {};
+        for (const k of ['crianca', 'idade', 'email', 'fonte', 'porta', 'kommo_lead_id', 'evento_id']) {
+          if (lead[k] !== undefined && lead[k] !== null && lead[k] !== '') patch[k] = lead[k];
+        }
+        if (Object.keys(patch).length) {
+          await sb(`capta_leads?id=eq.${existente}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+        }
+        novo = { id: existente, reaproveitado: true };
+      }
+    } catch (e) { /* sem a função, segue criando */ }
+
+    if (!novo) {
+      const created = await sb('capta_leads', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(lead),
+      });
+      novo = Array.isArray(created) ? created[0] : created;
+    }
 
     // 5) avisa o dono por e-mail — nunca bloqueia a gravação
     if (novo && novo.id) {
