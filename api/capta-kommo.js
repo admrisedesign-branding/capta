@@ -319,8 +319,10 @@ function idsDoWebhook(body) {
 // Kommo — e sem etiqueta o espelho o traria de volta. A regra se sustenta
 // sozinha: card cujo id NÃO existe mais no Capta, mas cujo telefone bate
 // com um lead que existe, é justamente o duplicado que foi absorvido.
-// Chamada: GET /api/capta-kommo?marcar_duplicados=<MIG_SECRET>
-// Acrescente &teste=1 para só listar, sem etiquetar nada.
+// Chamada: GET /api/capta-kommo?marcar_duplicados=<MIG_SECRET>&de=1&ate=3
+//   &teste=1  → só lista, não etiqueta
+//   &de/&ate  → intervalo de páginas (50 leads cada); vá avançando de 3 em 3
+//               até a resposta dizer que a página veio vazia.
 // ---------------------------------------------------------------------
 async function marcarDuplicados(req, res) {
   const esperado = (process.env.MIG_SECRET || process.env.CRON_SECRET || '').trim();
@@ -328,6 +330,11 @@ async function marcarDuplicados(req, res) {
     return res.status(401).json({ erro: 'Segredo inválido.' });
   }
   const soTeste = String(req.query.teste || '') === '1';
+  // Em pedaços: o Kommo bloqueia o IP (403 do nginx) quando passa de 7
+  // requisições por segundo. Cada chamada varre poucas páginas, devagar.
+  const de  = Math.max(1, Number(req.query.de) || 1);
+  const ate = Math.max(de, Number(req.query.ate) || de + 2);
+  const pausa = ms => new Promise(r => setTimeout(r, ms));
   const fim8 = v => String(v || '').replace(/\D/g, '').slice(-8);
 
   // o que o Capta conhece hoje
@@ -340,9 +347,10 @@ async function marcarDuplicados(req, res) {
   const achados = [];
   const diag = { paginas: 0, leadsVistos: 0, semContato: 0, jaNoCapta: 0, jaEtiquetado: 0, foneNaoBate: 0,
                  leadsCapta: (leads || []).length, fonesVivos: fonesVivos.size };
-  for (let pagina = 1; pagina <= 30; pagina++) {
+  for (let pagina = de; pagina <= ate; pagina++) {
     // limit 250 é recusado por algumas contas; 50 é o valor seguro
     const url = `${KOMMO}/api/v4/leads?with=contacts&page=${pagina}&limit=50`;
+    await pausa(400);
     const resp = await fetch(url, { headers: H_KOMMO }).catch(e => ({ ok: false, status: 0, erro: e.message }));
     if (!resp.ok) { diag.erroKommo = { status: resp.status, corpo: (await resp.text?.().catch(() => '') || '').slice(0, 200) }; break; }
     const lote = await resp.json().catch(() => null);
@@ -361,12 +369,12 @@ async function marcarDuplicados(req, res) {
         .flatMap(f => (f.values || []).map(v => fim8(v.value)));
       if (!fones.some(f => f.length === 8 && fonesVivos.has(f))) { diag.foneNaoBate++; continue; }
       achados.push({ id: lead.id, nome: lead.name });
-      await new Promise(r2 => setTimeout(r2, 160));                       // 7 req/s é o teto do Kommo
+      await pausa(400);                                                    // bem abaixo do teto de 7/s
     }
     if (linhas.length < 50) break;
   }
 
-  if (soTeste) return res.status(200).json({ teste: true, total: achados.length, diag, cards: achados.slice(0, 200) });
+  if (soTeste) return res.status(200).json({ teste: true, paginas: `${de}-${ate}`, total: achados.length, diag, cards: achados.slice(0, 200) });
 
   let ok = 0, falhas = 0;
   for (const c of achados) {
@@ -377,9 +385,9 @@ async function marcarDuplicados(req, res) {
       });
       resp.ok ? ok++ : falhas++;
     } catch (e) { falhas++; }
-    await new Promise(r2 => setTimeout(r2, 160));
+    await pausa(400);
   }
-  return res.status(200).json({ etiquetados: ok, falhas, total: achados.length });
+  return res.status(200).json({ etiquetados: ok, falhas, total: achados.length, paginas: `${de}-${ate}` });
 }
 
 async function espelho(req, res) {
