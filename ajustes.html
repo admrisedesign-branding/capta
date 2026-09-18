@@ -61,7 +61,7 @@ label.chk input{margin-top:2px}
 </head>
 <body>
 <div class="topbar"><a class="voltar" id="voltar" href="/dashboard.html">← Painel</a><h1>Ajustes</h1></div>
-<div class="wrap"><div class="barra"><div class="abas"><button class="on" id="ab-equipe" onclick="aba('equipe')">Equipe e permissões</button><button id="ab-recepcao" onclick="aba('recepcao')">Recepção e avisos</button><button id="ab-integra" onclick="aba('integra')">Integrações e investimento</button><button id="ab-conta" onclick="aba('conta')">Conta</button></div>
+<div class="wrap"><div class="barra"><div class="abas"><button class="on" id="ab-equipe" onclick="aba('equipe')">Equipe e permissões</button><button id="ab-recepcao" onclick="aba('recepcao')">Recepção e avisos</button><button id="ab-integra" onclick="aba('integra')">Integrações e investimento</button><button id="ab-lgpd" onclick="aba('lgpd')">LGPD</button><button id="ab-conta" onclick="aba('conta')">Conta</button></div>
   <button class="btn" style="margin-left:auto" id="btn-novo" onclick="editar(null)">+ Nova pessoa</button></div>
   <div id="raiz"><div class="aviso">Carregando…</div></div></div>
 <div id="modal"></div>
@@ -83,13 +83,14 @@ async function carregar(){
     EU = EQ.find(u => u.email === ((window.CaptaUser && CaptaUser.email && CaptaUser.email()) || '')) || null;
     desenhar(); } catch(e){ document.getElementById('raiz').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
 }
-function aba(a){ ABA = a; ['equipe','recepcao','integra','conta'].forEach(x => document.getElementById('ab-'+x).classList.toggle('on', x===a)); document.getElementById('btn-novo').style.display = a==='equipe' ? '' : 'none'; desenhar(); }
+function aba(a){ ABA = a; ['equipe','recepcao','integra','lgpd','conta'].forEach(x => document.getElementById('ab-'+x).classList.toggle('on', x===a)); document.getElementById('btn-novo').style.display = a==='equipe' ? '' : 'none'; desenhar(); }
 const telasDe = u => (u.telas && u.telas.length ? u.telas : (PAPEIS[u.papel] || {}).telas || []);
 
 function desenhar(){
   if (ABA === 'conta') return desenharConta();
   if (ABA === 'recepcao') return desenharRecepcao();
   if (ABA === 'integra') return desenharIntegra();
+  if (ABA === 'lgpd') return desenharLgpd();
   const gestor = !EU || EU.papel === 'gestor';
   document.getElementById('raiz').innerHTML = `
     <div class="bloco"><h3>Quem tem acesso</h3><div class="h">Cada pessoa entra com o próprio e-mail e senha em capta.riseagencia.com/login.html. O que ela pode ver e fazer vem do perfil — e dá pra ajustar tela a tela.</div>
@@ -152,6 +153,90 @@ async function desenharRecepcao(){
       <button class="btn g" onclick="novaChaveRecepcao()">Gerar nova chave</button></div>` +
     `<div class="bloco"><h3>Como deixar em tela cheia</h3><div class="h">No tablet: abra o link no Chrome, toque em ⋮ → <b>Adicionar à tela inicial</b>. Na TV/monitor: abra no navegador e aperte <b>F11</b>. Os dois links não pedem senha — quem tiver o link entra, então use só nos aparelhos da escola.</div></div>`;
 }
+// ---- LGPD ------------------------------------------------------------
+// Uma tela só com o que a lei cobra: prazo de guarda, o que já passou do
+// prazo, os pedidos das famílias e quem andou vendo os dados.
+let LG = null, PED_NOVO = false;
+const TIPOS_PEDIDO = [['acesso','Acesso aos dados'],['correcao','Correção'],['exclusao','Exclusão'],['portabilidade','Portabilidade'],['revogacao','Revogar consentimento']];
+async function carregarLgpd(){ try { LG = await api('lgpd'); } catch(e){ LG = { erro: e.message }; } desenhar(); }
+async function desenharLgpd(){
+  if (!LG) { document.getElementById('raiz').innerHTML = '<div class="aviso">Carregando…</div>'; return carregarLgpd(); }
+  if (LG.erro) { document.getElementById('raiz').innerHTML = `<div class="aviso">${esc(LG.erro)}</div>`; return; }
+  const abertos = (LG.pedidos||[]).filter(p => p.status !== 'concluido' && p.status !== 'recusado');
+  const hoje = new Date().toISOString().slice(0,10);
+  const rot = t => (TIPOS_PEDIDO.find(x => x[0] === t) || [,t])[1];
+
+  document.getElementById('raiz').innerHTML = `
+    <div class="bloco"><h3>Prazo de guarda dos dados</h3>
+      <div class="h">A LGPD pede que dado pessoal não fique guardado além do necessário (art. 15). Aqui você define por quanto tempo um lead que não virou aluno continua no sistema. Passado o prazo, o nome, o telefone e os dados da criança são apagados — origem, etapa e datas ficam, para o histórico do negócio não mentir.</div>
+      <div class="l2"><div class="campo"><label>Guardar lead não matriculado por</label>
+        <select id="lg-meses"><option value="">não expurgar (guardar para sempre)</option>
+          ${[6,12,18,24,36].map(m => `<option value="${m}" ${LG.retencao_meses===m?'selected':''}>${m} meses</option>`).join('')}</select></div>
+        <div class="campo"><label>&nbsp;</label><button class="btn" onclick="salvarLgpd()">Salvar prazo</button></div></div>
+      ${LG.retencao_meses ? `<div class="dica" style="margin-top:10px">${LG.candidatos.length
+          ? `<b>${LG.candidatos.length} leads</b> já passaram do prazo e podem ser expurgados.
+             <button class="btn g" style="margin-left:8px" onclick="verCandidatos()">ver lista</button>
+             <button class="btn" style="margin-left:6px" onclick="expurgar()">Expurgar agora</button>`
+          : 'Nenhum lead passou do prazo por enquanto.'}</div>` : ''}
+    </div>
+
+    <div class="bloco"><h3>Pedidos das famílias <span class="n">${abertos.length}</span></h3>
+      <div class="h">Quando um pai pede para ver, corrigir ou apagar os dados do filho, a resposta tem que sair em 15 dias (art. 18). Registre aqui para não perder o prazo.</div>
+      ${PED_NOVO ? `<div class="bloco-int">
+        <div class="l2"><div class="campo"><label>Nome de quem pediu</label><input id="pd-nome" placeholder="Maria Silva"></div>
+          <div class="campo"><label>Contato</label><input id="pd-contato" placeholder="92 99999-9999"></div></div>
+        <div class="l2"><div class="campo"><label>Tipo</label><select id="pd-tipo">${TIPOS_PEDIDO.map(([k,t]) => `<option value="${k}">${t}</option>`).join('')}</select></div>
+          <div class="campo"><label>E-mail (se houver)</label><input id="pd-email"></div></div>
+        <div class="campo"><label>O que foi pedido</label><input id="pd-detalhe" placeholder="Ex.: quer apagar os dados do filho"></div>
+        <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="abrirPedido()">Registrar</button><button class="btn g" onclick="PED_NOVO=false;desenhar()">cancelar</button></div>
+      </div>` : `<button class="btn" onclick="PED_NOVO=true;desenhar()">+ Registrar pedido</button>`}
+      ${(LG.pedidos||[]).length ? `<table style="margin-top:12px"><tr><th>Quem</th><th>Pedido</th><th>Prazo</th><th>Status</th><th></th></tr>
+        ${LG.pedidos.map(p => `<tr class="${p.status==='concluido'?'off':''}">
+          <td><b>${esc(p.nome)}</b><br><span style="color:var(--faint);font-size:12px">${esc(p.contato||p.email||'')}</span></td>
+          <td>${esc(rot(p.tipo))}${p.detalhe?`<br><span style="color:var(--faint);font-size:12px">${esc(p.detalhe)}</span>`:''}</td>
+          <td style="${p.status!=='concluido' && p.prazo < hoje ? 'color:#c23b3b;font-weight:800' : ''}">${p.prazo.split('-').reverse().join('/')}</td>
+          <td>${esc(p.status)}</td>
+          <td>${p.status==='concluido'?'':`<button class="btn g" onclick="concluirPedido('${p.id}','${p.lead_id||''}','${p.tipo}')">concluir</button>`}</td>
+        </tr>`).join('')}</table>` : ''}
+    </div>
+
+    <div class="bloco"><h3>Quem acessou os dados</h3>
+      <div class="h">Registro das últimas aberturas de tela e ações no painel. É o que responde “quem viu os dados dessa criança?” se alguém perguntar.</div>
+      ${(LG.acessos||[]).length ? `<table><tr><th>Quando</th><th>Pessoa</th><th>Tela</th><th>Ação</th></tr>
+        ${LG.acessos.slice(0,40).map(a => `<tr><td>${new Date(a.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+          <td>${esc(a.usuario_nome||a.usuario_email||'—')}</td><td>${esc(a.tela||'—')}</td><td>${esc(a.acao||'')}</td></tr>`).join('')}</table>`
+        : '<div class="dica">Nada registrado ainda.</div>'}
+    </div>`;
+}
+async function salvarLgpd(){
+  try { LG = await api('lgpd_config', { retencao_meses: document.getElementById('lg-meses').value }); desenhar(); toast('Prazo salvo', { tipo:'ok' }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+function verCandidatos(){
+  const l = LG.candidatos || [];
+  alert(`Leads que passaram do prazo (${l.length}):\n\n` + l.slice(0,40).map(x => `${x.nome || 'sem nome'} — último contato ${new Date(x.ultimo_toque).toLocaleDateString('pt-BR')}`).join('\n') + (l.length>40?`\n… e mais ${l.length-40}`:''));
+}
+async function expurgar(){
+  const n = (LG.candidatos||[]).length;
+  if (!confirm(`Expurgar ${n} leads?\n\nNome, telefone, e-mail, dados da criança, conversas e anotações são apagados — sem volta. Origem, etapa e datas continuam, para o histórico não mentir.`)) return;
+  try { const r = await api('expurgar'); toast(`${r.apagados} leads anonimizados`, { tipo:'ok' }); LG = null; desenhar(); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function abrirPedido(){
+  const abrir = { nome: document.getElementById('pd-nome').value.trim(), contato: document.getElementById('pd-contato').value.trim(),
+    email: document.getElementById('pd-email').value.trim(), tipo: document.getElementById('pd-tipo').value, detalhe: document.getElementById('pd-detalhe').value.trim() };
+  if (!abrir.nome) return toast('Informe quem pediu.', { tipo:'erro' });
+  try { LG = await api('pedido_titular', { abrir }); PED_NOVO = false; desenhar(); toast('Pedido registrado · prazo de 15 dias', { tipo:'ok' }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function concluirPedido(id, leadId, tipo){
+  const apagar = tipo === 'exclusao' && leadId &&
+    confirm('Pedido de exclusão: apagar também os dados desse lead no sistema agora? (nome, telefone, criança, conversas)');
+  const resposta = prompt('O que foi respondido à família? (fica registrado)') || '';
+  try { LG = await api('pedido_titular', { atualizar: { id, status: 'concluido', resposta, anonimizar: apagar, lead_id: leadId } }); desenhar(); toast('Pedido concluído', { tipo:'ok' }); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+
 let AVISOS = [], AV_ED = {};
 async function carregarAvisos(){ try { const r = await api('avisos'); AVISOS = r.avisos || []; desenhar(); } catch(e){} }
 function editarAviso(id){ AV_ED = { ...(AVISOS.find(a => a.id === id) || {}) }; desenhar(); }

@@ -51,3 +51,27 @@
   // helper para as telas montarem o ícone
   window.ajudaHTML = txt => `<span class="ajuda" tabindex="0" role="button" aria-label="Ajuda" data-dica="${String(txt).replace(/"/g, '&quot;')}">i</span>`;
 })();
+
+/* ---------------------------------------------------------------------
+   LGPD — registro de acesso (art. 37).
+   Toda tela que carrega este arquivo avisa ao servidor quem abriu o quê.
+   É o que responde "quem viu os dados dessa criança?" quando uma família
+   perguntar. Roda uma vez por tela, sem travar nada: se falhar, silencia.
+   --------------------------------------------------------------------- */
+(function () {
+  try {
+    const qs = new URLSearchParams(location.search);
+    const slug = qs.get('t'), token = qs.get('k');
+    if (!slug || !token) return;                       // fora do painel
+    const tela = (location.pathname.split('/').pop() || 'painel').replace('.html', '');
+    if (['login', 'capta', 'index'].includes(tela)) return;
+    const chave = `capta_acesso_${tela}_${new Date().toISOString().slice(0, 13)}`;
+    if (sessionStorage.getItem(chave)) return;         // uma vez por hora e por tela
+    sessionStorage.setItem(chave, '1');
+    fetch('/api/capta-whatsapp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acao: 'acesso', slug, token, tela,
+        email_atual: (window.CaptaUser && CaptaUser.email && CaptaUser.email()) || undefined })
+    }).catch(() => {});
+  } catch (e) {}
+})();
