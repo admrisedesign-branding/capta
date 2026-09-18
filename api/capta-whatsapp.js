@@ -586,7 +586,8 @@ async function lembretes(canal, resumo, turno) {
 
   for (const a of ags || []) {
     const h = String(a.hora_inicio || '').slice(0, 5);
-    const deManha = Number(h.slice(0, 2)) < 12;
+    // A tarde na My Robot começa às 14h: aula de 13h ainda é da manhã.
+    const deManha = Number(h.slice(0, 2)) < 14;
     // cada turno cuida do seu: de manhã só as aulas da tarde, de tarde só as da manhã
     if (turno === 'tarde' ? !deManha : deManha) continue;
     const fone = a.lead?.contato;
