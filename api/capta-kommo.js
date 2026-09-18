@@ -313,8 +313,71 @@ function idsDoWebhook(body) {
   return [...ids];
 }
 
+// ---------------------------------------------------------------------
+// MARCAR DUPLICADOS (uma vez, set/2026)
+// A limpeza fundiu 138 pares no Capta, mas o card perdido continua no
+// Kommo — e sem etiqueta o espelho o traria de volta. A regra se sustenta
+// sozinha: card cujo id NÃO existe mais no Capta, mas cujo telefone bate
+// com um lead que existe, é justamente o duplicado que foi absorvido.
+// Chamada: GET /api/capta-kommo?marcar_duplicados=<MIG_SECRET>
+// Acrescente &teste=1 para só listar, sem etiquetar nada.
+// ---------------------------------------------------------------------
+async function marcarDuplicados(req, res) {
+  const esperado = (process.env.MIG_SECRET || process.env.CRON_SECRET || '').trim();
+  if (!esperado || String(req.query.marcar_duplicados || '').trim() !== esperado) {
+    return res.status(401).json({ erro: 'Segredo inválido.' });
+  }
+  const soTeste = String(req.query.teste || '') === '1';
+  const fim8 = v => String(v || '').replace(/\D/g, '').slice(-8);
+
+  // o que o Capta conhece hoje
+  const tenant = await tenantId();
+  const r = await fetch(`${SB_URL}/rest/v1/capta_leads?tenant_id=eq.${tenant}&select=kommo_lead_id,contato&limit=5000`, { headers: H_SB });
+  const leads = await r.json().catch(() => []);
+  const idsVivos = new Set((leads || []).map(l => Number(l.kommo_lead_id)).filter(Boolean));
+  const fonesVivos = new Set((leads || []).map(l => fim8(l.contato)).filter(x => x.length === 8));
+
+  const achados = [];
+  for (let pagina = 1; pagina <= 30; pagina++) {
+    const lote = await kget(`/api/v4/leads?with=contacts&page=${pagina}&limit=250`).catch(() => null);
+    const linhas = lote?._embedded?.leads || [];
+    if (!linhas.length) break;
+
+    for (const lead of linhas) {
+      if (idsVivos.has(Number(lead.id))) continue;                       // ainda existe no Capta
+      if ((lead._embedded?.tags || []).some(t => /^duplicad/i.test(t.name || ''))) continue;  // já etiquetado
+      const cId = lead._embedded?.contacts?.[0]?.id;
+      if (!cId) continue;
+      const contato = await kget(`/api/v4/contacts/${cId}`).catch(() => null);
+      const fones = (contato?.custom_fields_values || [])
+        .filter(f => f.field_code === 'PHONE' || /phone/i.test(f.field_name || ''))
+        .flatMap(f => (f.values || []).map(v => fim8(v.value)));
+      if (!fones.some(f => f.length === 8 && fonesVivos.has(f))) continue;
+      achados.push({ id: lead.id, nome: lead.name });
+      await new Promise(r2 => setTimeout(r2, 160));                       // 7 req/s é o teto do Kommo
+    }
+    if (linhas.length < 250) break;
+  }
+
+  if (soTeste) return res.status(200).json({ teste: true, total: achados.length, cards: achados.slice(0, 200) });
+
+  let ok = 0, falhas = 0;
+  for (const c of achados) {
+    try {
+      const resp = await fetch(`${KOMMO}/api/v4/leads/${c.id}`, {
+        method: 'PATCH', headers: { ...H_KOMMO, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _embedded: { tags: [{ name: 'duplicado' }] } })
+      });
+      resp.ok ? ok++ : falhas++;
+    } catch (e) { falhas++; }
+    await new Promise(r2 => setTimeout(r2, 160));
+  }
+  return res.status(200).json({ etiquetados: ok, falhas, total: achados.length });
+}
+
 async function espelho(req, res) {
   try {
+    if (req.method === 'GET' && req.query?.marcar_duplicados) return await marcarDuplicados(req, res);
     // GET manual (backfill) exige o segredo; POST é o webhook do Kommo, que traz account_id
     if (req.method === 'GET' && req.query?.lead_id) {
       const esperado = (process.env.MIG_SECRET || process.env.CRON_SECRET || '').trim();
