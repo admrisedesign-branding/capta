@@ -380,23 +380,10 @@ button .mini-pt{border-color:rgba(0,0,0,.15);border-top-color:currentColor}
 .acts button:disabled,.hcol-mais.ocupado{cursor:default}
 .emb-fech{width:100%;height:calc(100vh - 210px);min-height:520px;border:0;border-radius:14px;background:var(--fundo,#F7F8FC)}
 .sep-visao{width:1px;align-self:stretch;background:var(--line);margin:0 4px}
-/* faixa dos 7 dias: rola de lado, uma coluna por dia */
-.sub-sec{margin:14px 0 6px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-.sub-sec small{font-weight:600;text-transform:none;letter-spacing:0;color:var(--faint);margin-left:6px}
-.semana-rol{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
-.semana-rol::-webkit-scrollbar{height:7px}
-.semana-rol::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
-.sem-col{flex:0 0 108px;scroll-snap-align:start;border:1px solid var(--line);border-radius:12px;padding:8px;background:var(--card)}
-.sem-dia{font-size:12px;font-weight:800;color:var(--ink);text-align:center;margin-bottom:6px}
-.sem-dia span{display:block;font-weight:600;color:var(--muted);font-size:11.5px}
-.sem-h{display:block;width:100%;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 4px;margin-bottom:5px;
-  font:inherit;font-size:13px;font-weight:800;color:var(--ink);cursor:pointer;text-align:center}
-.sem-h:hover{border-color:var(--brand);color:var(--brand)}
-.sem-h small{display:block;font-weight:600;font-size:10.5px;color:var(--muted)}
-.sem-vazio{text-align:center;font-size:11.5px;color:var(--faint);padding:8px 0}
 .manual-lin{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .manual-lin input{border:1px solid var(--line);border-radius:9px;padding:7px 9px;font:inherit;font-size:13px;font-weight:600}
 .dica-manual{display:block;color:var(--faint);font-size:11.5px;margin-top:5px}
+.sub-sec{margin:14px 0 6px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -1061,26 +1048,9 @@ function menuReagendar(a){
   const hs = VAGAS3.filter(h => (h.vagas ?? 1) > 0 && h.data > hoje).sort((x,y)=>(x.data+x.hora_inicio).localeCompare(y.data+y.hora_inicio));
   const pick = f => hs.find(h => { const w = new Date(h.data+'T12:00').getDay(), hi = parseInt(h.hora_inicio); return f==='sab'?w===6:f==='manha'?(w!==6&&hi<12):(w!==6&&hi>=12); });
 
-  // Próximos 7 dias, em faixa que rola de lado: mostra todas as vagas reais,
-  // não só as três primeiras. Quem fala com a família precisa da semana toda
-  // na frente para oferecer opção enquanto ainda está no telefone.
-  const dias = [];
-  for (let i = 1; i <= 7; i++) { const d = new Date(hoje + 'T12:00'); d.setDate(d.getDate() + i); dias.push(iso(d)); }
-  const semana = dias.map(dia => {
-    const doDia = hs.filter(h => h.data === dia);
-    const d = new Date(dia + 'T12:00');
-    return `<div class="sem-col">
-      <div class="sem-dia">${DIAS[d.getDay()].slice(0,3)}<span>${d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span></div>
-      ${doDia.length ? doDia.map(h => `<button class="sem-h" onclick="reagendar('${a.id}','${h.turma_id}','${h.data}','${h.hora_inicio}')" title="${h.vagas} kits livres">
-          ${hh(h.hora_inicio)}<small>${h.vagas} livre${h.vagas>1?'s':''}</small></button>`).join('')
-        : '<div class="sem-vazio">sem vaga</div>'}
-    </div>`;
-  }).join('');
   const vg = (rot, v) => `<div class="vg"><small>${rot}</small>${v?`<b>${DIAS[new Date(v.data+'T12:00').getDay()].slice(0,3)} ${new Date(v.data+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} · ${hh(v.hora_inicio)}</b><small>${v.vagas} First livres</small><button class="btn" onclick="reagendar('${a.id}','${v.turma_id}','${v.data}')">Reagendar</button>`:'<b>—</b><small>sem vaga em 30 dias</small>'}</div>`;
   return `<div class="menu"><p>Reagendar ${esc(a.crianca_nome||'')} — ofereça duas opções</p>
     <div class="vagas3">${vg('Manhã',pick('manha'))}${vg('Tarde',pick('tarde'))}${vg('Sábado',pick('sab'))}</div>
-    <p class="sub-sec">Próximos 7 dias <small>arraste para o lado</small></p>
-    <div class="semana-rol">${semana}</div>
     <p class="sub-sec">Outro dia e horário</p>
     <div class="manual-lin">
       <input type="date" id="rg-data" min="${hoje}" value="${ESC.rgData || ''}" onchange="ESC.rgData=this.value;pintarManual()">
