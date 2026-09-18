@@ -27,6 +27,16 @@
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://oaezsozoriqnkurxncjs.supabase.co';
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Telefone sempre com o 55 na frente. O formulário manda ora com, ora sem,
+// e telefone gravado de jeitos diferentes foi o que gerou 138 duplicatas.
+function comDDI(v) {
+  const d = String(v || '').replace(/\D/g, '');
+  if (!d) return null;
+  if (d.startsWith('55') && d.length >= 12) return d.slice(0, 20);
+  if (d.length === 10 || d.length === 11) return ('55' + d).slice(0, 20);
+  return d.slice(0, 20);
+}
+
 // chama função do banco (usada para achar lead pelo telefone, com e sem o 9)
 async function rpc(nome, args) {
   return sb(`rpc/${nome}`, { method: 'POST', body: JSON.stringify(args) });
@@ -160,7 +170,7 @@ module.exports = async function handler(req, res) {
     const lead = {
       tenant_id: t.id,
       nome: String(nome).trim().slice(0, 120),
-      contato: String(contato || '').replace(/\D/g, '').slice(0, 20) || null,
+      contato: comDDI(contato),
       respostas: ans,
       origem: String(origem || 'site').slice(0, 60),
     };
