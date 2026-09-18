@@ -56,7 +56,8 @@ module.exports = async function handler(req, res) {
     const autorizado = req.headers['x-vercel-cron']
       || (CRON_SECRET && req.query.cron === CRON_SECRET);
     if (!autorizado) return res.status(405).json({ erro: 'use POST' });
-    return await rodarCron(res);
+    // turno=tarde: a passada das 15h, que avisa quem tem aula amanhã de manhã
+    return await rodarCron(res, (req.query.turno || 'manha'));
   }
 
   if (req.method !== 'POST') return res.status(405).json({ erro: 'use POST' });
@@ -98,7 +99,7 @@ module.exports = async function handler(req, res) {
     // sem e-mail no corpo (painel antigo) vale o padrão mais permissivo do dono
     if (!body._papel && token === tenant.dashboard_token) body._papel = 'gestor';
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'acesso', 'lgpd', 'lgpd_config', 'expurgar', 'pedido_titular', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'acesso', 'lgpd', 'lgpd_config', 'expurgar', 'pedido_titular', 'lembretes_agora', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -116,6 +117,7 @@ module.exports = async function handler(req, res) {
         case 'lead_novo':       return await acaoLeadNovo(tenant, body, res);
         case 'acesso':          return await acaoAcesso(tenant, body, res);
         case 'lgpd':            return await acaoLgpd(tenant, body, res);
+        case 'lembretes_agora': return await acaoLembretesAgora(tenant, body, res);
         case 'lgpd_config':     return await acaoLgpdConfig(tenant, body, res);
         case 'expurgar':        return await acaoExpurgar(tenant, body, res);
         case 'pedido_titular':  return await acaoPedidoTitular(tenant, body, res);
@@ -507,7 +509,7 @@ async function acaoMidia(tenant, body, res) {
 // véspera e do dia. Sem isso o sistema só responde e nunca persegue — e é
 // a perseguição que segura o comparecimento.
 // ---------------------------------------------------------------------
-async function rodarCron(res) {
+async function rodarCron(res, turno) {
   // resumo da manhã para quem ativou
   try {
     const donos = await sb(`capta_tenants?resumo_para=not.is.null&resumo_ativo=is.true&select=id`).catch(() => []);
@@ -521,13 +523,24 @@ async function rodarCron(res) {
 
     for (const canal of canais || []) {
       resumo.negocios++;
-      try { await lembretes(canal, resumo); }
+      try { await lembretes(canal, resumo, turno || 'manha'); }
       catch (e) { console.error('[cron lembretes]', canal.tenant_id, e.message); }
     }
 
     for (const canal of canais || []) {
+      if (turno === 'tarde') break;   // avisos internos só na passada da manhã
       try { await avisosInternos(canal, resumo); }
       catch (e) { console.error('[cron avisos]', canal.tenant_id, e.message); }
+    }
+
+    // O plano Hobby só deixa dois crons por dia, e os dois agora são desta
+    // função (manhã e tarde). A sincronização do gasto do Meta Ads, que antes
+    // tinha cron próprio, passou a ser chamada aqui na passada da manhã.
+    if (turno !== 'tarde' && process.env.CRON_SECRET) {
+      try {
+        const base = process.env.CAPTA_URL || 'https://capta.riseagencia.com';
+        await fetch(`${base}/api/capta-config?sync=${encodeURIComponent(process.env.CRON_SECRET)}`);
+      } catch (e) { console.error('[cron meta]', e.message); }
     }
 
     try { resumo.sessoes = await rpc('capta_bot_abandonar_paradas', { p_horas: 48 }); }
@@ -548,111 +561,60 @@ async function rodarCron(res) {
 // e já exclui quem recebeu. As datas são calculadas no fuso de Manaus:
 // current_date em UTC vira o dia seguinte a partir das 20h locais.
 // ---------------------------------------------------------------------
-async function lembretes(canal, resumo) {
-  const fila = await rpc('capta_lembretes_pendentes', { p_tenant: canal.tenant_id });
-  if (!fila || !fila.length) return;
+// ---------------------------------------------------------------------
+// LEMBRETE DA AULA EXPERIMENTAL — uma mensagem por aula, no turno anterior
+//
+//   aula de MANHÃ   → avisada na VÉSPERA, às 15h ("amanhã, pela manhã")
+//   aula de TARDE   → avisada no MESMO DIA, às 8h ("hoje, pela tarde")
+//
+// O texto afirma que está tudo pronto em vez de perguntar se vem. Perguntar
+// "qualquer imprevisto avise" convida ao cancelamento — foi o padrão que a
+// operação percebeu e pediu para mudar.
+// ---------------------------------------------------------------------
+async function lembretes(canal, resumo, turno) {
+  const hoje = hojeManaus();
+  const amanha = new Date(new Date(hoje + 'T12:00:00Z').getTime() + 864e5).toISOString().slice(0, 10);
 
-  for (const item of fila) {
-    const primeiro = (item.crianca_nome || '').trim().split(' ')[0];
-    const hora = String(item.hora_inicio || '').slice(0, 5);
+  // manhã (8h): aulas de hoje à tarde · tarde (15h): aulas de amanhã de manhã
+  const alvoData = turno === 'tarde' ? amanha : hoje;
+  const campo    = turno === 'tarde' ? 'lembrete_d1_em' : 'lembrete_d0_em';
 
-    const texto = item.tipo === 'd1'
-      ? `Oi! Tudo certo pra amanhã às ${hora}? A aula experimental ${primeiro ? 'do ' + primeiro + ' ' : ''}já está reservada 😊\n\nResponda *1* para confirmar ou *2* se precisar remarcar.`
-      : `Bom dia! Lembrete da aula ${primeiro ? 'do ' + primeiro + ' ' : ''}hoje às ${hora}. Estamos te esperando!\n\nSe precisar remarcar, é só responder *2*.`;
+  const ags = await sb(`capta_agendamentos?tenant_id=eq.${canal.tenant_id}&data=eq.${alvoData}` +
+    `&status=in.(agendado,confirmado)&${campo}=is.null` +
+    `&select=id,data,hora_inicio,crianca_nome,lead:lead_id(id,nome,contato)&order=hora_inicio`).catch(() => []);
+
+  for (const a of ags || []) {
+    const h = String(a.hora_inicio || '').slice(0, 5);
+    const deManha = Number(h.slice(0, 2)) < 12;
+    // cada turno cuida do seu: de manhã só as aulas da tarde, de tarde só as da manhã
+    if (turno === 'tarde' ? !deManha : deManha) continue;
+    const fone = a.lead?.contato;
+    if (!fone) continue;
+
+    const resp = String(a.lead?.nome || '').trim().split(' ')[0];
+    const cri  = String(a.crianca_nome || '').trim().split(' ')[0];
+    const saud = turno === 'tarde' ? 'Boa tarde' : 'Bom dia';
+    const quando = turno === 'tarde' ? 'amanhã, pela parte da manhã' : 'hoje, pela parte da tarde';
+
+    const texto = `${saud}${resp ? ' ' + resp : ''}, passando aqui para reforçar a aula experimental ` +
+      `${cri ? 'do ' + cri + ' ' : ''}que acontecerá ${quando}, às ${h}.\n\n` +
+      `Já estamos deixando tudo organizado e ficamos desde já ansiosos e felizes em recebê-los. 😊`;
 
     try {
-      const envio = await prov.enviarTexto(canal, item.contato, texto);
-
-      // Marca ANTES de qualquer outra coisa: se falhar depois, o pior
-      // caso é a família não receber — melhor que receber duas vezes.
-      await sb(`capta_agendamentos?id=eq.${item.agendamento_id}`, {
+      const envio = await prov.enviarTexto(canal, fone, texto);
+      // marca antes do resto: no pior caso a família não recebe, o que é
+      // melhor do que receber duas vezes
+      await sb(`capta_agendamentos?id=eq.${a.id}`, {
         method: 'PATCH', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify(
-          item.tipo === 'd1'
-            ? { lembrete_d1_em: new Date().toISOString() }
-            : { lembrete_d0_em: new Date().toISOString() }
-        )
+        body: JSON.stringify({ [campo]: new Date().toISOString() })
       });
-
-      // Registra na conversa, para o histórico do inbox não ter buracos.
-      await registrar(canal, item, texto, envio.provedor_msg_id);
+      await registrar(canal, { contato: String(fone).replace(/\D/g, ''), lead_id: a.lead?.id }, texto, envio.provedor_msg_id).catch(() => null);
       resumo.enviados++;
-
-      // Ritmo humano: conexão não oficial banisce número que dispara rápido.
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 1500));   // ritmo humano
     } catch (e) {
       resumo.falhas++;
-      console.error('[lembrete]', item.agendamento_id, e.message);
+      console.error('[lembrete]', a.id, e.message);
     }
-  }
-}
-
-// ---------------------------------------------------------------------
-// AVISOS INTERNOS — cada pessoa da operação recebe só o que é dela.
-// 'aulas_dia'  → as experimentais de hoje (quem vai chegar e a que hora)
-// 'fechamento' → aulas de ontem sem baixa, que é onde o funil trava:
-//                sem desfecho ninguém sabe se matriculou, faltou ou vai pensar.
-// ---------------------------------------------------------------------
-async function avisosInternos(canal, resumo) {
-  const pessoas = await sb(`capta_avisos?tenant_id=eq.${canal.tenant_id}&ativo=is.true&select=nome,telefone,tipos`).catch(() => []);
-  if (!pessoas?.length) return;
-
-  const hoje = hojeManaus();
-  const base = new Date(hoje + 'T12:00:00Z').getTime();
-  const ontem = new Date(base - 864e5).toISOString().slice(0, 10);
-  const seteDias = new Date(base - 7 * 864e5).toISOString().slice(0, 10);
-  const precisa = t => pessoas.some(p => (p.tipos || []).includes(t));
-
-  let textoAulas = null, textoFechamento = null;
-
-  if (precisa('aulas_dia')) {
-    const ags = await sb(`capta_agendamentos?tenant_id=eq.${canal.tenant_id}&data=eq.${hoje}&status=in.(agendado,confirmado)&select=hora_inicio,crianca_nome,crianca_idade,extra,lead:lead_id(nome,contato)&order=hora_inicio`).catch(() => []);
-    textoAulas = (ags || []).length
-      ? `*Experimentais de hoje* (${ags.length})\n\n` + ags.map(a => {
-          const h = String(a.hora_inicio || '').slice(0, 5);
-          const cri = a.crianca_nome || 'sem nome';
-          return `${h} · ${cri}${a.crianca_idade ? `, ${a.crianca_idade} anos` : ''}${a.extra ? ' (extra)' : ''}\n     responsável: ${a.lead?.nome || '—'}${a.lead?.contato ? ' · ' + a.lead.contato : ''}`;
-        }).join('\n') + `\n\nDepois da aula, marque o resultado no Capta: matriculou, em andamento, não matriculou ou faltou.`
-      : `*Experimentais de hoje*\n\nNenhuma aula marcada para hoje.`;
-  }
-
-  if (precisa('fechamento')) {
-    try {
-      const pres = await sb(`capta_presencas?tenant_id=eq.${canal.tenant_id}&data=gte.${ontem}&feedback=lte.3&select=feedback,comentario,agendamento_id`).catch(() => []);
-      if ((pres || []).length) {
-        const ids = pres.map(x => x.agendamento_id).filter(Boolean);
-        const ags = ids.length ? await sb(`capta_agendamentos?tenant_id=eq.${canal.tenant_id}&id=in.(${ids.join(',')})&select=id,crianca_nome,lead:lead_id(nome,contato)`).catch(() => []) : [];
-        const linhas = pres.map(x => {
-          const a = (ags || []).find(y => y.id === x.agendamento_id);
-          return `${'⭐'.repeat(x.feedback || 1)} ${a?.crianca_nome || a?.lead?.nome || 'sem nome'}${a?.lead?.contato ? ` · ${a.lead.contato}` : ''}${x.comentario ? `\n     "${x.comentario}"` : ''}`;
-        }).join('\n');
-        textoFechamento = `*Avaliação baixa na aula* (${pres.length})\n\n${linhas}\n\nLigue antes de convidar para uma nova visita.` + (textoFechamento ? '' : '');
-      }
-    } catch (e) {}
-
-    const ags = await sb(`capta_agendamentos?tenant_id=eq.${canal.tenant_id}&data=lte.${ontem}&data=gte.${seteDias}&status=in.(agendado,confirmado,compareceu)&select=data,hora_inicio,crianca_nome,observacao,lead:lead_id(nome)&order=data`).catch(() => []);
-    const semBaixa = (ags || []).filter(a => !/desfecho:/i.test(a.observacao || ''));
-    if (semBaixa.length) {
-      const semResultado = `*Aulas sem resultado* (${semBaixa.length})\n\n` + semBaixa.slice(0, 15).map(a =>
-        `${a.data.slice(8, 10)}/${a.data.slice(5, 7)} ${String(a.hora_inicio || '').slice(0, 5)} · ${a.crianca_nome || a.lead?.nome || 'sem nome'}`
-      ).join('\n') + (semBaixa.length > 15 ? `\n… e mais ${semBaixa.length - 15}` : '')
-        + `\n\nSem a baixa o lead fica parado em Aula agendada e ninguém retoma. Abra Aula experimental no Capta e marque o resultado.`;
-      textoFechamento = textoFechamento ? `${textoFechamento}\n\n———\n\n${semResultado}` : semResultado;
-    }
-  }
-
-  for (const p of pessoas) {
-    const partes = [];
-    if ((p.tipos || []).includes('aulas_dia') && textoAulas) partes.push(textoAulas);
-    if ((p.tipos || []).includes('fechamento') && textoFechamento) partes.push(textoFechamento);
-    if ((p.tipos || []).includes('resumo')) { try { partes.push(await montarResumo(canal.tenant_id)); } catch (e) {} }
-    if (!partes.length) continue;
-    const cab = p.nome ? `Oi, ${String(p.nome).split(' ')[0]}!\n\n` : '';
-    try {
-      await prov.enviarTexto(canal, p.telefone, cab + partes.join('\n\n———\n\n'));
-      resumo.enviados++;
-      await new Promise(r => setTimeout(r, 1500));   // ritmo humano: conexão não oficial pune disparo rápido
-    } catch (e) { resumo.falhas++; console.error('[aviso]', p.telefone, e.message); }
   }
 }
 
@@ -2202,6 +2164,16 @@ async function acaoFaltasAluno(tenant, body, res) {
 // acessou os dados (art. 37), pedidos do titular com prazo de 15 dias
 // (art. 18) e expurgo do que não precisa mais ser guardado (art. 15/16).
 // =====================================================================
+
+// Dispara a rodada de lembretes na hora, sem esperar o cron. Serve para
+// testar o texto e para o dia em que o cron falhar.
+async function acaoLembretesAgora(tenant, body, res) {
+  const [canal] = await sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&status=eq.conectado&select=*&limit=1`).catch(() => []);
+  if (!canal) return res.status(400).json({ erro: 'WhatsApp não está conectado.' });
+  const r = { enviados: 0, falhas: 0 };
+  await lembretes(canal, r, body.turno === 'tarde' ? 'tarde' : 'manha');
+  return res.status(200).json({ ok: true, ...r });
+}
 
 // Registro de acesso. Chamado pelas telas ao abrir e nas ações sensíveis.
 // Não bloqueia nada: se falhar, a pessoa continua trabalhando.
