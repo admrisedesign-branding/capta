@@ -338,28 +338,31 @@ async function marcarDuplicados(req, res) {
   const fonesVivos = new Set((leads || []).map(l => fim8(l.contato)).filter(x => x.length === 8));
 
   const achados = [];
+  const diag = { paginas: 0, leadsVistos: 0, semContato: 0, jaNoCapta: 0, jaEtiquetado: 0, foneNaoBate: 0,
+                 leadsCapta: (leads || []).length, fonesVivos: fonesVivos.size };
   for (let pagina = 1; pagina <= 30; pagina++) {
     const lote = await kget(`/api/v4/leads?with=contacts&page=${pagina}&limit=250`).catch(() => null);
     const linhas = lote?._embedded?.leads || [];
     if (!linhas.length) break;
+    diag.paginas++; diag.leadsVistos += linhas.length;
 
     for (const lead of linhas) {
-      if (idsVivos.has(Number(lead.id))) continue;                       // ainda existe no Capta
-      if ((lead._embedded?.tags || []).some(t => /^duplicad/i.test(t.name || ''))) continue;  // já etiquetado
+      if (idsVivos.has(Number(lead.id))) { diag.jaNoCapta++; continue; }
+      if ((lead._embedded?.tags || []).some(t => /^duplicad/i.test(t.name || ''))) { diag.jaEtiquetado++; continue; }
       const cId = lead._embedded?.contacts?.[0]?.id;
-      if (!cId) continue;
+      if (!cId) { diag.semContato++; continue; }
       const contato = await kget(`/api/v4/contacts/${cId}`).catch(() => null);
       const fones = (contato?.custom_fields_values || [])
         .filter(f => f.field_code === 'PHONE' || /phone/i.test(f.field_name || ''))
         .flatMap(f => (f.values || []).map(v => fim8(v.value)));
-      if (!fones.some(f => f.length === 8 && fonesVivos.has(f))) continue;
+      if (!fones.some(f => f.length === 8 && fonesVivos.has(f))) { diag.foneNaoBate++; continue; }
       achados.push({ id: lead.id, nome: lead.name });
       await new Promise(r2 => setTimeout(r2, 160));                       // 7 req/s é o teto do Kommo
     }
     if (linhas.length < 250) break;
   }
 
-  if (soTeste) return res.status(200).json({ teste: true, total: achados.length, cards: achados.slice(0, 200) });
+  if (soTeste) return res.status(200).json({ teste: true, total: achados.length, diag, cards: achados.slice(0, 200) });
 
   let ok = 0, falhas = 0;
   for (const c of achados) {
