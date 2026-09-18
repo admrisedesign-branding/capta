@@ -164,6 +164,14 @@ async function espelhar(leadId) {
   const lead = await kget(`/api/v4/leads/${leadId}?with=contacts,loss_reason`);
   if (!lead) return { lead_id: leadId, skip: 'não encontrado' };
 
+  // Card marcado como duplicado: a API do Kommo não tem mesclagem, então a
+  // limpeza de set/2026 funde no Capta e etiqueta o card perdido lá como
+  // "duplicado". Sem isto o espelho recriaria o lead aqui na sincronização
+  // seguinte, e a duplicata voltaria do zero.
+  if ((lead._embedded?.tags || []).some(t => /^duplicad/i.test(t.name || ''))) {
+    return { lead_id: leadId, skip: 'marcado como duplicado no Kommo' };
+  }
+
   const contatoId = lead._embedded?.contacts?.find(c => c.is_main)?.id || lead._embedded?.contacts?.[0]?.id;
   const contato = contatoId ? await kget(`/api/v4/contacts/${contatoId}`) : null;
   let st = cache.statuses[lead.status_id] || {};
