@@ -172,6 +172,16 @@ async function espelhar(leadId) {
     return { lead_id: leadId, skip: 'marcado como duplicado no Kommo' };
   }
 
+  // Card absorvido na limpeza: a API do Kommo recusa a listagem de leads
+  // para este token, então a lista dos fundidos vive aqui. Sem isto o
+  // espelho recriaria a duplicata na próxima sincronização.
+  {
+    const t = await tenantId();
+    const ig = await fetch(`${SB_URL}/rest/v1/capta_kommo_ignorados?tenant_id=eq.${t}&kommo_lead_id=eq.${leadId}&select=kommo_lead_id&limit=1`, { headers: H_SB })
+      .then(x => x.json()).catch(() => []);
+    if ((ig || []).length) return { lead_id: leadId, skip: 'duplicado já fundido no Capta' };
+  }
+
   const contatoId = lead._embedded?.contacts?.find(c => c.is_main)?.id || lead._embedded?.contacts?.[0]?.id;
   const contato = contatoId ? await kget(`/api/v4/contacts/${contatoId}`) : null;
   let st = cache.statuses[lead.status_id] || {};
