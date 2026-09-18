@@ -384,6 +384,9 @@ button .mini-pt{border-color:rgba(0,0,0,.15);border-top-color:currentColor}
 .manual-lin input{border:1px solid var(--line);border-radius:9px;padding:7px 9px;font:inherit;font-size:13px;font-weight:600}
 .dica-manual{display:block;color:var(--faint);font-size:11.5px;margin-top:5px}
 .sub-sec{margin:14px 0 6px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.hcol-t.passou{opacity:.5}
+.hcol-t.passou .cap{background:transparent;border:1px solid var(--line);color:var(--faint);font-weight:700}
+.hcol-mais.vazia{color:var(--faint);font-size:12px;text-align:center;padding:10px 0;border:1px dashed var(--line);border-radius:10px;background:transparent;cursor:default}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>
@@ -569,12 +572,27 @@ function vDia(d){
     const colunas = horas.map(h => {
       const doHorario = expDoBloco.filter(a => hN(a.hora_inicio) === h && ehExp(a));
       const v = (VAGAS||[]).find(x => x.data === d && hN(x.hora_inicio) === h);
-      const total = v ? (v.capacidade ?? 8) : 8, livres = v ? v.vagas : 0;
+      // Sem linha de vagas para esta hora não significa lotado — significa que
+      // o cálculo não cobriu esse horário. Dizer "8/8 ocupados" aí é mentira e
+      // impede de marcar aula em horário que tem vaga.
+      const total = v ? (v.capacidade ?? 8) : 8;
+      const livres = v ? v.vagas : null;
+      // O cálculo de vagas só cobre o futuro. Hora que já passou não tem
+      // linha — e isso não é "lotado", é "acabou". Era o que a tela dizia
+      // errado: "sem kit livre 8/8" em horário que já tinha terminado.
+      const agoraMin = new Date().getHours() * 60 + new Date().getMinutes();
+      const passou = d < hoje || (d === hoje && (h + 1) * 60 <= agoraMin);
+      const semInfo = livres === null && !passou;
       return `<div class="hcol" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${h})">
-        <div class="hcol-t"><b>${String(h).padStart(2,'0')}:00</b><span>–${String(h+1).padStart(2,'0')}:00</span>
-          <span class="cap ${livres<=0?'cheio':livres<=2?'alerta':''}">${livres}/${total}</span></div>
+        <div class="hcol-t ${passou?'passou':''}"><b>${String(h).padStart(2,'0')}:00</b><span>–${String(h+1).padStart(2,'0')}:00</span>
+          <span class="cap ${passou||semInfo?'':livres<=0?'cheio':livres<=2?'alerta':''}">${passou?'encerrado':semInfo?'—':`${livres}/${total}`}</span></div>
         ${doHorario.map(mini).join('')}
-        ${livres > 0
+        ${passou
+          ? (doHorario.length ? '' : `<div class="hcol-mais vazia"><span>sem aula neste horário</span></div>`)
+          : semInfo
+          ? `<div class="hcol-mais" onclick="novoAgendamento('${d}','${t.id}',${h})">
+               <b>+ Marcar aula experimental</b><span>vaga não calculada para esta hora</span></div>`
+          : livres > 0
           ? `<div class="hcol-mais" onclick="novoAgendamento('${d}','${t.id}',${h})">
                <b>+ Marcar aula experimental</b><span>vagas restantes: ${livres}/${total}</span></div>`
           : `<div class="hcol-mais cheia"><b>Sem kit livre</b><span>${total}/${total} ocupados</span></div>`}
