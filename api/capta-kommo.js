@@ -341,9 +341,13 @@ async function marcarDuplicados(req, res) {
   const diag = { paginas: 0, leadsVistos: 0, semContato: 0, jaNoCapta: 0, jaEtiquetado: 0, foneNaoBate: 0,
                  leadsCapta: (leads || []).length, fonesVivos: fonesVivos.size };
   for (let pagina = 1; pagina <= 30; pagina++) {
-    const lote = await kget(`/api/v4/leads?with=contacts&page=${pagina}&limit=250`).catch(() => null);
+    // limit 250 é recusado por algumas contas; 50 é o valor seguro
+    const url = `${KOMMO}/api/v4/leads?with=contacts&page=${pagina}&limit=50`;
+    const resp = await fetch(url, { headers: H_KOMMO }).catch(e => ({ ok: false, status: 0, erro: e.message }));
+    if (!resp.ok) { diag.erroKommo = { status: resp.status, corpo: (await resp.text?.().catch(() => '') || '').slice(0, 200) }; break; }
+    const lote = await resp.json().catch(() => null);
     const linhas = lote?._embedded?.leads || [];
-    if (!linhas.length) break;
+    if (!linhas.length) { diag.fim = `página ${pagina} sem leads`; break; }
     diag.paginas++; diag.leadsVistos += linhas.length;
 
     for (const lead of linhas) {
@@ -359,7 +363,7 @@ async function marcarDuplicados(req, res) {
       achados.push({ id: lead.id, nome: lead.name });
       await new Promise(r2 => setTimeout(r2, 160));                       // 7 req/s é o teto do Kommo
     }
-    if (linhas.length < 250) break;
+    if (linhas.length < 50) break;
   }
 
   if (soTeste) return res.status(200).json({ teste: true, total: achados.length, diag, cards: achados.slice(0, 200) });
