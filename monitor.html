@@ -6,54 +6,173 @@
 <title>Aulas de hoje — My Robot</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-/* Identidade da escola: as cores vêm do site da My Robot (laranja #FF4D00,
-   roxo #6C3FFF, verde #00C566, amarelo #FFD233), num fundo escuro arroxeado
-   para a TV. O azul do Capta não aparece aqui: quem olha essa tela é a
-   família na entrada, não quem opera o painel. */
+/* Identidade da escola, versão escura: fundo quase preto arroxeado com o
+   laranja da marca (#FF4D00). Mesmas cores do site da My Robot. */
 :root{--brand:#FF4D00;--brand-2:#6C3FFF;--bg:#0A0614;--card:#16102A;--line:#2A1F4D;
 --ink:#FFFFFF;--muted:#B4A9D6;--faint:#7E74A3;
 --verde:#00C566;--exp:#FF7A3D;--morno:#FFD233}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;overflow:hidden}
-.topo{display:flex;align-items:center;gap:20px;padding:26px 40px 14px}
-.topo .marca{height:46px;width:auto;object-fit:contain}
-.topo h1{background:linear-gradient(92deg,var(--brand),var(--brand-2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.topo h1{font-size:34px;font-weight:900;letter-spacing:-.02em}
-.topo .dia{color:var(--muted);font-size:20px;text-transform:capitalize}
-.topo .rel{margin-left:auto;font-size:52px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-.wrap{padding:0 40px 40px;height:calc(100vh - 108px);overflow:hidden}
-.faixa{display:flex;gap:14px;align-items:stretch;margin-bottom:16px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px 26px;flex:1;min-width:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+  overflow:hidden;height:100vh;display:flex;flex-direction:column}
+/* O logo fica na mesma linha do título e do relógio: uma linha de cabeçalho
+   só, com tudo alinhado pela base. */
+.topo .marca{height:58px;width:auto;object-fit:contain;flex:0 0 auto}
+/* Linha do tempo do dia: mostra o caminho das aulas e onde estamos agora.
+   Fica entre o cabeçalho e os cartões, discreta — quem lê de longe olha os
+   nomes; ela serve para a família saber "falta pouco" num relance. */
+.pe{flex:0 0 auto;display:flex;align-items:center;gap:20px;margin:0;padding:10px 40px 16px;
+  background:rgba(255,255,255,.02)}
+.pe .site{margin-left:auto;font-size:15px;font-weight:700;color:var(--faint);text-decoration:none;letter-spacing:.01em}
+.linha-horas{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.linha-horas span{font-size:16px;font-weight:800;color:var(--muted);padding:7px 15px;border-radius:99px;
+  background:rgba(255,255,255,.06);border:1px solid var(--line);white-space:nowrap}
+.linha-horas span.passou{opacity:.4}
+.linha-horas span.agora{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 6px 22px rgba(255,77,0,.4)}
+.linha-horas .rot{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+  background:none;border:0;padding:0 6px 0 0}
+.topo{display:flex;align-items:center;gap:24px;padding:20px 40px 10px;flex:0 0 auto}
+.topo .titulo{display:flex;flex-direction:column;gap:2px;padding-left:24px;border-left:1px solid var(--line)}
+.topo h1{color:var(--ink);display:flex;align-items:center;gap:14px}
+.topo .turno{font-size:22px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#FFFFFF;
+  background:var(--brand);border-radius:99px;padding:6px 15px}
+.topo h1{font-size:46px;font-weight:900;letter-spacing:-.02em}
+.topo .dia{color:var(--muted);font-size:25px;text-transform:capitalize;font-weight:600}
+.topo .rel{margin-left:auto;font-size:68px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.wrap{padding:4px 40px 10px;flex:1;min-height:0;overflow:hidden}
+.faixa{display:flex;gap:14px;align-items:stretch;margin-bottom:calc(16px * var(--esc,1))}
+/* A coluna das experimentais acompanha a altura do bloco da turma: se a aula
+   dura duas horas, os dois cartões de uma hora dividem a mesma altura. */
+.faixa-unica{height:100%}
+.col-exp{display:flex;flex-direction:column;gap:14px;flex:0 0 38%;min-width:0}
+.col-exp .card{flex:1;display:flex;flex-direction:column}
+.col-exp .card .nomes{flex:1;align-content:flex-start}
+/* Sem turma no horário: as experimentais ocupam a tela, lado a lado. */
+.col-exp.sozinha{flex:1 1 100%;flex-direction:row}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;display:flex;flex-direction:column;
+  padding:calc(22px * var(--esc,1)) calc(26px * var(--esc,1));flex:1;min-width:0}
 .card{box-shadow:0 1px 0 rgba(255,255,255,.03) inset}
 .card.exp{border-color:rgba(255,77,0,.5);background:linear-gradient(180deg,rgba(255,77,0,.12),rgba(22,16,42,1))}
 .card:not(.exp){border-color:rgba(108,63,255,.32)}
-.card h2{font-size:15px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
-.card .hora{font-size:30px;font-weight:900;letter-spacing:-.02em}
-.card .hora small{font-size:16px;font-weight:700;color:var(--muted);margin-left:10px}
-.nomes{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
-.n{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:10px 16px;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px}
+.card h2{font-size:19px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.card .hora{font-size:calc(40px * var(--esc,1));font-weight:900;letter-spacing:-.02em}
+.card .hora small{font-size:calc(21px * var(--esc,1));font-weight:700;color:var(--muted);margin-left:10px}
+.nomes{flex:1;align-content:flex-start;display:flex;flex-wrap:wrap;gap:calc(10px * var(--esc,1));margin-top:calc(16px * var(--esc,1))}
+.n{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;
+  padding:calc(10px * var(--esc,1)) calc(16px * var(--esc,1));
+  font-size:calc(30px * var(--esc,1));font-weight:700;display:flex;align-items:center;gap:calc(10px * var(--esc,1))}
 .n.dentro{background:rgba(0,197,102,.16);border-color:rgba(0,197,102,.45);color:var(--verde)}
-.n.saiu{opacity:.4}
-.n small{font-size:13px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+.n.saiu{opacity:.45;text-decoration:line-through;text-decoration-color:var(--faint)}
+.n small{font-size:calc(17px * var(--esc,1));font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
 .n.dentro small{color:var(--verde)}
 .exp .n{background:rgba(255,77,0,.16);border-color:rgba(255,122,61,.4);color:var(--exp)}
 .exp .n.dentro{background:rgba(0,197,102,.18);border-color:rgba(0,197,102,.5);color:var(--verde)}
-.rodape{position:fixed;left:40px;right:40px;bottom:22px;display:flex;gap:26px;align-items:center;color:var(--faint);font-size:16px;font-weight:600}
-.rodape b{color:var(--ink);font-size:20px;margin-right:6px}
-.vazio{display:grid;place-items:center;height:60vh;color:var(--faint);font-size:26px;text-align:center;line-height:1.5}
-.leg{margin-left:auto;display:flex;gap:18px}.leg span{display:flex;align-items:center;gap:8px}.leg i{width:12px;height:12px;border-radius:4px;display:inline-block}
+.rodape{margin:0;padding:14px 40px 10px;border-top:1px solid var(--line);background:rgba(255,255,255,.02);
+  display:flex;gap:26px;align-items:center;color:var(--faint);font-size:20px;font-weight:600;flex:0 0 auto}
+.rodape b{color:var(--ink);font-size:26px;margin-right:6px}
+
+.vazio{display:grid;place-items:center;height:60vh;color:var(--faint);font-size:34px;text-align:center;line-height:1.5}
+.leg{margin-left:auto;display:flex;gap:18px}.leg span{display:flex;align-items:center;gap:8px}.leg i{width:16px;height:16px;border-radius:5px;display:inline-block}
+
+/* Espera animada: círculos que respiram nas cores da marca, robô flutuando e
+   três pontinhos de "já já começa". Só CSS — a TV fica horas nessa tela e não
+   pode esquentar processador nem depender de biblioteca. */
+body.esperando .topo .rel{opacity:.9}
+.splash{position:relative;height:100%;display:grid;place-items:center;overflow:hidden}
+.splash .orbe{position:absolute;border-radius:50%;filter:blur(60px);opacity:.5;animation:respira 9s ease-in-out infinite}
+.splash .o1{width:46vh;height:46vh;background:var(--brand);left:8%;top:6%}
+.splash .o2{width:38vh;height:38vh;background:var(--brand-2);right:10%;bottom:4%;animation-delay:-3s}
+.splash .o3{width:28vh;height:28vh;background:#FFD233;right:32%;top:12%;opacity:.28;animation-delay:-6s}
+@keyframes respira{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(2vw,-3vh,0) scale(1.18)}}
+.splash .robo{font-size:19vh;line-height:1;animation:flutua 4.5s ease-in-out infinite;filter:drop-shadow(0 18px 40px rgba(255,77,0,.35))}
+@keyframes flutua{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-3.5vh) rotate(3deg)}}
+/* Fim do dia: é o mesmo robô, só que com sono — respira devagar, inclina a
+   cabeça e solta uns "z" subindo. Trocar por outro emoji quebrava o personagem. */
+.splash .robo{position:relative}
+.splash .robo.dorme{animation:cochila 6s ease-in-out infinite;filter:drop-shadow(0 18px 40px rgba(108,63,255,.35))}
+@keyframes cochila{0%,100%{transform:rotate(-7deg) scale(1)}50%{transform:rotate(-4deg) scale(1.04)}}
+.zzz{position:absolute;top:-2vh;right:-4vh;display:flex;align-items:flex-end;gap:.6vh}
+.zzz i{font-style:normal;font-weight:900;color:var(--brand-2);opacity:0;animation:sobeZ 3.6s ease-in-out infinite}
+.zzz i:nth-child(1){font-size:3vh;animation-delay:0s}
+.zzz i:nth-child(2){font-size:4.2vh;animation-delay:.5s}
+.zzz i:nth-child(3){font-size:5.4vh;animation-delay:1s}
+@keyframes sobeZ{0%{opacity:0;transform:translateY(1.5vh) scale(.8)}35%{opacity:.95}70%{opacity:.5;transform:translateY(-3vh) scale(1.05)}100%{opacity:0;transform:translateY(-5vh) scale(1.1)}}
+.splash-txt{position:absolute;bottom:14vh;text-align:center;z-index:2}
+.splash-txt b{display:block;font-size:6vh;font-weight:900;letter-spacing:-.02em;
+  background:linear-gradient(92deg,var(--brand),#FFD233);-webkit-background-clip:text;background-clip:text;color:transparent}
+.splash-txt span{display:block;margin-top:.6vh;font-size:3vh;font-weight:700;color:var(--muted)}
+.splash .pontos{position:absolute;bottom:8vh;display:flex;gap:12px}
+.splash .pontos i{width:12px;height:12px;border-radius:50%;background:var(--brand);opacity:.35;animation:pisca 1.4s ease-in-out infinite}
+.splash .pontos i:nth-child(2){animation-delay:.2s}
+.splash .pontos i:nth-child(3){animation-delay:.4s}
+@keyframes pisca{0%,100%{opacity:.25;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
+/* balão de fala do robô */
+.balao{position:absolute;top:16vh;background:var(--card);border:1px solid var(--line);border-radius:22px;
+  padding:2.2vh 3.2vh;font-size:3.2vh;font-weight:800;color:var(--ink);max-width:70vw;text-align:center;z-index:3;
+  box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.balao::after{content:'';position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);
+  border:14px solid transparent;border-top-color:var(--card);border-bottom:0}
+.balao.entra{animation:balaoEntra .5s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes balaoEntra{0%{opacity:0;transform:translateY(14px) scale(.94)}100%{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.splash *{animation:none!important}}
+
+/* ABERTURA — aparece quando a TV liga (ou quando a página recarrega).
+   Dura poucos segundos e sai sozinha; depois disso a tela é a operação. */
+#abertura{position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;
+  animation:abSai .9s ease 6.4s forwards}
+#abertura.pulado{display:none}
+.ab-fundo{position:absolute;inset:0;overflow:hidden}
+.ab-orbe{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;animation:respira 9s ease-in-out infinite}
+.ab-orbe.a1{width:52vh;height:52vh;background:var(--brand);left:6%;top:4%}
+.ab-orbe.a2{width:42vh;height:42vh;background:var(--brand-2);right:8%;bottom:2%;animation-delay:-3s}
+.ab-orbe.a3{width:30vh;height:30vh;background:#FFD233;right:30%;top:10%;opacity:.3;animation-delay:-6s}
+#ab-logo{position:absolute;top:9vh;height:9vh;width:auto;object-fit:contain;z-index:2;
+  opacity:0;animation:abSobe .9s ease .15s forwards}
+.ab-robo{font-size:26vh;line-height:1;z-index:2;transform-origin:70% 90%;
+  animation:abEntra .8s cubic-bezier(.2,.9,.3,1.3) .3s both, acena 2.2s ease-in-out 1.1s 2;
+  filter:drop-shadow(0 22px 50px rgba(255,77,0,.4))}
+.ab-ola{position:absolute;bottom:19vh;z-index:2;font-size:8.5vh;font-weight:900;letter-spacing:-.02em;
+  background:linear-gradient(92deg,var(--brand),#FFD233);-webkit-background-clip:text;background-clip:text;color:transparent;
+  opacity:0;animation:abSobe .8s ease .9s forwards}
+.ab-frase{position:absolute;bottom:11vh;z-index:2;font-size:3.4vh;font-weight:700;color:var(--muted);
+  max-width:78vw;text-align:center;opacity:0;animation:abSobe .8s ease 1.5s forwards}
+@keyframes abEntra{0%{opacity:0;transform:translateY(8vh) scale(.7)}100%{opacity:1;transform:none}}
+@keyframes abSobe{0%{opacity:0;transform:translateY(3vh)}100%{opacity:1;transform:none}}
+@keyframes acena{0%,100%{transform:rotate(0)}25%{transform:rotate(9deg)}60%{transform:rotate(-7deg)}}
+@keyframes abSai{to{opacity:0;visibility:hidden}}
+@media (prefers-reduced-motion: reduce){#abertura *{animation:none!important;opacity:1!important}}
 </style>
 </head>
 <body>
-<div class="topo"><img src="/logo-monitor.png" alt="" class="marca" onerror="this.remove()"><h1>Aulas de hoje</h1><span class="dia" id="dia"></span><span class="rel" id="rel"></span></div>
-<div class="wrap" id="raiz"><div class="vazio">Carregando…</div></div>
+<div class="topo">
+  <img src="/logo-monitor.png" alt="" class="marca" onerror="this.remove()">
+  <div class="titulo"><h1>Aulas de hoje <span class="turno" id="turno"></span></h1><span class="dia" id="dia"></span></div>
+  <span class="rel" id="rel"></span>
+</div>
+<div id="abertura">
+  <div class="ab-fundo"><i class="ab-orbe a1"></i><i class="ab-orbe a2"></i><i class="ab-orbe a3"></i></div>
+  <img id="ab-logo" alt="">
+  <div class="ab-robo">🤖</div>
+  <div class="ab-ola" id="ab-ola"></div>
+  <div class="ab-frase" id="ab-frase"></div>
+</div>
+<div class="wrap" id="raiz" style="--esc:1"><div class="vazio">Carregando…</div></div>
 <div class="rodape" id="rodape"></div>
+<div class="pe"><div class="linha-horas" id="linha-horas"></div><a class="site" href="#">myrobotmanaus.com</a></div>
 
 <script>
 const p = new URLSearchParams(location.search);
 const SLUG = p.get('t') || '', TOKEN = p.get('k') || '';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hh = t => String(t||'').slice(0,5);
+// Tela pública, na entrada: aparece o primeiro nome e a inicial do sobrenome.
+// Nome completo de criança em tela aberta é exposição desnecessária — quem
+// precisa do nome inteiro (e do responsável) tem o tablet e o painel.
+function nomePublico(n){
+  const p = String(n || '').trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return '';
+  if (p.length === 1) return p[0];
+  return `${p[0]} ${p[p.length - 1][0].toUpperCase()}.`;
+}
 const emMin = t => { const [h,m] = String(t||'0:0').split(':').map(Number); return h*60 + (m||0); };
 const agora = () => { const d = new Date(); return d.getHours()*60 + d.getMinutes(); };
 let D = null;
@@ -66,30 +185,185 @@ function relogio(){ const d = new Date();
   document.getElementById('dia').textContent = d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}); }
 async function carregar(){ try { D = await api('recepcao'); desenhar(); } catch(e){ document.getElementById('raiz').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; } }
 const pres = (alunoId, agId) => (D.presencas||[]).find(x => (alunoId && x.aluno_id === alunoId) || (agId && x.agendamento_id === agId));
+// ---------------------------------------------------------------------
+// O QUE A TELA MOSTRA, E QUANDO TROCA
+//
+// Turno: até as 13h a tela é da manhã; a partir das 13h, da tarde.
+// Turma (alunos ativos): um bloco por vez. Ele sai UMA HORA depois de
+//   começar — às 9h o bloco das 8h–10h dá lugar ao das 10h–12h. Uma hora é
+//   tempo de todo mundo ter dado presença e a recepção ter corrido atrás
+//   de quem faltou.
+// Experimental: dois blocos de uma hora, empilhados. A cada virada de hora
+//   o de cima sai, o de baixo sobe e entra o seguinte.
+// ---------------------------------------------------------------------
+const TURNO_CORTE = 13 * 60;   // 13:00 separa manhã e tarde
+const doTurno = ini => (agora() < TURNO_CORTE) === (emMin(ini) < TURNO_CORTE);
 function desenhar(){
-  const turmas = (D.turmas||[]).filter(t => agora() <= emMin(t.hora_fim) + 20);
-  const exps = (D.agendamentos||[]).filter(a => agora() <= emMin(a.hora_fim) + 20);
+  const ag = agora();
+  const doTurnoA = x => doTurno(x);
+  const dentroDe = (alunoId, agId) => { const pr = pres(alunoId, agId); return pr && !pr.saida_em; };
   const nome = x => `<span class="n ${(() => { const pr = pres(x.aluno_id, x.ag_id); return pr ? (pr.saida_em ? 'saiu' : 'dentro') : ''; })()}">${esc(x.txt)}${x.sub?`<small>${esc(x.sub)}</small>`:''}</span>`;
+  document.getElementById('turno').textContent = ag < TURNO_CORTE ? 'Manhã' : 'Tarde';
+
+  // TURMA: a que está valendo agora. Sai uma hora depois de começar.
+  const turma = (D.turmas||[]).filter(t => doTurnoA(t.hora_inicio) && emMin(t.hora_inicio) + 60 > ag)
+    .sort((a, b) => emMin(a.hora_inicio) - emMin(b.hora_inicio))[0] || null;
+
+  // EXPERIMENTAL: as duas próximas horas que ainda têm visitante no turno.
+  const exps = (D.agendamentos||[]).filter(a => doTurnoA(a.hora_inicio));
+  const porHora = {};
+  for (const a of exps) { const h = Math.floor(emMin(a.hora_inicio) / 60) * 60; (porHora[h] = porHora[h] || []).push(a); }
+  const horas = Object.keys(porHora).map(Number).filter(h => h + 60 > ag).sort((a, b) => a - b).slice(0, 2);
+
   let html = '';
-  for (const t of turmas.slice(0, 3)) {
-    const alunos = (D.alunos||[]).filter(a => a.turma_id === t.id);
-    const expT = exps.filter(a => a.turma_id === t.id);
-    if (!alunos.length && !expT.length) continue;
-    const dentro = alunos.filter(a => { const pr = pres(a.id); return pr && !pr.saida_em; }).length + expT.filter(a => { const pr = pres(null, a.id); return pr && !pr.saida_em; }).length;
-    html += `<div class="faixa">
-      <div class="card"><h2>Turma</h2><div class="hora">${hh(t.hora_inicio)}–${hh(t.hora_fim)}<small>${dentro} em sala · ${alunos.length + expT.length} previstos</small></div>
-        <div class="nomes">${alunos.map(a => nome({ txt: a.nome_curto || a.nome, sub: a.kit, aluno_id: a.id })).join('') || '<span class="n" style="opacity:.4">sem alunos</span>'}</div></div>
-      ${expT.length ? `<div class="card exp" style="max-width:38%"><h2>Aula experimental</h2><div class="hora">${hh(expT[0].hora_inicio)}<small>visitantes</small></div>
-        <div class="nomes">${expT.map(a => nome({ txt: a.crianca_nome || 'Visitante', sub: a.crianca_idade ? a.crianca_idade + ' anos' : '', ag_id: a.id })).join('')}</div></div>` : ''}
-    </div>`;
+  if (turma || horas.length) {
+    const alunos = turma ? (D.alunos||[]).filter(a => a.turma_id === turma.id) : [];
+    // Sem turma no horário, só experimental: o cartão vazio de "sem turma" não
+    // dizia nada a ninguém. A coluna das experimentais toma a tela inteira.
+    const cardTurma = turma ? `<div class="card"><h2>Turma</h2>
+      <div class="hora">${hh(turma.hora_inicio)}–${hh(turma.hora_fim)}<small>${alunos.filter(a => dentroDe(a.id)).length} em sala · ${alunos.length} previstos</small></div>
+      <div class="nomes">${alunos.map(a => nome({ txt: nomePublico(a.nome_curto || a.nome), sub: a.kit, aluno_id: a.id })).join('') || '<span class="n" style="opacity:.4">sem alunos</span>'}</div></div>` : '';
+
+    const coluna = horas.length ? `<div class="col-exp ${turma ? '' : 'sozinha'}">${horas.map(h => {
+      const lista = porHora[h];
+      const hs = `${String(Math.floor(h / 60)).padStart(2, '0')}:00`;
+      return `<div class="card exp"><h2>Aula experimental</h2>
+        <div class="hora">${hs}<small>${lista.filter(a => dentroDe(null, a.id)).length} em sala · ${lista.length} previstos</small></div>
+        <div class="nomes">${lista.map(a => nome({ txt: nomePublico(a.crianca_nome) || 'Visitante', sub: a.crianca_idade ? a.crianca_idade + ' anos' : '', ag_id: a.id })).join('')}</div></div>`;
+    }).join('')}</div>` : '';
+
+    html = `<div class="faixa faixa-unica">${cardTurma}${coluna}</div>`;
   }
-  document.getElementById('raiz').innerHTML = html || `<div class="vazio">Sem aulas agora.<br>🤖</div>`;
+
+  // Sem aula agora (intervalo, fim do turno, manhã vazia): em vez de um aviso
+  // seco, a tela vira uma espera animada com a marca — é o que fica no ar por
+  // mais tempo durante o dia, e quem passa na entrada vai olhar.
+  const proxima = (D.turmas||[]).filter(t => emMin(t.hora_inicio) > ag).sort((a,b) => emMin(a.hora_inicio) - emMin(b.hora_inicio))[0];
+  const expProx = (D.agendamentos||[]).filter(a => emMin(a.hora_inicio) > ag).sort((a,b) => emMin(a.hora_inicio) - emMin(b.hora_inicio))[0];
+  const volta = proxima && expProx ? Math.min(emMin(proxima.hora_inicio), emMin(expProx.hora_inicio))
+    : proxima ? emMin(proxima.hora_inicio) : expProx ? emMin(expProx.hora_inicio) : null;
+  document.body.classList.toggle('esperando', !html);
+  document.getElementById('raiz').innerHTML = html || `
+    <div class="splash">
+      <div class="orbe o1"></div><div class="orbe o2"></div><div class="orbe o3"></div>
+      <div class="balao" id="balao"></div>
+      <div class="robo ${volta == null ? 'dorme' : ''}">🤖${volta == null ? '<span class="zzz"><i>z</i><i>z</i><i>z</i></span>' : ''}</div>
+      <div class="splash-txt">
+        <b>${volta != null ? 'Já já tem aula' : 'Até amanhã!'}</b>
+        <span>${volta != null
+          ? `Próxima turma às ${String(Math.floor(volta / 60)).padStart(2, '0')}:${String(volta % 60).padStart(2, '0')}`
+          : 'As aulas de hoje terminaram — bom descanso 🌙'}</span>
+      </div>
+      <div class="pontos"><i></i><i></i><i></i></div>
+    </div>`;
+
+  linhaHoras(ag);
+  if (!html) falaRobo(volta == null);   // sem próxima aula = fim do dia
+  caber();
   const totalDentro = (D.presencas||[]).filter(x => !x.saida_em).length;
   const totalExp = (D.agendamentos||[]).length;
+  document.getElementById('rodape').style.display = html ? 'flex' : 'none';
   document.getElementById('rodape').innerHTML = `<span><b>${totalDentro}</b>em sala agora</span><span><b>${totalExp}</b>aulas experimentais hoje</span>
-    <span class="leg"><span><i style="background:var(--verde)"></i>já chegou</span><span><i style="background:rgba(255,255,255,.15)"></i>previsto</span><span><i style="background:var(--exp)"></i>visitante</span></span>`;
+    <span class="leg"><span><i style="background:var(--verde)"></i>presente</span><span><i style="background:rgba(255,255,255,.18)"></i>faltou</span><span><i style="background:var(--exp)"></i>visitante</span></span>`;
 }
+
+// Linha do tempo do dia: da primeira à última hora com aula, marcando a atual.
+function linhaHoras(ag){
+  const el = document.getElementById('linha-horas'); if (!el) return;
+  const marcos = [
+    ...(D.turmas||[]).map(t => [emMin(t.hora_inicio), emMin(t.hora_fim)]),
+    ...(D.agendamentos||[]).map(a => [emMin(a.hora_inicio), emMin(a.hora_fim)])
+  ];
+  if (!marcos.length) { el.innerHTML = ''; return; }
+  const ini = Math.floor(Math.min(...marcos.map(m => m[0])) / 60);
+  const fim = Math.ceil(Math.max(...marcos.map(m => m[1])) / 60);
+  const horaAtual = Math.floor(ag / 60);
+  let out = '<span class="rot">horários de hoje:</span>';
+  for (let h = ini; h <= fim; h++) {
+    const cls = h === horaAtual ? 'agora' : h < horaAtual ? 'passou' : '';
+    out += `<span class="${cls}">${h}h</span>`;
+  }
+  el.innerHTML = out;
+}
+
+// O robô conversa enquanto espera. Troca de frase de tempos em tempos —
+// quem passa na entrada duas vezes não vê a mesma coisa.
+const FRASES = [
+  'Recarregando as baterias…',
+  'Guardando os parafusos no lugar',
+  'Testando os motores… tudo certo!',
+  'Quem chegar primeiro escolhe o kit 👀',
+  'Já já tem robô andando por aqui',
+  'Arrumando a sala pra próxima turma',
+  'Bip bop. Isso quer dizer "oi"',
+  'Sabia? Errar é parte de programar',
+  'Aquecendo as engrenagens',
+  'Deixando tudo pronto pra vocês'
+];
+// Fim do dia é outro clima: ninguém mais vai entrar, então o robô se despede.
+const FRASES_FIM = [
+  'Desligando os motores… quase.',
+  'Hora do meu sono de beleza 🔌',
+  'Vou recarregar a bateria. Até amanhã!',
+  'Guardei todos os parafusos. Quase todos.',
+  'Modo soneca ativado. Bip… bip… zzz',
+  'Bom descanso! Amanhã tem mais robô.',
+  'Fechando a oficina. A gente se vê!',
+  'Já são… hora de ir. Boa noite! 🌙',
+  'Deixa que amanhã eu arrumo a bagunça',
+  'Última linha de código do dia: dormir()'
+];
+let iFrase = Math.floor(Math.random() * FRASES.length), tFrase = null;
+function falaRobo(fim){
+  const el = document.getElementById('balao'); if (!el) return;
+  const lista = fim ? FRASES_FIM : FRASES;
+  const pinta = () => { el.textContent = lista[iFrase % lista.length]; el.classList.remove('entra'); void el.offsetWidth; el.classList.add('entra'); };
+  pinta();
+  clearInterval(tFrase);
+  tFrase = setInterval(() => { if (!document.getElementById('balao')) return clearInterval(tFrase); iFrase++; pinta(); }, 7000);
+}
+
+// Dia cheio: em vez de cortar nomes, a tela encolhe os cartões até tudo caber.
+// Some ninguém — a professora precisa ver a turma inteira de uma vez.
+function caber(){
+  const raiz = document.getElementById('raiz');
+  raiz.style.setProperty('--esc', 1);
+  let e = 1;
+  // não desce de 72%: abaixo disso o nome deixa de ser legível de longe
+  while (raiz.scrollHeight > raiz.clientHeight + 2 && e > 0.72) {
+    e = Math.round((e - 0.03) * 100) / 100;
+    raiz.style.setProperty('--esc', e);
+  }
+}
+addEventListener('resize', () => { if (D) desenhar(); });
+// ABERTURA: bom dia do robô com uma frase do dia. Aparece quando a TV liga e
+// sai sozinha em poucos segundos. Um clique/toque pula.
+const MOTIVACAO = [
+  'Todo robô já foi uma ideia na cabeça de alguém.',
+  'Hoje alguém vai montar algo que nunca existiu.',
+  'Errar é a parte do código onde a gente aprende.',
+  'Curiosidade é o melhor sensor que existe.',
+  'Quem tenta de novo sempre chega mais longe.',
+  'A melhor peça do kit é a imaginação.',
+  'Programar é conversar com uma máquina em outra língua.',
+  'Toda grande invenção começou com "e se…?"'
+];
+function abertura(){
+  const el = document.getElementById('abertura'); if (!el) return;
+  // A tela liga no começo do expediente: a abertura é sempre um bom dia.
+  document.getElementById('ab-ola').textContent = 'Bom dia!';
+  // frase do dia: muda a cada dia, não a cada recarga da página
+  const dia = Math.floor(Date.now() / 864e5);
+  document.getElementById('ab-frase').textContent = MOTIVACAO[dia % MOTIVACAO.length];
+  const logo = document.getElementById('ab-logo');
+  logo.src = '/logo-monitor.png'; logo.onerror = () => logo.remove();
+  el.onclick = () => el.classList.add('pulado');
+  setTimeout(() => el.classList.add('pulado'), 7400);
+}
+abertura();
 relogio(); setInterval(relogio, 15000);
+// a virada de bloco é por relógio, não por dado novo: redesenha sozinho
+setInterval(() => { if (D) desenhar(); }, 20000);
 if (!SLUG || !TOKEN) document.getElementById('raiz').innerHTML = '<div class="vazio">Abra pelo link do monitor.</div>';
 else { carregar(); setInterval(carregar, 30000); }
 </script>
