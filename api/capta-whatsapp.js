@@ -675,7 +675,7 @@ async function acaoAgenda(tenant, body, res) {
     sb(`capta_agendamentos?tenant_id=eq.${tenant.id}` +
        `&status=in.(agendado,confirmado,compareceu,faltou)` +
        `&select=id,data,hora_inicio,hora_fim,status,crianca_nome,crianca_idade,turma_id,tipo,aluno_id,` +
-       `confirmado_em,lead:lead_id(id,nome,contato)&order=data.asc,hora_inicio.asc&limit=300`)
+       `confirmado_em,criado_em,lead:lead_id(id,nome,contato)&order=data.asc,hora_inicio.asc&limit=300`)
   ]);
 
   return res.status(200).json({ turmas: turmas || [], horarios: horarios || [], agendamentos: agendamentos || [] });
