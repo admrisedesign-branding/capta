@@ -201,13 +201,23 @@ async function carregar(){ try { D = await api('recepcao'); } catch(e){} }
 const pres = (alunoId, agId) => (D?.presencas||[]).find(x => (alunoId && x.aluno_id === alunoId) || (agId && x.agendamento_id === agId));
 const leadDe = a => (D?.leads||[]).find(l => l.id === a.lead_id) || {};
 
+// Tela da recepção, à vista de quem entra: aparece primeiro nome e inicial
+// do sobrenome. O nome inteiro fica só no cartão de confirmação, para a
+// recepcionista conferir quem é. A busca continua achando pelo nome todo.
+function nomePublico(n){
+  const p = String(n || '').trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return '';
+  if (p.length === 1) return p[0];
+  return `${p[0]} ${p[p.length - 1][0].toUpperCase()}.`;
+}
+
 function pessoas(){
   if (!D) return [];
   const out = (D.agendamentos||[]).map(a => { const pr = pres(null, a.id); const l = leadDe(a);
-    return { tipo:'exp', id:a.id, nome:a.crianca_nome || l.nome || 'Visitante', sub:`aula experimental · ${hh(a.hora_inicio)}${a.crianca_idade?` · ${a.crianca_idade} anos`:''}${l.nome?` · com ${primeiro(l.nome)}`:''}`, dentro: !!pr && !pr.saida_em, fim: !!(pr && pr.saida_em) };
+    return { tipo:'exp', id:a.id, nome:a.crianca_nome || l.nome || 'Visitante', publico: nomePublico(a.crianca_nome || l.nome) || 'Visitante', sub:`aula experimental · ${hh(a.hora_inicio)}${a.crianca_idade?` · ${a.crianca_idade} anos`:''}`, dentro: !!pr && !pr.saida_em, fim: !!(pr && pr.saida_em) };
   });
   for (const t of (D.turmas||[])) for (const al of (D.alunos||[]).filter(x => x.turma_id === t.id)) {
-    const pr = pres(al.id); out.push({ tipo:'aluno', id:al.id, nome: al.nome_curto || al.nome, sub:`turma ${hh(t.hora_inicio)}${al.kit?` · ${al.kit}`:''}`, dentro: !!pr && !pr.saida_em, fim: !!(pr && pr.saida_em) });
+    const pr = pres(al.id); out.push({ tipo:'aluno', id:al.id, nome: al.nome_curto || al.nome, publico: nomePublico(al.nome_curto || al.nome), sub:`turma ${hh(t.hora_inicio)}${al.kit?` · ${al.kit}`:''}`, dentro: !!pr && !pr.saida_em, fim: !!(pr && pr.saida_em) });
   }
   return out;
 }
@@ -222,7 +232,7 @@ function filtrar(){
   let lista = pessoas().filter(x => x.tipo === (MODO === 'aluno' ? 'aluno' : 'exp') && !x.fim);
   if (q) lista = lista.filter(x => x.nome.toLowerCase().includes(q));
   document.getElementById('cards').innerHTML = lista.map((x,i) => `<button class="pes ${x.dentro?'dentro':''}" style="animation-delay:${Math.min(i*40,400)}ms" onclick='escolher(${JSON.stringify(x).replace(/'/g,"&#39;")})'>
-      <div class="n">${esc(x.nome)}</div><div class="s">${esc(x.sub)}</div>
+      <div class="n">${esc(x.publico || x.nome)}</div><div class="s">${esc(x.sub)}</div>
       <span class="et ${x.dentro?'saindo':(x.tipo==='exp'?'exp':'aluno')}">${x.dentro ? 'tocar para sair' : (x.tipo==='exp'?'aula experimental':'aluno')}</span></button>`).join('')
     + (MODO === 'exp' ? `<button class="pes novo" onclick="novoVisitante()">+ Não achei meu nome</button>` : '')
     + (!lista.length ? `<div class="nada">${MODO==='exp' ? 'Nenhuma aula experimental agora.<br>Se você veio conhecer, toque em “Não achei meu nome”.' : 'Nenhuma turma neste horário 🤖'}</div>` : '');
