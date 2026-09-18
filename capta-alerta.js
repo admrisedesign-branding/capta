@@ -1,9 +1,13 @@
 /* capta-alerta.js — quem espera resposta há quanto tempo, e o que fazer com isso.
    Usado pela lista de conversas, pela tela do dia e pelo painel (som e aviso). */
 (function () {
-  // Limites por temperatura, em minutos: [atrasada, urgente]
-  // Quente espera menos; frio e morno também têm teto, para ninguém ficar esquecido.
-  const LIMITES = { quente: [10, 60], morno: [30, 120], frio: [60, 240], padrao: [10, 90] };
+  // Limites por temperatura, em minutos: [atrasada, urgente].
+  // A régua é a mesma do manual da equipe: quente responde em até 2h,
+  // morno em 8h, frio em 24h. "Atrasada" avisa na metade do prazo, para
+  // dar tempo de reagir antes de estourar. É esta régua que também conta
+  // o "falar efetivamente" nas metas — alerta e meta falam a mesma língua.
+  const LIMITES = { quente: [60, 120], morno: [240, 480], frio: [720, 1440], padrao: [120, 240] };
+  const PRAZO_META = { quente: 120, morno: 480, frio: 1440, padrao: 240 };   // minutos
 
   function minutosEsperando(conv) {
     if (!conv || !conv.aguardando_desde || conv.resolvida_em) return 0;
@@ -29,6 +33,9 @@
     const temp = t === 'quente' ? 300 : t === 'morno' ? 200 : t === 'frio' ? 100 : 150;
     return base + temp + Math.min(minutosEsperando(conv), 99) / 100;
   }
+  // prazo da temperatura, em minutos — usado pela contagem de metas
+  function prazo(temp) { return PRAZO_META[String(temp || '').toLowerCase()] || PRAZO_META.padrao; }
+
   function etiqueta(conv) {
     const n = nivel(conv); if (!n) return '';
     return `<span class="al-tag ${n}" title="${rotulo(conv)}">${n === 'urgente' ? '⏰ ' : '⏱ '}${rotulo(conv)}</span>`;
@@ -89,7 +96,7 @@
     return { novas, cruzaram };
   }
 
-  window.CaptaAlerta = { LIMITES, minutosEsperando, nivel, rotulo, peso, etiqueta, tocar, avisar, pedirPermissao, processar };
+  window.CaptaAlerta = { LIMITES, PRAZO_META, prazo, minutosEsperando, nivel, rotulo, peso, etiqueta, tocar, avisar, pedirPermissao, processar };
   const CSS = `
   .al-tag{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;white-space:nowrap}
   .al-tag.atrasada{background:#FFF3C4;color:#8a5a06}

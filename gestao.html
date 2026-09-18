@@ -98,6 +98,21 @@ tr:last-child td{border-bottom:0}
   .card,.kpi{box-shadow:none;break-inside:avoid}
   .grid{grid-template-columns:1fr 1fr}
 }
+/* Metas — o quadro da parede, com o andamento de cada indicador */
+.m-tab{width:100%;border-collapse:collapse;margin-top:6px}
+.m-tab th{text-align:left;font-size:11.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);padding:6px 10px 6px 0}
+.m-tab td{padding:9px 10px 9px 0;border-top:1px solid var(--line)}
+.m-nome{font-size:13.5px;font-weight:700;min-width:180px}
+.m-tag{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);border:1px solid var(--line);border-radius:99px;padding:2px 7px;margin-left:7px}
+.m-cel b{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.m-cel span{font-size:11.5px;color:var(--faint);margin-left:4px}
+.m-barra{display:block;height:5px;border-radius:99px;background:var(--line-2,#F0F2F7);margin-top:5px;overflow:hidden}
+.m-barra em{display:block;height:100%;border-radius:99px;background:var(--brand)}
+.m-barra.ok em{background:var(--verde,#1f7a4d)}
+.m-barra.meio em{background:#E8A800}
+.m-barra.baixo em{background:var(--quente,#c23b3b)}
+.m-na{color:var(--faint)}
+.m-pe{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style><script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
 <style>
@@ -159,7 +174,48 @@ const rotulo = k => { const [a,m] = k.split('-'); return `${MESES[+m-1]}/${a}`; 
 // Ordem canônica das etapas (as do Kommo); qualquer outra vai depois, na ordem em que aparecer
 const ORDEM = ['Incoming leads','Novo Lead','Em Contato','Qualificado','Aula Agendada','Matrícula em Andamento','Venda ganha','Aluno Ativo (matriculado)','Remarketing','Venda perdida','Closed - lost'];
 
-let TODOS = [], TENANT = {}, INVEST = [];
+let TODOS = [], TENANT = {}, INVEST = [], METAS = null;
+
+// Metas da equipe: o quadro da parede, com o que já foi feito hoje, na
+// semana e no mês. Vem da API porque cruza leads, aulas, mensagens e
+// ligações — o painel de leads sozinho não sabe disso.
+async function carregarMetas(){
+  try {
+    const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ acao:'metas', slug: SLUG, token: TOKEN }) });
+    METAS = await r.json();
+  } catch(e){ METAS = { erro: true }; }
+  render();
+}
+function blocoMetas(){
+  if (!METAS) return '<div class="card"><h3>Metas da equipe</h3><div class="aviso">Carregando…</div></div>';
+  if (METAS.erro || !(METAS.metas||[]).length) return '';
+  const cols = ['dia','semana','mes'], rot = ['Hoje','Semana','Mês'];
+  const barra = (f, m) => { if (!m) return '<span class="m-na">—</span>';
+    const pct = Math.min(100, Math.round(f / m * 100));
+    const cor = pct >= 100 ? 'ok' : pct >= 60 ? 'meio' : 'baixo';
+    return `<div class="m-cel"><b>${f}</b><span>de ${m}</span><i class="m-barra ${cor}"><em style="width:${pct}%"></em></i></div>`; };
+  return `<div class="card"><h3>Metas da equipe <span class="sub">foco · disciplina · resultados</span></h3>
+    <table class="m-tab"><tr><th></th>${rot.map(r => `<th>${r}</th>`).join('')}</tr>
+    ${METAS.metas.map(m => `<tr>
+      <td class="m-nome">${esc(m.rotulo)}${m.manual ? '<span class="m-tag" title="O Capta não mede isso: alguém lança à mão">manual</span>' : ''}</td>
+      ${cols.map((c, i) => `<td>${barra((METAS.feito[m.chave]||[0,0,0])[i], m[c])}</td>`).join('')}
+    </tr>`).join('')}</table>
+    <div class="m-pe">${(METAS.metas||[]).some(m => m.manual)
+      ? `<button class="btn g" onclick="lancarMeta('avaliacoes')">+ avaliação no Google</button>
+         <button class="btn g" onclick="lancarMeta('eventos')">+ evento ou parceria</button>` : ''}</div>
+  </div>`;
+}
+async function lancarMeta(chave){
+  const v = prompt(chave === 'avaliacoes' ? 'Quantas avaliações novas no Google?' : 'Quantos eventos ou parcerias?', '1');
+  if (v === null) return;
+  const valor = Number(v); if (!Number.isFinite(valor) || valor <= 0) return;
+  try {
+    const r = await fetch('/api/capta-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ acao:'metas', slug: SLUG, token: TOKEN, lancar: { chave, valor } }) });
+    METAS = await r.json(); render();
+  } catch(e){}
+}
 
 
 async function carregar(){
@@ -171,7 +227,7 @@ async function carregar(){
     fetch('/api/capta-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'investimento',slug:SLUG,token:TOKEN})})
       .then(r=>r.json()).then(j=>{ INVEST = j.investimento || []; render(); }).catch(()=>{});
     document.title = `Painel Gestão — ${TENANT.nome || 'Capta'}`;
-    montarMeses(); render();
+    montarMeses(); render(); carregarMetas();
   }catch(e){
     document.getElementById('raiz').innerHTML = `<div class="aviso">Não consegui carregar os leads.<br>${esc(e.message)}</div>`;
   }
@@ -279,6 +335,7 @@ function render(){
   document.getElementById('raiz').innerHTML = `
     <div class="cab"><div><h2>${esc(TENANT.nome||'')}</h2><div class="sub">${k ? rotulo(k) : 'Todo o período'} · gerado ${new Date().toLocaleDateString('pt-BR')}</div></div></div>
     <div class="kpis">${kpis}</div>
+    ${blocoMetas()}
     <div class="grid">
       ${(() => {
         const g = INVEST.filter(i => !k || i.mes.slice(0,7) === k);
