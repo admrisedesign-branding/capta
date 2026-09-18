@@ -378,6 +378,7 @@ body.trabalhando{cursor:progress}
 button .mini-pt{border-color:rgba(0,0,0,.15);border-top-color:currentColor}
 @keyframes gira{to{transform:rotate(360deg)}}
 .acts button:disabled,.hcol-mais.ocupado{cursor:default}
+.emb-fech{width:100%;height:calc(100vh - 210px);min-height:520px;border:0;border-radius:14px;background:var(--fundo,#F7F8FC)}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>if(new URLSearchParams(location.search).get('embed')==='1'){document.documentElement.classList.add('embed');document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('embed'));}</script>
@@ -866,6 +867,13 @@ function desenhar(){ setTimeout(() => { if (AULA_ABERTA) pintarAula(); }, 0);
   if (MODO === 'dia') { periodo = fmt(SEL, { weekday:'long', day:'numeric', month:'long' }); dias = [SEL]; corpo = vDia(SEL); }
   else if (MODO === 'semana') { const s = segunda(SEL); dias = [0,1,2,3,4,5].map(n => addDias(s, n)); periodo = `${fmt(dias[0],{day:'numeric',month:'long'})} a ${fmt(dias[5],{day:'numeric',month:'long'})}`; corpo = vSemanaGrade(); }
   else { const x = new Date(SEL+'T12:00:00'); periodo = x.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); const f = iso(new Date(x.getFullYear(), x.getMonth()+1, 0, 12)); dias = []; for (let d = iso(new Date(x.getFullYear(), x.getMonth(), 1, 12)); d <= f; d = addDias(d,1)) dias.push(d); corpo = vMes(); }
+  // aba Fechamento: mostra o acompanhamento das experimentais, sem o calendário
+  if (TIPO === 'fechamento') {
+    document.getElementById('raiz').innerHTML = `
+      <div class="filtro-linha">${barraTipo(nAlunos, nExp, nRep)}</div>
+      ${telaFechamento()}`;
+    return;
+  }
   document.getElementById('raiz').innerHTML = `
     <div class="barra">${VAGAS.length?'':'<span style="font-size:12px;color:var(--faint)">carregando vagas…</span>'}<button class="nav" onclick="mover(-1)">‹</button><button class="nav" onclick="mover(1)">›</button><button class="nav" onclick="SEL=hoje;carregar()">Hoje</button><span class="periodo">${periodo}</span>${abasHtml()}<button class="btn" onclick="novoAgendamento()">+ Novo agendamento</button></div>
     <div class="filtro-linha">${barraTipo(nAlunos, nExp, nRep)}</div>
@@ -1123,12 +1131,21 @@ try { TIPO = localStorage.getItem('capta_visao_agenda') || 'todos'; } catch(e){}
 const ehRep = a => (a.tipo || 'experimental') === 'reposicao';
 const ehExp = a => (a.tipo || 'experimental') === 'experimental';
 function mudarTipo(t){ TIPO = t; try { localStorage.setItem('capta_visao_agenda', t); } catch(e){} desenhar(); }
+
+// A Agenda é a tela principal: o acompanhamento das experimentais (resultado
+// de cada aula, leads sem data, descobrir agendas) entra aqui como uma aba,
+// em vez de viver numa tela separada que ninguém achava.
+function telaFechamento(){
+  const qs = `?t=${encodeURIComponent(SLUG)}&k=${encodeURIComponent(TOKEN)}&embed=1`;
+  return `<iframe class="emb-fech" src="/aula-experimental.html${qs}" title="Fechamento das aulas experimentais"></iframe>`;
+}
 function barraTipo(nAl, nEx, nRe){
   const b = (k, t, sub, q) => `<button class="${TIPO===k?'on':''}" onclick="mudarTipo('${k}')" title="${sub}">${t}${q!=null?`<span class="q">${q}</span>`:''}</button>`;
   return `<div class="filtro-tipo">
     ${b('todos','Tudo','Turmas, aulas experimentais e reposições')}
     ${b('experimental','Aulas experimentais','Quem vem conhecer a escola — trabalho do comercial', nEx)}
     ${b('alunos','Alunos e reposições','Quem já estuda aqui — trabalho da secretaria', nAl + nRe)}
+    ${b('fechamento','Fechamento','Resultado de cada aula experimental, leads sem data e descobrir agendas')}
   </div>
   <button class="btn g" style="margin-left:auto" onclick="listaAlunos()">Lista de matriculados</button>`;
 }
