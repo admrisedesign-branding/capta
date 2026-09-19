@@ -2969,12 +2969,13 @@ async function acaoCasarLid(tenant, canal, body, res) {
   // ---- 0) fundir duplicadas: a mesma pessoa como conversa A (número real) e B (@lid) ----
   // Descobre o @lid das conversas com número real (pergunta à Z-API), e quando
   // acha uma conversa B com esse @lid, move as mensagens dela para A e apaga B.
-  let fundidas = 0;
+  let fundidas = 0, falhas = 0;
   const reais = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lid=is.null&select=id,telefone,lead_id&order=ultima_mensagem_em.desc.nullslast&limit=${limite}`).catch(() => []);
   for (const a of reais || []) {
     const dig = String(a.telefone || '').replace(/\D/g, '');
     if (!dig || dig.length > 13) continue;                       // já é @lid, pula
-    const lid = await prov.lidDoTelefone(canal, a.telefone).catch(() => null);
+    const lid = await prov.lidDoTelefone(canal, a.telefone).catch(() => undefined);
+    if (lid === undefined) { falhas++; if (falhas >= 3) break; continue; }   // provedor fora: não marca nada
     await sb(`capta_conversas?id=eq.${a.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lid: lid || 'sem' }) }).catch(() => null);
     if (!lid) continue;
     const bs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&id=neq.${a.id}&or=(lid.eq.${lid},telefone.eq.${lid},telefone.eq.55${lid})&select=id,nao_lidas`).catch(() => []);
@@ -2991,16 +2992,18 @@ async function acaoCasarLid(tenant, canal, body, res) {
     }
   }
   const convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=is.null&select=id,telefone,lid,nome&limit=300`).catch(() => []);
-  const pend = (convs || []).filter(c => c.lid || String(c.telefone || '').replace(/\D/g, '').length > 13);
+  const pend = (convs || []).filter(c => (c.lid && c.lid !== 'sem') || String(c.telefone || '').replace(/\D/g, '').length > 13);
   if (!pend.length) return res.status(200).json({ ok: true, ligadas: 0, restantes: 0, aviso: 'Nenhuma conversa com @lid pendente.' });
-  const lids = new Map(); pend.forEach(c => { const l = (c.lid || String(c.telefone).replace(/\D/g, '')); lids.set(l, c); });
+  const lids = new Map(); pend.forEach(c => { const l = ((c.lid && c.lid !== 'sem') ? c.lid : String(c.telefone).replace(/\D/g, '')); lids.set(l, c); });
 
   // leads ainda sem @lid conhecido
   const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&contato=not.is.null&lid=is.null&select=id,nome,contato&order=criado_em.desc&limit=${limite}`).catch(() => []);
   let ligadas = 0, consultados = 0;
   for (const l of leads || []) {
-    const lid = await prov.lidDoTelefone(canal, l.contato).catch(() => null);
+    if (falhas >= 3) break;
+    const lid = await prov.lidDoTelefone(canal, l.contato).catch(() => undefined);
     consultados++;
+    if (lid === undefined) { falhas++; continue; }                         // provedor fora: tenta na próxima rodada
     await sb(`capta_leads?id=eq.${l.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lid: lid || 'sem' }) }).catch(() => null);
     if (!lid) continue;
     const c = lids.get(lid);
@@ -3017,7 +3020,8 @@ async function acaoCasarLid(tenant, canal, body, res) {
     await sb(`capta_conversas?id=eq.${c.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lead_id: l.id, telefone: prov.comDDI(l.contato) || c.telefone }) }).catch(() => null);
     ligadas++; lids.delete(l.lid); } }
   const faltamLeads = (await sb(`capta_leads?tenant_id=eq.${tenant.id}&contato=not.is.null&lid=is.null&select=id&limit=1000`).catch(() => [])).length;
-  return res.status(200).json({ ok: true, fundidas, ligadas, consultados, conversas_pendentes: lids.size, leads_por_consultar: faltamLeads });
+  return res.status(200).json({ ok: true, fundidas, ligadas, consultados, falhas_provedor: falhas, conversas_pendentes: lids.size, leads_por_consultar: faltamLeads,
+    aviso: falhas >= 3 ? 'A Z-API não respondeu (ou respondeu sem @lid). Nada foi marcado; confira a instância e rode de novo.' : undefined });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
