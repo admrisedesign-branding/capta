@@ -1174,6 +1174,25 @@ async function kommoPreco(tenantId, leadId, valor) {
   const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
   await fetch(`https://${dominio}/api/v4/leads/${l[0].kommo_lead_id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ price: Math.round(valor) }) });
 }
+// Troca o nome genérico ("Contato do WhatsApp") pelo nome real no CONTATO do
+// Kommo — é de lá que o espelho lê o nome; senão a próxima sincronização
+// desfaz a correção. O nome do card só muda se também for genérico.
+async function kommoRenomear(tenantId, leadId, nome) {
+  const token = process.env.KOMMO_TOKEN; if (!token) return false;
+  const l = await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id&limit=1`); if (!l?.[0]?.kommo_lead_id) return false;
+  const dominio = process.env.KOMMO_DOMAIN || 'roboticanorte.kommo.com';
+  const h = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const r = await fetch(`https://${dominio}/api/v4/leads/${l[0].kommo_lead_id}?with=contacts`, { headers: h });
+  if (!r.ok) return false;
+  const lead = await r.json();
+  const cs = lead._embedded?.contacts || [];
+  const cid = (cs.find(c => c.is_main) || cs[0])?.id;
+  let ok = false;
+  if (cid) ok = (await fetch(`https://${dominio}/api/v4/contacts/${cid}`, { method: 'PATCH', headers: h, body: JSON.stringify({ name: nome }) })).ok;
+  const generico = !lead.name || /^(contato do whatsapp|lead #?\d+|novo lead|\+?[\d\s()-]{8,})$/i.test(String(lead.name).trim());
+  if (generico) ok = (await fetch(`https://${dominio}/api/v4/leads/${lead.id}`, { method: 'PATCH', headers: h, body: JSON.stringify({ name: nome }) })).ok || ok;
+  return ok;
+}
 async function kommoTag(tenantId, leadId, tag) {
   const token = process.env.KOMMO_TOKEN; if (!token) return null;
   const l = await sb(`capta_leads?id=eq.${leadId}&tenant_id=eq.${tenantId}&select=kommo_lead_id,tags&limit=1`); if (!l?.[0]?.kommo_lead_id) return null;
@@ -3071,7 +3090,7 @@ async function acaoIdentificar(tenant, body, res) {
     const cron = (msgs || []).reverse();
     // telefones escritos pelo CLIENTE (os da escola são o próprio número da unidade)
     const fones = [...new Set(cron.filter(m => m.direcao === 'entrada').flatMap(m => fonesNoTexto(m.texto || m.transcricao)))];
-    const nomeWhats = (conv.nome && !/@lid$/i.test(conv.nome) && !/^\+?[\d\s()-]{10,}$/.test(conv.nome)) ? conv.nome : '';
+    const nomeWhats = (conv.nome && !/@lid$/i.test(conv.nome) && !/^\+?[\d\s()-]{10,}$/.test(conv.nome) && !/^(contato do whats ?app|contato sem n[uú]mero|my robot manaus)/i.test(conv.nome)) ? conv.nome : '';
     let out = { nome: nomeWhats || '', telefone: fones[0] || '', crianca: '', idade: '', de_onde: fones[0] ? 'número escrito na conversa' : (nomeWhats ? 'nome do perfil do WhatsApp' : ''), ia: false };
 
     if (body.ia) {
@@ -3107,6 +3126,22 @@ async function acaoIdentificar(tenant, body, res) {
 
   // ------------------------------------------------------------ SALVAR
   const nome = String(body.nome || '').trim();
+  // Conversa já ligada a um lead sem nome de verdade ("Contato do WhatsApp",
+  // criado pelo Kommo): só completa o cadastro — no Capta e no Kommo.
+  if (conv.lead_id) {
+    if (!nome) return res.status(400).json({ erro: 'Escreva o nome da pessoa.' });
+    const [ld] = await sb(`capta_leads?id=eq.${conv.lead_id}&tenant_id=eq.${tenant.id}&select=id,etapa_id,crianca&limit=1`).catch(() => []);
+    if (!ld) return res.status(404).json({ erro: 'Lead não encontrado.' });
+    const patch = { nome };
+    if (body.crianca) patch.crianca = String(body.crianca).trim();
+    if (body.idade) patch.idade = Number(body.idade) || null;
+    if (!ld.etapa_id) patch.etapa_id = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Novo%20lead&select=id&limit=1`).catch(() => []))?.[0]?.id || null;
+    await sb(`capta_leads?id=eq.${ld.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+    await sb(`capta_conversas?id=eq.${conv.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ nome }) }).catch(() => null);
+    const kommo = await kommoRenomear(tenant.id, ld.id, nome).catch(() => false);
+    if (body.crianca || body.idade) kommoNota(tenant.id, ld.id, `Capta: cadastro completado — responsável ${nome}${body.crianca ? ', criança ' + body.crianca : ''}${body.idade ? ', ' + body.idade + ' anos' : ''}`).catch(() => null);
+    return res.status(200).json({ ok: true, lead_id: ld.id, lead_nome: nome, lead_criado: false, completado: true, kommo, conversa_id: conv.id });
+  }
   let fone = String(body.telefone || '').replace(/\D/g, '');
   if (!nome) return res.status(400).json({ erro: 'Escreva o nome da pessoa.' });
   if (fone.length < 10 || fone.length > 13) return res.status(400).json({ erro: 'Telefone inválido: use DDD + número, ex.: 92 99999-9999.' });
