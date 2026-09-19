@@ -65,14 +65,14 @@
   @media(max-width:760px){#lp.aberto{width:100%;max-width:100%}#lp .corpo{padding:12px 14px}#lp .escrever{padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}#lp .cab{padding:12px 14px}}
   `;
   const AJUDA_ETAPA = {
-    'novo lead': 'Chegou e ninguém falou com ele ainda.',
-    'em contato': 'Uma pessoa da escola já respondeu; ainda não se sabe o suficiente sobre a criança.',
-    'qualificado': 'Já sabemos nome e idade da criança e a família respondeu sobre horário ou valor.',
-    'aula agendada': 'Tem dia e hora marcados (o Capta põe aqui sozinho ao agendar).',
-    'matrícula em andamento': 'Fez a aula e quer, mas ainda não pagou.',
+    'novo lead': 'Chegou; nenhuma pessoa da escola falou ainda. Vai para Em contato quando um atendente manda mensagem.',
+    'em contato': 'Já falamos com a família. Vai para Qualificado quando ela der nome + idade da criança e mostrar interesse.',
+    'qualificado': 'Nome + idade + interesse. Vai para Aula agendada ao marcar a aula. ⚠️ Conversão na Meta.',
+    'aula agendada': 'A família aceitou dia e hora. Sai pelo desfecho do Rafa na tela Aula experimental. ⚠️ Conversão na Meta.',
+    'matrícula em andamento': 'Fez a aula e está decidindo. Fecha no card da aula: Matriculou ou Não matriculou.',
     'aluno ativo': 'Matriculado.',
     'remarketing': 'Não fechou agora, mas pode voltar.',
-    'perdido': 'Sem interesse, idade fora ou sumiu.',
+    'perdido': 'Só manual (Rafa ou Bento): sem interesse de vez.',
   };
   const FONTES = ['anúncio','instagram','google busca','google business','evento','direto','indicação'];
   const PORTAS = ['site','whatsapp-bot','whatsapp-direto','evento','my robot'];

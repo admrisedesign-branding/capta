@@ -33,6 +33,13 @@ body.embed
 .raia-cor{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
 .raia-nome{font-weight:700;font-size:13.5px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .raia-cab .ajuda{margin-right:auto}
+.regras-ov{position:fixed;inset:0;background:rgba(15,20,40,.45);z-index:80;display:grid;place-items:center;padding:16px}
+.regras{background:var(--card);border-radius:16px;max-width:960px;width:100%;max-height:88vh;overflow:auto;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.25);font-size:13px;line-height:1.5}
+.regras-cab{display:flex;align-items:center;margin-bottom:10px;font-size:15px}.regras-cab button{margin-left:auto;border:0;background:none;font-size:22px;cursor:pointer;color:var(--muted)}
+.regras-tab{overflow-x:auto}.regras table{width:100%;border-collapse:collapse;min-width:640px}
+.regras th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line)}
+.regras td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}.regras p{margin:10px 0 0;color:var(--muted)}
+.raia-cab .org-col{margin-left:6px;font-size:13px;padding:3px 8px;line-height:1}
 .raia-qtd{font-size:12px;font-weight:700;color:var(--muted);background:var(--gray-bg);border-radius:99px;padding:2px 8px}
 .raia-corpo{padding:10px;display:flex;flex-direction:column;gap:8px;flex:1}
 
@@ -345,14 +352,14 @@ async function carregar() {
 
 // O que cada coluna quer dizer — para quem abre o Pipeline sem ter combinado o critério
 const AJUDA_ETAPA = {
-  'novo lead': 'Chegou e <b>ninguém falou com ele ainda</b>. Sai daqui sozinho assim que uma pessoa (não o robô) responde.',
-  'em contato': 'Uma pessoa da escola já respondeu. Aqui a conversa está viva, mas ainda não se sabe o suficiente sobre a criança.',
-  'qualificado': 'Você já sabe <b>nome e idade da criança</b> e a família respondeu sobre horário ou valor. O interesse é real — falta só marcar a aula.',
-  'aula agendada': 'Tem <b>dia e hora marcados</b>. O Capta coloca aqui sozinho quando você agenda; o lembrete D-1 e D0 sai automático.',
-  'matrícula em andamento': 'Fez a aula experimental e disse que quer, mas ainda não pagou ou está decidindo.',
-  'aluno ativo': 'Matriculado. Vira aluno na tela de Alunos e entra na receita do Painel.',
-  'remarketing': 'Não fechou agora, mas pode voltar: orçamento, horário que não bateu, "vou pensar". Vale retomar mais pra frente.',
-  'perdido': 'Sem interesse, idade fora ou sumiu. Fica no histórico e conta como perda no Painel.',
+  'novo lead': '<b>Entra:</b> lead que acabou de chegar (site, bot, WhatsApp, evento). <b>Sai para Em contato</b> quando uma <b>pessoa</b> da escola manda mensagem — robô, resposta automática e resumo do formulário não contam.',
+  'em contato': '<b>Entra:</b> uma pessoa da escola já falou com a família. <b>Sai para Qualificado</b> quando a família responde, dá o <b>nome e a idade</b> da criança e demonstra interesse (pergunta horário, valor, como funciona).',
+  'qualificado': '<b>Entra:</b> sabemos nome e idade da criança e a família mostrou interesse. <b>Sai para Aula agendada</b> quando a aula é marcada (Agendar aula). ⚠️ Mover para cá manda evento de conversão para a Meta: só com critério cumprido.',
+  'aula agendada': '<b>Entra:</b> a família aceitou dia e hora — o Capta põe aqui sozinho ao agendar; lembretes D-1 e D0 saem automáticos. <b>Sai</b> pelo desfecho do Rafa na tela Aula experimental. Quem faltou fica aqui, com a tag reagendar. ⚠️ Evento de conversão na Meta.',
+  'matrícula em andamento': '<b>Entra:</b> fez a aula e o Rafa marcou <b>Em andamento</b> (está decidindo). <b>Sai</b> quando o Rafa marca Matriculou (→ Aluno ativo) ou Não matriculou (→ Remarketing) no card da aula.',
+  'aluno ativo': '<b>Entra:</b> o Rafa marcou <b>Matriculou</b> no fechamento. Vira aluno na tela Alunos e entra na receita do Painel.',
+  'remarketing': '<b>Entra:</b> o Rafa marcou <b>Não matriculou</b>, ou a família disse claramente que agora não dá (vai pensar, achou caro, horário não bate). Vale retomar mais pra frente.',
+  'perdido': '<b>Só manual</b>, pelo Rafa ou pelo Bento: sem interesse de vez, idade fora da faixa ou pediu para não receber mais. A IA nunca coloca ninguém aqui.',
 };
 const ajudaEtapa = nome => AJUDA_ETAPA[String(nome||'').toLowerCase().trim()] || null;
 const iconeAjuda = txt => (window.ajudaHTML ? ajudaHTML(txt) : '');
@@ -406,7 +413,7 @@ function barraFiltros(total, vis) {
     <span class="fb-n">${vis} de ${total}</span>
     ${ORG.ligado
       ? `<button class="btn g" onclick="sairOrganizar()">sair de organizar</button>`
-      : `<button class="btn g" onclick="organizar()" title="A IA lê as conversas e sugere em que etapa cada lead deveria estar">✨ Organizar</button>
+      : `<button class="btn g" onclick="verRegras()" title="Quando cada lead entra e sai de cada coluna">📋 Regras do funil</button><button class="btn g" onclick="organizar({ col: null })" title="A IA lê as conversas e sugere em que etapa cada lead deveria estar">✨ Organizar</button>
          ${AGD.ligado ? `<button class="btn g" onclick="sairAgendas()">sair de agendas</button>`
            : `<button class="btn g" onclick="acharAgendas()" title="Leads em Aula agendada sem data no Capta: a IA lê o Kommo e a conversa e descobre o dia e a hora combinados">🔎 Descobrir agendas</button>`}`}
     </div>`;
@@ -423,9 +430,9 @@ function desenhar() {
 
   const mob = window.matchMedia('(max-width:760px)').matches;
   const barraOrg = ORG.ligado ? `<div class="org-topo">
-      <b>${ORG.semEtapa ? 'Organizando os leads sem etapa' : 'Organizando o funil'}</b>
-      <span>${ORG.rodando ? 'lendo conversas…' : `${ORG.sug.length} sugestão${ORG.sug.length===1?'':'ões'} · só os leads com sugestão aparecem`}</span>
-      <button class="btn g" onclick="organizar()" ${ORG.rodando?'disabled':''}>ler mais 8</button>
+      <b>${ORG.col ? `✨ Organizando: ${esc(ORG.colNome)}` : 'Organizando o funil'}</b>
+      <span>${ORG.rodando ? 'lendo conversas…' : `${ORG.sug.length} sugestão${ORG.sug.length===1?'':'ões'} · ${ORG.lidos.size} lido${ORG.lidos.size===1?'':'s'}${ORG.restantes != null ? ` · faltam ${ORG.restantes}` : ''} · só os leads com sugestão aparecem`}</span>
+      <button class="btn g" onclick="organizar()" ${ORG.rodando || ORG.restantes === 0 ?'disabled':''}>${ORG.restantes === 0 ? 'coluna lida' : 'ler mais 8'}</button>
       ${ORG.sug.filter(x=>!x.avisa_meta).length ? `<button class="btn g" onclick="marcarTodasSug(true)">marcar todas</button><button class="btn g" onclick="marcarTodasSug(false)">limpar</button>` : ''}
       <button class="btn" onclick="aplicarSug()" ${ORG.marcados.size?'':'disabled'}>Aprovar ${ORG.marcados.size || ''}</button>
       <button class="btn g" onclick="sairOrganizar()">sair</button>
@@ -437,7 +444,7 @@ function desenhar() {
         <span class="raia-cor" style="background:${esc(c.e.cor || '#2E5BFF')}"></span>
         <span class="raia-nome">${esc(c.e.nome)}</span>${ajudaEtapa(c.e.nome) ? iconeAjuda(ajudaEtapa(c.e.nome)) : ''}
         <span class="raia-qtd">${c.itens.length}</span>
-        ${!c.e.id ? `<button class="btn g" style="margin-left:auto;font-size:11.5px;padding:4px 9px" title="Leads que entraram sem etapa. A IA lê a conversa de cada um e sugere a etapa certa; quem não tem conversa vai para Novo lead." onclick="event.stopPropagation();organizar({semEtapa:true})" ${ORG.rodando?'disabled':''}>✨ organizar</button>` : ''}
+        ${c.itens.length && !['ganha','perdida'].includes(c.e.tipo) ? `<button class="btn g org-col" title="${esc(dicaOrganizar(c.e))}" onclick="event.stopPropagation();organizar({ col: '${c.e.id || 'sem'}', nome: '${esc(c.e.nome)}' })" ${ORG.rodando?'disabled':''}>✨</button>` : ''}
       </div>
       <div class="raia-corpo">
         ${c.itens.length ? c.itens.map(cartao).join('') : '<div class="vazia">Nenhum lead aqui' + (c.e.id ? '' : '') + '</div>'}
@@ -454,27 +461,64 @@ function desenhar() {
 // Qualificado e Aula agendada disparam evento de conversão na Meta (webhook
 // do Kommo), por isso saem um de cada vez, com confirmação.
 // ---------------------------------------------------------------------
-let ORG = { ligado: false, rodando: false, sug: [], marcados: new Set(), semEtapa: false };
+const ORG0 = () => ({ ligado: false, rodando: false, sug: [], marcados: new Set(), col: null, colNome: '', lidos: new Set(), restantes: null });
+let ORG = ORG0();
+// o que a varredura de cada coluna procura (aparece ao passar o mouse na ✨)
+function dicaOrganizar(e){
+  const n = String(e.nome || '').toLowerCase();
+  if (!e.id) return 'Leads sem etapa: a IA lê a conversa e sugere a etapa certa; quem não tem conversa vai para Novo lead.';
+  if (/novo lead/.test(n)) return 'Varre o Novo lead: quem já recebeu mensagem de uma PESSOA da escola (não do robô nem do formulário) vai para Em contato; quem já deu o nome da criança e mostrou interesse, para Qualificado.';
+  if (/em contato/.test(n)) return 'Varre Em contato: quem respondeu, deu o nome da criança e mostrou interesse vai para Qualificado; quem combinou dia e hora, para Aula agendada.';
+  if (/qualificado/.test(n)) return 'Varre Qualificado: quem combinou dia e hora da aula na conversa vai para Aula agendada (a aula é criada na agenda ao aprovar).';
+  if (/aula agendada/.test(n)) return 'Varre Aula agendada: aula que já passou vira Matrícula em andamento ou Remarketing, conforme a conversa. O normal é o desfecho vir da tela Aula experimental.';
+  return 'A IA lê a conversa de cada lead desta coluna e sugere a etapa certa. Nunca faz o lead voltar no funil (só Remarketing/Perdido).';
+}
 const sugDe = id => ORG.sug.find(s => s.lead_id === id);
 
 async function organizar(op){
-  if (op && op.semEtapa && !ORG.semEtapa) { ORG = { ligado: false, rodando: false, sug: [], marcados: new Set(), semEtapa: true }; }
+  // trocou de coluna (ou saiu do funil todo para uma coluna): começa do zero
+  if (op && op.col !== undefined && op.col !== ORG.col) { ORG = ORG0(); ORG.col = op.col; ORG.colNome = op.nome || ''; }
   if (!ORG.ligado) { ORG.ligado = true; desenhar(); }
   if (ORG.rodando) return;
   ORG.rodando = true; desenhar();
   try {
-    const d = await api('triagem', ORG.semEtapa ? { limite: 8, so_sem_etapa: true, pular: ORG.sug.map(x => x.lead_id) } : { limite: 8 });
+    const d = await api('triagem', { limite: 8, pular: [...ORG.lidos], ...(ORG.col ? { etapa_id: ORG.col } : {}) });
     if (d.erro) { toast(d.erro, { tipo:'erro' }); }
     else {
+      (d.lidos || []).forEach(id => ORG.lidos.add(id));
+      ORG.restantes = d.restantes ?? null;
       const novos = (d.sugestoes || []).filter(n => !ORG.sug.some(x => x.lead_id === n.lead_id));
       ORG.sug = [...ORG.sug, ...novos];
-      if (!novos.length) toast(ORG.semEtapa ? 'Nenhum lead sem etapa para sugerir agora.' : 'Nada novo para sugerir.');
+      if (!novos.length) toast((d.lidos || []).length ? `Li ${d.lidos.length}: todos já estão na etapa certa.` : 'Nada mais para ler nesta coluna.');
       else toast(`${novos.length} sugestão${novos.length>1?'ões':''} — confira nos cards`, { tipo:'ok' });
     }
   } catch(e){ toast(e.message, { tipo:'erro' }); }
   ORG.rodando = false; desenhar();
 }
-function sairOrganizar(){ ORG = { ligado: false, rodando: false, sug: [], marcados: new Set(), semEtapa: false }; desenhar(); }
+// Regras do funil: o mesmo critério que a equipe e a IA usam, num lugar só
+function verRegras(){
+  const L = [
+    ['Novo lead', 'Chegou (site, bot, WhatsApp, evento)', 'Uma PESSOA da escola mandou mensagem → Em contato', 'Automático (mensagem de atendente no Capta) · ✨ varredura'],
+    ['Em contato', 'Uma pessoa da escola já falou', 'Família deu nome + idade da criança e mostrou interesse → Qualificado', 'Atendente · ✨ varredura'],
+    ['Qualificado ⚠️', 'Nome + idade + interesse da família', 'Aula marcada → Aula agendada', 'Automático ao agendar'],
+    ['Aula agendada ⚠️', 'Família aceitou dia e hora', 'Desfecho do Rafa (Matriculou / Em andamento / Não matriculou). Faltou fica aqui com tag reagendar', 'Tela Aula experimental'],
+    ['Matrícula em andamento', 'Fez a aula, está decidindo', 'Matriculou → Aluno ativo · Não matriculou → Remarketing', 'Card da aula ("A família decidiu?")'],
+    ['Aluno ativo', 'Rafa marcou Matriculou', '—', 'Automático'],
+    ['Remarketing', 'Não matriculou, ou disse que agora não dá', 'Voltou a demonstrar interesse → etapa da retomada', 'Rafa · ✨ varredura'],
+    ['Perdido', 'Sem interesse de vez / idade fora / pediu para parar', '—', 'Só manual (Rafa ou Bento). A IA nunca sugere'],
+  ];
+  const ov = document.createElement('div');
+  ov.className = 'regras-ov'; ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = `<div class="regras">
+    <div class="regras-cab"><b>📋 Regras do funil</b><button onclick="this.closest('.regras-ov').remove()">×</button></div>
+    <div class="regras-tab"><table><thead><tr><th>Coluna</th><th>Entra quando</th><th>Sai quando</th><th>Quem move</th></tr></thead>
+    <tbody>${L.map(r => `<tr>${r.map((c,i) => `<td>${i===0?'<b>'+esc(c)+'</b>':esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <p>⚠️ <b>Qualificado</b> e <b>Aula agendada</b> mandam evento de conversão para a Meta. Nunca mova leads em lote para elas — um lead errado ensina o anúncio a buscar o público errado.</p>
+    <p>✨ A varredura por IA segue estas mesmas regras e <b>nunca faz um lead voltar</b> de etapa (só pode mandar para Remarketing). Em dúvida entre duas etapas, ela escolhe a menos avançada.</p>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function sairOrganizar(){ ORG = ORG0(); desenhar(); }
 
 // ---- Descobrir agendas -------------------------------------------------
 // Lead parado em "Aula agendada" sem agendamento no Capta: a IA lê o campo
@@ -540,7 +584,8 @@ function painelAgendas(){
 }
 function marcarSug(id, on){ on ? ORG.marcados.add(id) : ORG.marcados.delete(id); desenhar(); }
 function ignorarSug(id){ ORG.sug = ORG.sug.filter(s => s.lead_id !== id); ORG.marcados.delete(id); desenhar(); }
-function marcarTodasSug(on){ ORG.marcados = new Set(on ? ORG.sug.filter(s => !s.avisa_meta).map(s => s.lead_id) : []); desenhar(); }
+// confiança baixa não entra no "marcar todas": precisa ser marcada uma a uma
+function marcarTodasSug(on){ ORG.marcados = new Set(on ? ORG.sug.filter(s => !s.avisa_meta && s.confianca !== 'baixa').map(s => s.lead_id) : []); desenhar(); }
 
 async function aplicarSug(){
   const itens = ORG.sug.filter(s => ORG.marcados.has(s.lead_id) && !s.avisa_meta);

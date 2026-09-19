@@ -437,14 +437,16 @@ function cartao(a){
     const menu = ABERTO && ABERTO.id === a.id && ABERTO.tipo === 'reagendar' ? menuReagendar(a) : '';
     pe = `<div class="done neutral"><span><b>Faltou.</b> Voltou para o atendimento como <i>urgente</i>, com a tag <i>REAGENDAR</i> no Capta e no Kommo</span>
       <span><button class="undo alt" onclick="abrirMenu('${a.id}','reagendar')">opções</button> <button class="undo" onclick="desfazer('${a.id}')">desfazer</button></span></div>${menu}`;
-  } else if (D_) {
+  } else if (D_ && !(D_.t === 'andamento' && ABERTO && ABERTO.id === a.id)) {
     est = D_.t === 'matriculou' ? ' win' : D_.t === 'nao' ? ' lost' : ' hold';
     const txt = D_.t === 'matriculou' ? `<b>Matriculou${D_.obs?' · '+esc(D_.obs.split(' · ')[0]):''}.</b> Baixa no Kommo como ganho: vai para Aluno ativo com a tag <i>pagamento: ${esc((D_.obs.split(' · ')[0]||'').toLowerCase())}</i>`
       : D_.t === 'nao' ? (/perdido/i.test(a.observacao||'')
         ? `<b>Perdido${D_.obs?' · '+esc(D_.obs.replace(/\s*·\s*perdido/i,'')):''}.</b> Saiu do funil: etapa Perdido no Capta e no Kommo`
         : `<b>Não fechou${D_.obs?' · '+esc(D_.obs):''}.</b> Vai para Remarketing no Kommo com a tag <i>motivo: ${esc(D_.obs.toLowerCase())}</i>`)
-      : `<b>Em andamento.</b> Continua na coluna de Aula agendada, com a tag <i>em andamento</i>. A observação abaixo vai como nota no Kommo. <i>“${esc(D_.obs||'sem observação')}”</i>`;
-    pe = `<div class="done ${D_.t==='matriculou'?'win':D_.t==='nao'?'lost':'hold'}"><span>${txt}</span>${D_.t==='matriculou'?'':`<button class="undo" onclick="desfazer('${a.id}')">desfazer</button>`}</div>`;
+      : `<b>Em andamento.</b> Foi para <b>Matrícula em andamento</b>, com a tag <i>em andamento</i>. A observação vai como nota no Kommo. <i>“${esc(D_.obs||'sem observação')}”</i>`;
+    pe = `<div class="done ${D_.t==='matriculou'?'win':D_.t==='nao'?'lost':'hold'}"><span>${txt}</span>${D_.t==='matriculou'?'':`<button class="undo" onclick="desfazer('${a.id}')">desfazer</button>`}</div>`
+      // a família decidiu dias depois: o Rafa fecha aqui mesmo, sem arrastar card no Pipeline
+      + (D_.t==='andamento' ? `<div class="acts mini"><span style="font-size:11.5px;color:var(--muted)">A família decidiu?</span><button class="yes" onclick="trocarDesfecho('${a.id}','matriculou')">Matriculou</button><button onclick="trocarDesfecho('${a.id}','nao')">Não matriculou</button></div>` : '');
   } else {
     const menu = ABERTO && ABERTO.id === a.id ? menuDesfecho(a) : '';
     // as quatro opções sempre visíveis, como no protótipo (a recepção dá baixa no dia; aula futura também pode ser remarcada/cancelada)
@@ -505,6 +507,9 @@ async function confirmarMatricula(id){
 }
 async function cancelar(id){ if (!confirm('Cancelar esta aula?')) return; try { await api('presenca', { agendamento_id: id, status: 'cancelado', motivo: 'cancelado pela recepção' }); toast('Aula cancelada · lead voltou de etapa · Kommo atualizado'); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
 async function reagendar(id, turmaId, data){ try { await api('remarcar', { agendamento_id: id, turma_id: turmaId, data, motivo: 'reagendado pela recepção' }); ABERTO = null; VAGAS3 = null; toast('Aula remarcada · Kommo atualizado', { tipo:'ok' }); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
+// Fecha um "em andamento" sem desfazer antes: desfazer devolveria o lead a
+// Aula agendada, e mover para lá manda outro evento de conversão para a Meta.
+function trocarDesfecho(id, tipo){ abrirMenu(id, tipo); }
 async function desfazer(id){ try { await api('desfazer', { agendamento_id: id }); toast('Desfeito · aula voltou a agendada'); await carregar(); } catch(e){ toast(e.message,{tipo:'erro'}); } }
 
 // conversa do lead: gaveta compartilhada
