@@ -423,7 +423,7 @@ function desenhar() {
 
   const mob = window.matchMedia('(max-width:760px)').matches;
   const barraOrg = ORG.ligado ? `<div class="org-topo">
-      <b>Organizando o funil</b>
+      <b>${ORG.semEtapa ? 'Organizando os leads sem etapa' : 'Organizando o funil'}</b>
       <span>${ORG.rodando ? 'lendo conversas…' : `${ORG.sug.length} sugestão${ORG.sug.length===1?'':'ões'} · só os leads com sugestão aparecem`}</span>
       <button class="btn g" onclick="organizar()" ${ORG.rodando?'disabled':''}>ler mais 8</button>
       ${ORG.sug.filter(x=>!x.avisa_meta).length ? `<button class="btn g" onclick="marcarTodasSug(true)">marcar todas</button><button class="btn g" onclick="marcarTodasSug(false)">limpar</button>` : ''}
@@ -437,6 +437,7 @@ function desenhar() {
         <span class="raia-cor" style="background:${esc(c.e.cor || '#2E5BFF')}"></span>
         <span class="raia-nome">${esc(c.e.nome)}</span>${ajudaEtapa(c.e.nome) ? iconeAjuda(ajudaEtapa(c.e.nome)) : ''}
         <span class="raia-qtd">${c.itens.length}</span>
+        ${!c.e.id ? `<button class="btn g" style="margin-left:auto;font-size:11.5px;padding:4px 9px" title="Leads que entraram sem etapa. A IA lê a conversa de cada um e sugere a etapa certa; quem não tem conversa vai para Novo lead." onclick="event.stopPropagation();organizar({semEtapa:true})" ${ORG.rodando?'disabled':''}>✨ organizar</button>` : ''}
       </div>
       <div class="raia-corpo">
         ${c.itens.length ? c.itens.map(cartao).join('') : '<div class="vazia">Nenhum lead aqui' + (c.e.id ? '' : '') + '</div>'}
@@ -453,26 +454,27 @@ function desenhar() {
 // Qualificado e Aula agendada disparam evento de conversão na Meta (webhook
 // do Kommo), por isso saem um de cada vez, com confirmação.
 // ---------------------------------------------------------------------
-let ORG = { ligado: false, rodando: false, sug: [], marcados: new Set() };
+let ORG = { ligado: false, rodando: false, sug: [], marcados: new Set(), semEtapa: false };
 const sugDe = id => ORG.sug.find(s => s.lead_id === id);
 
-async function organizar(){
+async function organizar(op){
+  if (op && op.semEtapa && !ORG.semEtapa) { ORG = { ligado: false, rodando: false, sug: [], marcados: new Set(), semEtapa: true }; }
   if (!ORG.ligado) { ORG.ligado = true; desenhar(); }
   if (ORG.rodando) return;
   ORG.rodando = true; desenhar();
   try {
-    const d = await api('triagem', { limite: 8 });
+    const d = await api('triagem', ORG.semEtapa ? { limite: 8, so_sem_etapa: true, pular: ORG.sug.map(x => x.lead_id) } : { limite: 8 });
     if (d.erro) { toast(d.erro, { tipo:'erro' }); }
     else {
       const novos = (d.sugestoes || []).filter(n => !ORG.sug.some(x => x.lead_id === n.lead_id));
       ORG.sug = [...ORG.sug, ...novos];
-      if (!novos.length) toast('Nada novo para sugerir.');
+      if (!novos.length) toast(ORG.semEtapa ? 'Nenhum lead sem etapa para sugerir agora.' : 'Nada novo para sugerir.');
       else toast(`${novos.length} sugestão${novos.length>1?'ões':''} — confira nos cards`, { tipo:'ok' });
     }
   } catch(e){ toast(e.message, { tipo:'erro' }); }
   ORG.rodando = false; desenhar();
 }
-function sairOrganizar(){ ORG = { ligado: false, rodando: false, sug: [], marcados: new Set() }; desenhar(); }
+function sairOrganizar(){ ORG = { ligado: false, rodando: false, sug: [], marcados: new Set(), semEtapa: false }; desenhar(); }
 
 // ---- Descobrir agendas -------------------------------------------------
 // Lead parado em "Aula agendada" sem agendamento no Capta: a IA lê o campo
