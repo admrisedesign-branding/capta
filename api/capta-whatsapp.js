@@ -99,7 +99,7 @@ module.exports = async function handler(req, res) {
     // sem e-mail no corpo (painel antigo) vale o padrão mais permissivo do dono
     if (!body._papel && token === tenant.dashboard_token) body._papel = 'gestor';
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'acesso', 'lgpd', 'lgpd_config', 'expurgar', 'pedido_titular', 'lembretes_agora', 'metas', 'casar_lid', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'acesso', 'lgpd', 'lgpd_config', 'expurgar', 'pedido_titular', 'lembretes_agora', 'metas', 'casar_lid', 'identificar', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -119,6 +119,7 @@ module.exports = async function handler(req, res) {
         case 'lgpd':            return await acaoLgpd(tenant, body, res);
         case 'lembretes_agora': return await acaoLembretesAgora(tenant, body, res);
         case 'metas':           return await acaoMetas(tenant, body, res);
+        case 'identificar':     return await acaoIdentificar(tenant, body, res);
         case 'casar_lid': {
           const [canal] = await sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&status=eq.conectado&select=*&limit=1`).catch(() => []);
           if (!canal) return res.status(400).json({ erro: 'WhatsApp não está conectado.' });
@@ -2663,7 +2664,7 @@ async function acaoSugerir(tenant, body, res) {
   ].filter(Boolean).join('\n');
 
   const sistema = `Você ajuda a recepção da My Robot Manaus, escola de robótica para crianças em Manaus, a responder pais no WhatsApp.
-Objetivo da conversa: entender a criança (nome e idade), despertar interesse e marcar a AULA EXPERIMENTAL gratuita de 1 hora. O valor da mensalidade só é apresentado pessoalmente, depois da aula.
+Objetivo da conversa: entender a criança (nome e idade), despertar interesse e marcar a AULA EXPERIMENTAL exclusiva de 1 hora (nunca chame de gratuita ou sem custo). O valor da mensalidade só é apresentado pessoalmente, depois da aula.
 Regras: escreva como uma pessoa de Manaus escreve no WhatsApp — curto, caloroso, no máximo 3 linhas, no máximo 1 emoji, sem formalidade de e-mail, sem "prezado". Nunca invente preço, endereço, horário ou vaga: use apenas os horários listados no contexto. Ofereça no máximo duas opções de horário. Se ainda não souber nome e idade da criança, pergunte isso antes de oferecer horário.
 Devolva SOMENTE um JSON no formato {"sugestoes":[{"titulo":"...","texto":"..."}]} com 3 opções de resposta diferentes entre si (por exemplo: uma direta, uma que pergunta algo, uma que contorna objeção). O "titulo" tem no máximo 4 palavras.`;
 
@@ -3022,6 +3023,140 @@ async function acaoCasarLid(tenant, canal, body, res) {
   const faltamLeads = (await sb(`capta_leads?tenant_id=eq.${tenant.id}&contato=not.is.null&lid=is.null&select=id&limit=1000`).catch(() => [])).length;
   return res.status(200).json({ ok: true, fundidas, ligadas, consultados, falhas_provedor: falhas, conversas_pendentes: lids.size, leads_por_consultar: faltamLeads,
     aviso: falhas >= 3 ? 'A Z-API não respondeu (ou respondeu sem @lid). Nada foi marcado; confira a instância e rode de novo.' : undefined });
+}
+
+// ---------------------------------------------------------------------
+// IDENTIFICAR CONTATO DE NÚMERO OCULTO (@lid)
+// O WhatsApp esconde o número de algumas pessoas: a conversa chega só com
+// um @lid e não há como descobrir o telefone por API. Quem descobre é o
+// atendente, na conversa. Esta ação:
+//   modo 'ler'    → procura nome/telefone nas mensagens (regex; com ia:true
+//                   a IA lê a conversa) e diz se o telefone já é de um lead
+//   modo 'salvar' → acha ou cria o lead, guarda o @lid nele e liga a
+//                   conversa; se o lead já tinha conversa pelo número real,
+//                   junta as duas
+// ---------------------------------------------------------------------
+function fonesNoTexto(t) {
+  const achados = [];
+  const re = /(?:\+?55[\s.-]?)?\(?\b(\d{2})\)?[\s.-]?(9?\d{4})[\s.-]?(\d{4})\b/g;
+  let m;
+  while ((m = re.exec(String(t || '')))) {
+    const ddd = Number(m[1]);
+    if (ddd < 11 || ddd > 99) continue;
+    const d = `${m[1]}${m[2]}${m[3]}`;
+    if (d.length === 10 || d.length === 11) achados.push('55' + d);
+  }
+  return achados;
+}
+
+async function acaoIdentificar(tenant, body, res) {
+  const convId = body.conversa_id;
+  if (!convId) return res.status(400).json({ erro: 'Informe a conversa.' });
+  const [conv] = await sb(`capta_conversas?id=eq.${convId}&tenant_id=eq.${tenant.id}&select=id,telefone,lid,nome,lead_id,atendente&limit=1`).catch(() => []);
+  if (!conv) return res.status(404).json({ erro: 'Conversa não encontrada.' });
+  const lidConv = (conv.lid && conv.lid !== 'sem') ? conv.lid
+    : (String(conv.telefone || '').replace(/\D/g, '').length > 13 ? String(conv.telefone).replace(/\D/g, '') : null);
+
+  const leadDoFone = async fone => {
+    const d = String(fone || '').replace(/\D/g, ''); if (d.length < 10) return null;
+    const oito = d.slice(-8);
+    const ls = await sb(`capta_leads?tenant_id=eq.${tenant.id}&contato=like.*${oito}&select=id,nome,contato,etapa_id,crianca&limit=5`).catch(() => []);
+    const ddd = d.replace(/^55/, '').slice(0, 2);
+    return (ls || []).find(l => String(l.contato || '').replace(/\D/g, '').replace(/^55/, '').startsWith(ddd)) || null;
+  };
+
+  // ------------------------------------------------------------ LER
+  if ((body.modo || 'ler') === 'ler') {
+    const msgs = await sb(`capta_mensagens?conversa_id=eq.${conv.id}&select=direcao,texto,transcricao,tipo,criado_em&order=criado_em.desc&limit=60`).catch(() => []);
+    const cron = (msgs || []).reverse();
+    // telefones escritos pelo CLIENTE (os da escola são o próprio número da unidade)
+    const fones = [...new Set(cron.filter(m => m.direcao === 'entrada').flatMap(m => fonesNoTexto(m.texto || m.transcricao)))];
+    const nomeWhats = (conv.nome && !/@lid$/i.test(conv.nome) && !/^\+?[\d\s()-]{10,}$/.test(conv.nome)) ? conv.nome : '';
+    let out = { nome: nomeWhats || '', telefone: fones[0] || '', crianca: '', idade: '', de_onde: fones[0] ? 'número escrito na conversa' : (nomeWhats ? 'nome do perfil do WhatsApp' : ''), ia: false };
+
+    if (body.ia) {
+      const chave = process.env.ANTHROPIC_API_KEY;
+      if (!chave) out.aviso = 'A leitura por IA não está ativa nesta conta; usei só o que dá pra achar sem IA.';
+      else if (cron.length) {
+        const historico = cron.map(m => `${m.direcao === 'entrada' ? 'CLIENTE' : 'ESCOLA'}: ${(m.texto || m.transcricao || '[' + (m.tipo || 'mídia') + ']').slice(0, 400)}`).join('\n');
+        try {
+          const r = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'x-api-key': chave, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001', max_tokens: 300,
+              system: 'Você extrai dados de uma conversa de WhatsApp entre uma escola e um CLIENTE (em geral mãe ou pai). Devolva SOMENTE JSON: {"nome":"","telefone":"","crianca":"","idade":"","trecho":""}. nome = nome do CLIENTE (quem escreve), nunca o da escola nem o da criança. telefone = número de WhatsApp que o CLIENTE informou, só dígitos com DDD. crianca/idade = da criança, se aparecer. trecho = a frase curta da conversa de onde tirou o nome ou telefone. Deixe vazio o que não estiver escrito; nunca invente.',
+              messages: [{ role: 'user', content: historico.slice(-12000) }]
+            })
+          });
+          const j = await r.json();
+          if (j.error) throw new Error(j.error.message || 'A IA recusou o pedido.');
+          const txt = (j.content || []).filter(x => x.type === 'text').map(x => x.text).join('');
+          const d = JSON.parse(txt.replace(/```json|```/g, '').trim());
+          const tel = fonesNoTexto(d.telefone)[0] || (String(d.telefone || '').replace(/\D/g, '').length >= 10 ? '55' + String(d.telefone).replace(/\D/g, '').replace(/^55/, '') : '');
+          out = { nome: d.nome || out.nome, telefone: tel || out.telefone, crianca: d.crianca || '', idade: d.idade ? String(d.idade).replace(/\D/g, '') : '', de_onde: d.trecho ? `a IA leu: "${String(d.trecho).slice(0, 120)}"` : out.de_onde, ia: true };
+        } catch (e) {
+          await registrarFalha(tenant.id, 'identificar', e.message).catch(() => null);
+          out.aviso = 'A IA não conseguiu ler agora; mostrei só o que dá pra achar sem IA.';
+        }
+      }
+    }
+    const existente = out.telefone ? await leadDoFone(out.telefone) : null;
+    return res.status(200).json({ ...out, lead_existente: existente ? { id: existente.id, nome: existente.nome, contato: existente.contato } : null });
+  }
+
+  // ------------------------------------------------------------ SALVAR
+  const nome = String(body.nome || '').trim();
+  let fone = String(body.telefone || '').replace(/\D/g, '');
+  if (!nome) return res.status(400).json({ erro: 'Escreva o nome da pessoa.' });
+  if (fone.length < 10 || fone.length > 13) return res.status(400).json({ erro: 'Telefone inválido: use DDD + número, ex.: 92 99999-9999.' });
+  fone = fone.startsWith('55') && fone.length >= 12 ? fone : '55' + fone;
+
+  const quem = await usuarioDe(tenant.id, body.email_atual).catch(() => null);
+  const autor = quem?.nome || body.por_nome || conv.atendente || null;
+
+  let lead = await leadDoFone(fone), criado = false;
+  if (!lead) {
+    const etapaId = (await sb(`capta_etapas?tenant_id=eq.${tenant.id}&nome=eq.Novo%20lead&select=id&limit=1`).catch(() => []))?.[0]?.id || null;
+    const ins = await sb('capta_leads', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+      tenant_id: tenant.id, nome, contato: fone, lid: lidConv,
+      crianca: body.crianca || null, idade: body.idade ? Number(body.idade) || null : null,
+      origem: 'whatsapp-direto', porta: 'whatsapp-direto', status: 'contatado', etapa_id: etapaId,
+      atendente: autor, notas: 'Chegou pelo WhatsApp com número oculto (@lid); identificado na inbox' + (autor ? ` por ${autor}` : '')
+    }) }).catch(() => null);
+    lead = ins?.[0] || await leadDoFone(fone);   // o gatilho de unificação pode ter absorvido o insert
+    criado = !!ins?.[0];
+    if (!lead) return res.status(500).json({ erro: 'Não consegui criar o lead.' });
+  }
+  if (lidConv) await sb(`capta_leads?id=eq.${lead.id}&tenant_id=eq.${tenant.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lid: lidConv }) }).catch(() => null);
+  if (!criado && (body.crianca || body.idade)) {
+    const patch = {}; if (body.crianca && !lead.crianca) patch.crianca = body.crianca; if (body.idade) patch.idade = Number(body.idade) || null;
+    if (Object.keys(patch).length) await sb(`capta_leads?id=eq.${lead.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) }).catch(() => null);
+  }
+
+  // o lead já tinha conversa pelo número real? junta as duas nela
+  const oito = fone.slice(-8);
+  const outras = (await sb(`capta_conversas?tenant_id=eq.${tenant.id}&id=neq.${conv.id}&or=(lead_id.eq.${lead.id},telefone.like.*${oito})&select=id,lid,nao_lidas,aguardando_desde&order=ultima_mensagem_em.desc.nullslast&limit=1`).catch(() => [])) || [];
+  let ficou = conv.id, unida = false;
+  if (outras[0]) {
+    const a = outras[0];
+    await sb(`capta_mensagens?conversa_id=eq.${conv.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ conversa_id: a.id }) });
+    const [cv] = await sb(`capta_conversas?id=eq.${conv.id}&select=nao_lidas&limit=1`).catch(() => []);
+    await sb(`capta_conversas?id=eq.${conv.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    const [ult] = await sb(`capta_mensagens?conversa_id=eq.${a.id}&select=texto,tipo,criado_em,direcao&order=criado_em.desc&limit=1`).catch(() => []);
+    await sb(`capta_conversas?id=eq.${a.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+      lead_id: lead.id, lid: (a.lid && a.lid !== 'sem') ? a.lid : lidConv,
+      nao_lidas: (a.nao_lidas || 0) + (cv?.nao_lidas || 0),
+      ...(ult ? { ultima_mensagem: ult.texto || `[${ult.tipo}]`, ultima_mensagem_em: ult.criado_em,
+        aguardando_desde: ult.direcao === 'entrada' ? (a.aguardando_desde || ult.criado_em) : null } : {})
+    }) }).catch(() => null);
+    ficou = a.id; unida = true;
+  } else {
+    await sb(`capta_conversas?id=eq.${conv.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+      lead_id: lead.id, telefone: fone, lid: lidConv, nome
+    }) });
+  }
+  return res.status(200).json({ ok: true, lead_id: lead.id, lead_nome: lead.nome || nome, lead_criado: criado, conversa_id: ficou, unida });
 }
 
 // Casa o telefone com um lead existente (comparação normalizada pela
