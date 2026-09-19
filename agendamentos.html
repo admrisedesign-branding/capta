@@ -353,6 +353,14 @@ body.embed .topbar{display:none}body.embed .wrap{padding-top:16px}
 .minix.lost{background:var(--quente-bg);border-color:rgba(224,49,39,.3)}.minix.lost b,.minix.lost span{color:#9d2d24}
 .minix.hold{background:var(--morno-bg);border-color:rgba(224,147,15,.35)}.minix.hold b,.minix.hold span{color:#8a5a06}
 .minix.gone{opacity:.7}
+.minix .mx-etapa{display:block;font-style:normal;font-size:10.5px;font-weight:800;margin-top:3px;letter-spacing:.02em}
+.etapa-agora{margin-top:8px;padding:6px 10px;border-radius:9px;font-size:12.5px;background:var(--gray-bg,#f2f4f8);color:var(--ink)}
+.etapa-agora.win{background:var(--verde-bg);color:#14713a}.etapa-agora.lost{background:var(--quente-bg);color:#9d2d24}.etapa-agora.hold{background:var(--morno-bg);color:#8a5a06}
+.chamada{display:inline-flex;gap:3px;margin-left:auto;flex-shrink:0}
+.chamada button{border:1px solid var(--line);background:#fff;border-radius:7px;width:26px;height:24px;font-size:11.5px;font-weight:800;color:var(--muted);cursor:pointer;font-family:inherit;padding:0}
+.chamada .ch-p.on{background:#16a34a;border-color:#16a34a;color:#fff}.chamada .ch-f.on{background:#e03127;border-color:#e03127;color:#fff}
+.al-linha.ch-presente .n{color:#14713a;font-weight:700}.al-linha.ch-faltou .n{color:#9d2d24;text-decoration:line-through;text-decoration-color:rgba(157,45,36,.4)}
+.ch-res{font-size:11px;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;margin-left:6px}
 
 /* aula de aluno remarcada */
 .tg-rem{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;background:rgba(124,92,219,.14);
@@ -488,11 +496,31 @@ async function api(acao, extra = {}, cacheMs) {
   if (cacheMs) CACHE.set(chave, { t: Date.now(), d });
   return d;
 }
+// ---- etapa atual do lead no card da aula / chamada dos matriculados ----
+let ETAPAS = [], PRES = {};
+// etapa do lead quando ela já não é "Aula agendada" (alguém mudou no Pipeline ou no Kommo)
+function etapaFora(l){
+  const e = ETAPAS.find(x => x.id === (l || {}).etapa_id); if (!e) return null;
+  const n = e.nome.toLowerCase().trim(); if (n === 'aula agendada') return null;
+  const cor = e.tipo === 'ganha' || /aluno ativo/.test(n) ? 'win' : e.tipo === 'perdida' || /remarketing|perdid/.test(n) ? 'lost' : /matr/.test(n) ? 'hold' : 'gone';
+  return { nome: e.nome, cor };
+}
+function chamadaDe(alunoId, d){ const p = PRES[alunoId + '|' + d]; return !p ? null : p.entrada_em ? 'presente' : p.motivo === 'falta' ? 'faltou' : null; }
+async function chamada(alunoId, d, status){
+  const atual = chamadaDe(alunoId, d);
+  const novo = atual === status ? 'limpar' : status;     // clicar de novo desmarca
+  const ant = PRES[alunoId + '|' + d];
+  PRES[alunoId + '|' + d] = novo === 'limpar' ? undefined : { aluno_id: alunoId, data: d, entrada_em: novo === 'presente' ? (ant?.entrada_em || new Date().toISOString()) : null, motivo: novo === 'faltou' ? 'falta' : null };
+  desenhar();
+  try { await api('chamada', { aluno_id: alunoId, data: d, status: novo }); }
+  catch(e){ PRES[alunoId + '|' + d] = ant; desenhar(); toast(e.message, { tipo:'erro' }); }
+}
 async function carregar(){
   try {
     const de = addDias(segunda(SEL), -35), ate = addDias(segunda(SEL), 42);
     const [al, ex] = await Promise.all([api('alunos', {}, 60000), api('experimentais', { de, ate }, 20000)]);
-    D = { ...al, agendamentos: ex.agendamentos || [] }; EXP = ex.agendamentos || []; LEADS = ex.leads || []; carregadoDe = de; carregadoAte = ate; desenhar();
+    D = { ...al, agendamentos: ex.agendamentos || [] }; EXP = ex.agendamentos || []; LEADS = ex.leads || [];
+    ETAPAS = ex.etapas || []; PRES = {}; (ex.presencas || []).forEach(p => { PRES[p.aluno_id + '|' + p.data] = p; }); carregadoDe = de; carregadoAte = ate; desenhar();
     if (AULA_ABERTA) pintarAula();
     // vagas vêm depois: a grade já aparece, os números de vaga entram em seguida
     api('agenda', { dias: 45 }, 45000).then(ag => { VAGAS = ag.horarios || []; desenhar(); }).catch(() => {});
@@ -607,12 +635,13 @@ function vDia(d){
         <span class="bd-sub"><b style="color:var(--ink)">${als.length + expDoBloco.length}</b>/${sala} na sala</span></div>
       <div class="bd-corpo">
         ${TIPO === 'experimental' ? '' : `<div class="bd-col">
-          <div class="bd-tit azul">Matriculados · ${als.filter(a=>!a._rem).length}${als.filter(a=>a._rem).length?` <span class="tg-rem">${als.filter(a=>a._rem).length} remarcado${als.filter(a=>a._rem).length>1?'s':''}</span>`:''}</div>
-          ${als.map(a => `<div class="al-linha ${a._rem?'saiu':''}">
+          <div class="bd-tit azul">Matriculados · ${als.filter(a=>!a._rem).length}${d <= hoje ? (() => { const v = als.filter(a => !a._rem); const p = v.filter(a => chamadaDe(a.id, d) === 'presente').length, f = v.filter(a => chamadaDe(a.id, d) === 'faltou').length; return p || f ? ` <span class="ch-res">✓ ${p} · F ${f}${v.length-p-f ? ' · '+(v.length-p-f)+' sem chamada' : ''}</span>` : ''; })() : ''}${als.filter(a=>a._rem).length?` <span class="tg-rem">${als.filter(a=>a._rem).length} remarcado${als.filter(a=>a._rem).length>1?'s':''}</span>`:''}</div>
+          ${als.map(a => { const ch = !a._rem && d <= hoje ? chamadaDe(a.id, d) : null; return `<div class="al-linha ${a._rem?'saiu':''} ${ch?'ch-'+ch:''}">
             <div class="al" onclick="abrirAluno('${a.id}')" title="${esc(a.nome)}${a.kit?' · '+esc(a.kit):''}"><span class="k" style="background:${corKit(a.kit)}"></span><span class="n">${esc(a.nome_curto||a.nome)}</span>${tagRem(a)}</div>
+            ${!a._rem && d <= hoje ? `<span class="chamada"><button class="ch-p ${ch==='presente'?'on':''}" onclick="chamada('${a.id}','${d}','presente')" title="${ch==='presente'?'desmarcar':'presente'}">✓</button><button class="ch-f ${ch==='faltou'?'on':''}" onclick="chamada('${a.id}','${d}','faltou')" title="${ch==='faltou'?'desmarcar':'faltou'}">F</button></span>` : ''}
             ${a._rem ? `<button class="bt-rem" onclick="desfazerRemarcacao('${a._rem.id}')" title="desfazer">desfazer</button>`
-              : a._veio ? '' : `<button class="bt-rem" onclick="remarcarAluno('${a.id}','${d}')" title="marcar a aula desta semana para outro dia">remarcar</button>`}
-          </div>`).join('') || '<div class="al" style="cursor:default;color:var(--faint)">ninguém nesta turma</div>'}
+              : a._veio || ch === 'presente' ? '' : `<button class="bt-rem" onclick="remarcarAluno('${a.id}','${d}')" title="marcar a aula desta semana para outro dia">remarcar</button>`}
+          </div>`; }).join('') || '<div class="al" style="cursor:default;color:var(--faint)">ninguém nesta turma</div>'}
           <div class="kits">${(D.kits||[]).map(k => { const u = porKit[k.kit]||0, liv = k.capacidade - u;
             return `<span class="kt ${liv<=0?'cheio':liv<=2?'alerta':''}" title="${esc(k.kit)}: ${u} de ${k.capacidade}">${esc(k.kit.replace('App Developer','App').replace('Bot',''))} ${u}/${k.capacidade}</span>`; }).join('')}</div>
         </div>`}
@@ -658,11 +687,13 @@ function vDia(d){
 // card reduzido da aula experimental: clicar abre o card inteiro
 function mini(a){
   const l = leadDe(a); const D_ = desfechoDe(a);
-  const cor = D_ ? (D_.t === 'matriculou' ? 'win' : D_.t === 'nao' ? 'lost' : D_.t === 'andamento' ? 'hold' : 'gone') : '';
+  const ef = etapaFora(l);
+  const cor = D_ ? (D_.t === 'matriculou' ? 'win' : D_.t === 'nao' ? 'lost' : D_.t === 'andamento' ? 'hold' : 'gone') : ef ? ef.cor : '';
   return `<div class="minix ${cor}" onclick="abrirAula('${a.id}')" title="ver e dar baixa">
     <b>${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade ? `<em>${a.crianca_idade} anos</em>` : ''}</b>
     <span>${esc(l.nome || 'sem responsável')}</span>
-    ${D_ ? `<i class="mx-res">${D_.t === 'matriculou' ? 'matriculou' : D_.t === 'nao' ? 'não fechou' : D_.t === 'andamento' ? 'em andamento' : 'faltou'}</i>` : ''}</div>`;
+    ${D_ ? `<i class="mx-res">${D_.t === 'matriculou' ? 'matriculou' : D_.t === 'nao' ? 'não fechou' : D_.t === 'andamento' ? 'em andamento' : 'faltou'}</i>` : ''}
+    ${ef && !(D_ && ((D_.t === 'andamento' && /matr/i.test(ef.nome)) || (D_.t === 'matriculou' && ef.cor === 'win'))) ? `<i class="mx-etapa" title="Etapa atual no funil">📍 ${esc(ef.nome)}</i>` : ''}</div>`;
 }
 let AULA_ABERTA = null;
 function abrirAula(id){
@@ -1073,6 +1104,7 @@ function cartao(a){
     <button class="scriptbtn" onclick="script('${a.id}')" title="Ver a conversa">script</button>
     <div class="top"><span class="hora-card">${hh(a.hora_inicio)}${a.hora_fim?`–${hh(a.hora_fim)}`:''}</span><span class="kid">${esc(a.crianca_nome || l.nome || 'Criança')}${a.crianca_idade?`<em>${a.crianca_idade} anos</em>`:''}</span>${rot}</div>
     <div class="guard">com ${esc(l.nome||'responsável')}${l.contato?` · <a href="https://wa.me/${String(l.contato).replace(/\D/g,'')}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--brand);font-weight:700;text-decoration:none">${esc(l.contato)}</a>`:''}${l.atendente?' · '+esc(l.atendente):''}</div>
+    ${etapaFora(l) ? `<div class="etapa-agora ${etapaFora(l).cor}">📍 No funil agora: <b>${esc(etapaFora(l).nome)}</b></div>` : ''}
     <div class="top" style="margin-top:8px">${org?`<span class="org ${org[1]}">${esc(org[0])}</span>`:''}${rea?`<span class="rea">remarcou ${rea}×</span>`:''}${a.status==='confirmado'?'<span class="rea" style="background:var(--verde-bg);color:var(--verde)">confirmou ✓</span>':''}${/pediu para remarcar/i.test(a.observacao||'')?'<span class="rea" style="background:rgba(224,49,39,.1);color:var(--quente)">pediu remarcar</span>':''}</div>
     ${sinal ? `<div class="sinal">${esc(sinal)}</div>` : ''}
     ${pe}</div>`;
