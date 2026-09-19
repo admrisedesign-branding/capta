@@ -93,6 +93,13 @@ tr:hover td{background:var(--brand-softer);cursor:pointer}
 .pt.falta{background:var(--quente-bg);color:var(--quente)}
 #ficha .sub-sec{font-size:11.5px;font-weight:700;color:var(--muted);margin:12px 0 2px}
 .chamada-f{display:inline-flex;gap:6px}
+#ficha .lk{border:0;background:none;color:var(--brand);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;padding:0;margin-left:8px}
+#ficha .hist{margin-top:14px;border:1px solid var(--line);border-radius:11px;padding:9px 12px}
+#ficha .hist summary{font-size:12.5px;font-weight:700;color:var(--brand);cursor:pointer}
+#ficha .hist-in p{font-size:12px;color:var(--muted);line-height:1.5;margin:8px 0 4px}
+#ficha .hist-lin{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+#ficha .hist-lin label{font-size:12px;font-weight:700;color:var(--muted);min-width:118px}
+#ficha .hist-lin input{border:1px solid var(--campo-borda,#C4CBDA);border-radius:9px;padding:6px 8px;font:inherit;font-size:13px}
 .chamada-f button{border:1px solid var(--campo-borda,#C4CBDA);background:#fff;border-radius:8px;padding:4px 9px;font-size:12px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
 .chamada-f .cf-p:hover{background:var(--verde-bg);border-color:var(--verde);color:var(--verde)}
 .chamada-f .cf-f:hover{background:var(--quente-bg);border-color:var(--quente);color:var(--quente)}
@@ -387,10 +394,13 @@ async function confirmarMudanca(turmaId, cheio){
   } catch(e){ toast(e.message, { tipo:'erro' }); }
 }
 
+let FICHA = { id: null, desde: null, todas: false };
 async function abrirFicha(id){
   document.getElementById('ficha').classList.add('aberto'); document.getElementById('ficha-scrim').classList.add('on');
   document.getElementById('ficha').innerHTML = `<div class="corpo"><div class="aviso">Carregando…</div></div>`;
-  let f; try { f = await api('ficha_aluno', { aluno_id: id }); } catch(e){ document.getElementById('ficha').innerHTML = `<div class="corpo"><div class="aviso">${esc(e.message)}</div></div>`; return; }
+  if (FICHA.id !== id) FICHA = { id, desde: null, todas: false };
+  let f; try { f = await api('ficha_aluno', { aluno_id: id, ...(FICHA.desde ? { desde: FICHA.desde } : {}) }); } catch(e){ document.getElementById('ficha').innerHTML = `<div class="corpo"><div class="aviso">${esc(e.message)}</div></div>`; return; }
+  FICHA.ultima = f;
   const a = f.aluno, t = f.turma, l = f.lead, m = f.matriculas?.[0];
   const ini = (a.nome||'?').trim().split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
   const freq = f.frequencia;
@@ -421,9 +431,20 @@ async function abrirFicha(id){
       <div class="barra-f"><i class="${clsF}" style="width:${freq}%"></i></div>`}
       ${aulasF.length ? `<div class="pontos">${aulasF.map(p => `<span class="pt ${p.status==='presente'?'ok':p.status==='faltou'?'falta':''}" title="${new Date(p.data+'T12:00').toLocaleDateString('pt-BR')} · ${p.status==='presente'?'presente':p.status==='faltou'?'faltou':'sem chamada'}">${new Date(p.data+'T12:00').getDate()}</span>`).join('')}</div>
       <div class="obs" style="color:var(--muted);font-size:11.5px;margin-top:6px">últimas aulas — verde: veio · vermelho: faltou · cinza: sem chamada</div>` : ''}
-      ${(f.sem_chamada||[]).length ? `<div class="sub-sec">Aulas sem chamada</div>
-        ${f.sem_chamada.map(d => `<div class="linha-f"><span>${new Date(d+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</span>
-          <b class="chamada-f"><button class="cf-p" onclick="chamadaFicha('${a.id}','${d}','presente')" title="veio">✓ veio</button><button class="cf-f" onclick="chamadaFicha('${a.id}','${d}','faltou')" title="faltou">F faltou</button></b></div>`).join('')}` : ''}
+      ${(f.sem_chamada||[]).length ? `<div class="sub-sec">Aulas sem chamada <span style="font-weight:600;color:var(--faint)">· ${f.sem_chamada_total}</span>
+          <button class="lk" onclick="todasVeio('${a.id}')" title="Marca como presente todas as aulas sem chamada listadas">✓ marcar todas como veio</button></div>
+        ${(FICHA.todas ? f.sem_chamada : f.sem_chamada.slice(0, 6)).map(d => `<div class="linha-f"><span>${new Date(d+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</span>
+          <b class="chamada-f"><button class="cf-p" onclick="chamadaFicha('${a.id}','${d}','presente')" title="veio">✓ veio</button><button class="cf-f" onclick="chamadaFicha('${a.id}','${d}','faltou')" title="faltou">F faltou</button></b></div>`).join('')}
+        ${!FICHA.todas && f.sem_chamada.length > 6 ? `<button class="lk" style="margin-top:6px" onclick="FICHA.todas=true;abrirFicha('${a.id}')">ver todas (${f.sem_chamada.length})</button>` : ''}` : ''}
+      ${t ? `<details class="hist" ${FICHA.desde ? 'open' : ''}><summary>Preencher histórico anterior</summary>
+        <div class="hist-in">
+          <p>O Capta conta as aulas a partir de <b>${f.inicio ? new Date(f.inicio+'T12:00').toLocaleDateString('pt-BR') : '—'}</b>. Se o aluno começou antes, informe a data da matrícula: as aulas desde então entram em "Aulas sem chamada" para marcar.</p>
+          <div class="hist-lin"><label>Matriculado desde</label><input type="date" id="h-desde" max="${new Date().toISOString().slice(0,10)}" value="${FICHA.desde || f.inicio || ''}">
+            <button class="btn g" onclick="FICHA.desde=document.getElementById('h-desde').value||null;FICHA.todas=true;abrirFicha('${a.id}')">mostrar aulas</button></div>
+          <div class="hist-lin"><label>Aula em outra data</label><input type="date" id="h-data" max="${new Date().toISOString().slice(0,10)}">
+            <span class="chamada-f"><button class="cf-p" onclick="outraData('${a.id}','presente')">✓ veio</button><button class="cf-f" onclick="outraData('${a.id}','faltou')">F faltou</button></span></div>
+          <p style="margin-top:6px">Use "outra data" para reposição, aula em outro dia ou quando o aluno estava em outra turma.</p>
+        </div></details>` : ''}
 
       ${f.notas?.length ? `<div class="sec">Satisfação ${media?`· média ${media} ⭐`:''}</div>
         ${f.notas.slice(0,4).map(n => `<div class="nota-f"><b>${'⭐'.repeat(n.nota)} <span style="font-weight:600;color:var(--muted)">${new Date(n.data+'T12:00').toLocaleDateString('pt-BR')}</span></b>${n.comentario?esc(n.comentario):''}</div>`).join('')}` : ''}
@@ -446,6 +467,18 @@ async function abrirFicha(id){
         ${a.status === 'ativo' ? `<button onclick="trancar('${a.id}')">Trancar</button>` : `<button onclick="reativar('${a.id}')">Reativar</button>`}
       </div>
     </div>`;
+}
+async function todasVeio(alunoId){
+  const datas = (FICHA.ultima && FICHA.ultima.sem_chamada) || [];
+  if (!datas.length) return;
+  if (!confirm(`Marcar ${datas.length} aula${datas.length>1?'s':''} como presente?\n\nConfira antes: aula em que o aluno faltou deve ser marcada com F.`)) return;
+  try { await api('chamada', { aluno_id: alunoId, datas, status: 'presente' }); toast(`${datas.length} aula${datas.length>1?'s':''} marcada${datas.length>1?'s':''} como presente`, { tipo:'ok' }); await abrirFicha(alunoId); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
+async function outraData(alunoId, status){
+  const d = (document.getElementById('h-data') || {}).value;
+  if (!d) return toast('Escolha a data da aula.', { tipo:'erro' });
+  await chamadaFicha(alunoId, d, status);
 }
 async function chamadaFicha(alunoId, data, status){
   try { await api('chamada', { aluno_id: alunoId, data, status }); await abrirFicha(alunoId); }
