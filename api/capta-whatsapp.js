@@ -2032,7 +2032,7 @@ async function acaoFichaAluno(tenant, body, res) {
   if (!al) return res.status(404).json({ erro: 'Aluno não encontrado.' });
   const [turmas, presencas, lead, matriculas] = await Promise.all([
     sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim`).catch(() => []),
-    sb(`capta_presencas?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&select=data,entrada_em,saida_em,feedback,comentario,motivo&order=data.desc&limit=180`).catch(() => []),
+    sb(`capta_presencas?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&select=data,entrada_em,saida_em,feedback,comentario,motivo&order=data.desc&limit=400`).catch(() => []),
     al.lead_id ? sb(`capta_leads?id=eq.${al.lead_id}&select=id,nome,contato,email,fonte,porta,origem,criado_em,kommo_lead_id,evento_id,temperatura`).catch(() => []) : [],
     al.lead_id ? sb(`capta_matriculas?tenant_id=eq.${tenant.id}&lead_id=eq.${al.lead_id}&select=valor_bruto,fechada_em,fechada_por,status&order=fechada_em.desc`).catch(() => []) : []
   ]);
@@ -2042,11 +2042,15 @@ async function acaoFichaAluno(tenant, body, res) {
   // Frequência só com o que foi REGISTRADO (chamada da Agenda ou check-in do
   // tablet). Aula sem registro é "sem chamada", não falta — antes, todo aluno
   // que não passava no tablet aparecia com 0% e várias faltas.
+  // O histórico começa na matrícula — ou antes, se a secretaria preencheu
+  // aulas anteriores (o Capta só conheceu o aluno depois) ou pediu (body.desde).
+  const maisAntiga = (presencas || []).map(p => p.data).sort()[0];
+  let inicioEf = [inicio, maisAntiga, /^\d{4}-\d{2}-\d{2}$/.test(body.desde || '') ? body.desde : null].filter(Boolean).sort()[0];
   const porDia = {}; (presencas || []).forEach(p => { porDia[p.data] = p.entrada_em ? 'presente' : p.motivo === 'falta' ? 'faltou' : null; });
   const hojeS = hojeManaus(), agoraMin = agoraMinManaus();
   const datas = [];
-  if (turma && inicio) {
-    const d = new Date(inicio + 'T12:00:00');
+  if (turma && inicioEf) {
+    const d = new Date(inicioEf + 'T12:00:00');
     for (; d.toISOString().slice(0, 10) <= hojeS; d.setDate(d.getDate() + 1)) {
       const dia = d.toISOString().slice(0, 10);
       if (d.getDay() !== turma.dia_semana) continue;
@@ -2062,7 +2066,7 @@ async function acaoFichaAluno(tenant, body, res) {
   const notas = (presencas || []).filter(p => p.feedback).map(p => ({ data: p.data, nota: p.feedback, comentario: p.comentario }));
   return res.status(200).json({
     aluno: al, turma: turma || null, presencas: presencas || [], previstas, presentes, faltas,
-    sem_chamada: semChamada.slice(-6).reverse(), sem_chamada_total: semChamada.length, aulas,
+    sem_chamada: semChamada.slice(-80).reverse(), sem_chamada_total: semChamada.length, aulas, inicio: inicioEf || null, inicio_matricula: inicio || null,
     frequencia: presentes + faltas ? Math.round(presentes / (presentes + faltas) * 100) : null,
     notas, lead: lead?.[0] || null, matriculas: matriculas || []
   });
@@ -2182,22 +2186,26 @@ async function acaoVagasKit(tenant, body, res) {
 // com entrada; faltou = linha sem entrada com motivo 'falta'.
 async function acaoChamada(tenant, body, res) {
   const { aluno_id, status } = body;
-  const dia = body.data || hojeManaus();
   if (!aluno_id || !['presente', 'faltou', 'limpar'].includes(status)) return res.status(400).json({ erro: 'Informe o aluno e presente/faltou.' });
-  if (dia > hojeManaus()) return res.status(400).json({ erro: 'Não dá para marcar chamada de aula que ainda não aconteceu.' });
   const [al] = await sb(`capta_alunos?id=eq.${aluno_id}&tenant_id=eq.${tenant.id}&select=id&limit=1`).catch(() => []);
   if (!al) return res.status(404).json({ erro: 'Aluno não encontrado.' });
+  // histórico em lote (preencher desde a matrícula): body.datas = ['AAAA-MM-DD', …]
+  const lista = Array.isArray(body.datas) ? [...new Set(body.datas.map(String))].filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 150) : [body.data || hojeManaus()];
+  if (lista.some(d => d > hojeManaus())) return res.status(400).json({ erro: 'Não dá para marcar chamada de aula que ainda não aconteceu.' });
+  for (const dia of lista) await marcarChamada(tenant, aluno_id, dia, status);
+  return res.status(200).json({ ok: true, status: status === 'limpar' ? null : status, marcadas: lista.length });
+}
+async function marcarChamada(tenant, aluno_id, dia, status) {
   const ja = (await sb(`capta_presencas?tenant_id=eq.${tenant.id}&data=eq.${dia}&aluno_id=eq.${aluno_id}&select=id,entrada_em&limit=1`).catch(() => []))?.[0];
   if (status === 'limpar') {
     if (ja) await sb(`capta_presencas?id=eq.${ja.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
-    return res.status(200).json({ ok: true, status: null });
+    return;
   }
   const dados = status === 'presente'
     ? { entrada_em: ja?.entrada_em || new Date().toISOString(), motivo: null }
     : { entrada_em: null, saida_em: null, motivo: 'falta' };
   if (ja) await sb(`capta_presencas?id=eq.${ja.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(dados) });
   else await sb('capta_presencas', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ tenant_id: tenant.id, data: dia, aluno_id, ...dados }) });
-  return res.status(200).json({ ok: true, status });
 }
 
 const hhmm = t => { const [h, m] = String(t || '00:00').split(':').map(Number); return h * 60 + (m || 0); };
