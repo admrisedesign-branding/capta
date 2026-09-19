@@ -240,13 +240,17 @@ function normalizarWebhook(payload) {
 // ---------------------------------------------------------------------
 // Pergunta à Z-API se o número tem WhatsApp e qual é o @lid dele.
 // É o que permite casar as conversas que chegam só com @lid aos leads do Kommo.
+// zapiFetch já devolve o corpo em objeto — tratar como resposta HTTP
+// (r.ok / r.json()) quebrava com "Cannot read properties of undefined".
 async function lidDoTelefone(canal, telefone) {
   const fone = comDDI(telefone);
   if (!fone) return null;
-  const r = await zapiFetch(canal, `phone-exists/${fone}`, { method: 'GET' });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.exists) return null;
-  const lid = String(j.lid || j.jid || '').replace('@lid', '').replace(/\D/g, '');
+  let j;
+  try { j = await zapiFetch(canal, `phone-exists/${fone}`, { method: 'GET' }); }
+  catch (e) { return null; }                       // número inexistente ou provedor fora
+  if (!j || j.exists === false) return null;
+  const bruto = j.lid || j.jid || j.chatLid || j.senderLid || '';
+  const lid = String(bruto).replace('@lid', '').replace(/\D/g, '');
   return lid || null;
 }
 
