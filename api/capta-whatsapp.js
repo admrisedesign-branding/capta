@@ -99,7 +99,7 @@ module.exports = async function handler(req, res) {
     // sem e-mail no corpo (painel antigo) vale o padrão mais permissivo do dono
     if (!body._papel && token === tenant.dashboard_token) body._papel = 'gestor';
 
-    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'acesso', 'lgpd', 'lgpd_config', 'expurgar', 'pedido_titular', 'lembretes_agora', 'metas', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
+    const SEM_WHATS = ['funil', 'mover', 'agenda', 'agendar', 'remarcar', 'presenca', 'lead', 'campos', 'alunos', 'aluno', 'aluno_confirmar', 'turmas_vagas', 'transferir_aluno', 'boas_vindas', 'lead_novo', 'nota', 'notas', 'acesso', 'lgpd', 'lgpd_config', 'expurgar', 'pedido_titular', 'lembretes_agora', 'metas', 'casar_lid', 'experimentais', 'desfecho', 'desfazer', 'conversa_atualizar', 'respostas', 'importar_historico', 'importar_midia', 'atendente_historico', 'ligacao', 'ligacoes', 'avisos', 'equipe', 'equipe_salvar', 'eu', 'eventos', 'evento_salvar', 'evento_leads', 'casar_conversas', 'sem_data', 'mapear_aulas', 'saude', 'transcrever', 'vagas_kit', 'repor', 'faltas_aluno', 'sugerir', 'triagem', 'triagem_aplicar', 'retomada', 'retomada_marcar', 'remarcar_aluno', 'desfazer_remarcacao', 'recepcao', 'checkin', 'feedback', 'visita_avulsa', 'resumo_config', 'resumo_agora', 'ficha_aluno'];
     if (SEM_WHATS.includes(acao)) {
       switch (acao) {
         case 'agenda':   return await acaoAgenda(tenant, body, res);
@@ -119,6 +119,7 @@ module.exports = async function handler(req, res) {
         case 'lgpd':            return await acaoLgpd(tenant, body, res);
         case 'lembretes_agora': return await acaoLembretesAgora(tenant, body, res);
         case 'metas':           return await acaoMetas(tenant, body, res);
+        case 'casar_lid':       return await acaoCasarLid(tenant, body, res);
         case 'lgpd_config':     return await acaoLgpdConfig(tenant, body, res);
         case 'expurgar':        return await acaoExpurgar(tenant, body, res);
         case 'pedido_titular':  return await acaoPedidoTitular(tenant, body, res);
@@ -2272,6 +2273,62 @@ async function contarFalarEfetivo(tenantId, desde) {
     semana: lista.filter(d => d >= seg).length,
     mes: lista.length
   };
+}
+
+// =====================================================================
+// CASAR CONVERSAS @lid COM OS LEADS
+// O WhatsApp vem escondendo o número: em vez do telefone, manda um @lid.
+// A conversa nasce sem dono e a pessoa some do Pipeline e da agenda — em
+// 19/set/2026 eram 248 de 297 conversas assim.
+// A Z-API não converte @lid em telefone (o WhatsApp não deixa), mas faz o
+// caminho inverso: dado um telefone, ela diz qual é o @lid. Então perguntamos
+// o @lid de cada lead que já temos e ligamos as conversas por ele.
+// Roda em lotes: GET não serve, a chamada é por ação, com &lote=.
+// =====================================================================
+async function acaoCasarLid(tenant, body, res) {
+  const [canal] = await sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&status=eq.conectado&select=*&limit=1`).catch(() => []);
+  if (!canal) return res.status(400).json({ erro: 'WhatsApp não está conectado.' });
+
+  const lote = Math.min(Math.max(Number(body.lote) || 25, 1), 60);
+  const pausa = ms => new Promise(r => setTimeout(r, ms));
+
+  // leads com telefone de verdade e ainda sem @lid conhecido
+  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&lid=is.null&contato=not.is.null` +
+    `&select=id,nome,contato&order=criado_em.desc&limit=${lote}`).catch(() => []);
+  const faltam = await sbCount(`capta_leads?tenant_id=eq.${tenant.id}&lid=is.null&contato=not.is.null&select=id`);
+
+  let consultados = 0, achados = 0, ligadas = 0;
+  for (const l of leads || []) {
+    const fone = String(l.contato || '').replace(/\D/g, '');
+    if (fone.length < 10 || fone.length > 13) continue;      // @lid antigo ou lixo
+    consultados++;
+    let lid = null;
+    try { lid = await prov.lidDoTelefone(canal, fone); } catch (e) { /* segue */ }
+    await pausa(350);
+    if (!lid) continue;
+    achados++;
+
+    await sb(`capta_leads?id=eq.${l.id}&tenant_id=eq.${tenant.id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lid })
+    }).catch(() => null);
+
+    // conversa órfã com esse @lid passa a ter dono
+    const r = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=is.null&or=(lid.eq.${lid},telefone.eq.${lid})`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ lead_id: l.id, telefone: fone })
+    }).catch(() => []);
+    ligadas += (r || []).length;
+  }
+  return res.status(200).json({ consultados, lid_encontrado: achados, conversas_ligadas: ligadas, faltam: Math.max(0, (faltam || 0) - consultados) });
+}
+
+// conta linhas sem trazer tudo
+async function sbCount(path) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}&limit=1`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, Prefer: 'count=exact' } });
+    return Number(r.headers.get('content-range')?.split('/')?.[1] || 0);
+  } catch (e) { return null; }
 }
 
 // Dispara a rodada de lembretes na hora, sem esperar o cron. Serve para
