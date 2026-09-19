@@ -1302,9 +1302,17 @@ async function abrirAluno(alunoId, dataAula){
   catch(e){ REP.erro = e.message; }
   desenharAluno();
 }
+// chamada atrasada, direto do modal do aluno: marca e recarrega as faltas
+async function chamadaModal(data, status){
+  const al = REP.aluno;
+  try { await api('chamada', { aluno_id: al.id, data, status });
+    PRES[al.id + '|' + data] = { aluno_id: al.id, data, entrada_em: status === 'presente' ? new Date().toISOString() : null, motivo: status === 'faltou' ? 'falta' : null };
+    REP.dados = await api('faltas_aluno', { aluno_id: al.id }); desenharAluno(); desenhar(); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
+}
 function desenharAluno(){
   const al = REP.aluno; const d = REP.dados; const t = (D.turmas||[]).find(x => x.id === al.turma_id);
-  const faltas = d?.faltas || []; const reps = d?.reposicoes || [];
+  const faltas = d?.faltas || []; const reps = d?.reposicoes || []; const semCh = d?.sem_chamada || [];
   document.getElementById('modal').innerHTML = `<div class="fundo" id="fundo"><div class="janela aluno-jan" style="max-width:540px">
     <h3>${esc(al.nome_curto || al.nome)}</h3>
     <p>${al.kit ? esc(al.kit) : ''}${t ? ` · ${DIAS[t.dia_semana]} ${hh(t.hora_inicio)}–${hh(t.hora_fim)}` : ' · sem turma'}${al.matricula ? ` · matrícula ${esc(al.matricula)}` : ''}</p>
@@ -1316,7 +1324,10 @@ function desenharAluno(){
       <div class="sec" style="font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px">Faltas recentes</div>
       ${faltas.length ? faltas.slice(0,4).map(f => `<div class="falta"><b>${DIAS3[dow(f.data)]} ${fmt(f.data,{day:'2-digit',month:'2-digit'})}</b><span style="color:var(--muted)">${hh(f.hora_inicio)}</span>
         <button class="btn sm" onclick="escolherReposicao('${f.data}')">repor esta</button></div>`).join('')
-        : '<div style="font-size:13px;color:var(--faint)">Sem faltas nos últimos 21 dias 👏</div>'}
+        : '<div style="font-size:13px;color:var(--faint)">Nenhuma falta marcada nos últimos 21 dias 👏</div>'}
+      ${semCh.length ? `<div class="sec" style="font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px">Aulas sem chamada</div>
+        ${semCh.slice(0,4).map(f => `<div class="falta"><b>${DIAS3[dow(f.data)]} ${fmt(f.data,{day:'2-digit',month:'2-digit'})}</b><span style="color:var(--muted)">${hh(f.hora_inicio)}</span>
+          <span class="chamada"><button class="ch-p" onclick="chamadaModal('${f.data}','presente')" title="veio">✓</button><button class="ch-f" onclick="chamadaModal('${f.data}','faltou')" title="faltou">F</button></span></div>`).join('')}` : ''}
       ${reps.length ? `<div class="sec" style="font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px">Reposições marcadas</div>
         ${reps.slice(0,4).map(r => `<div class="linha-f"><span>${DIAS3[dow(r.data)]} ${fmt(r.data,{day:'2-digit',month:'2-digit'})} · ${hh(r.hora_inicio)}</span><span style="color:var(--muted)">${esc(r.status)}</span></div>`).join('')}` : ''}
       ${blocoVagasRep()}
