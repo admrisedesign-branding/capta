@@ -387,6 +387,9 @@ button .mini-pt{border-color:rgba(0,0,0,.15);border-top-color:currentColor}
 .hcol-t.passou{opacity:.5}
 .hcol-t.passou .cap{background:transparent;border:1px solid var(--line);color:var(--faint);font-weight:700}
 .hcol-mais.vazia{color:var(--faint);font-size:12px;text-align:center;padding:10px 0;border:1px dashed var(--line);border-radius:10px;background:transparent;cursor:default}
+.ag-busca{flex:1 1 220px;min-width:170px;max-width:300px;border:1px solid var(--line);border-radius:10px;
+  padding:7px 11px;font:inherit;font-size:13px;background:var(--card)}
+.ag-busca:focus{outline:none;border-color:var(--brand)}
 </style>
 <style>body.embed .voltar,body.embed .topbar h1{display:none}body.embed .topbar{height:auto;min-height:0;background:transparent;backdrop-filter:none;border-bottom:0;padding:10px 18px 0;position:static;justify-content:flex-end}body.embed .topbar:not(:has(.ferr)):not(:has(.abas)):not(:has(button)){display:none}</style>
 <script>
@@ -474,7 +477,7 @@ const fmt = (d, o) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', o);
 const corKit = k => (D.kits.find(x => x.kit === k) || {}).cor || '#9AA1B4';
 const KITCUR = k => (k||'').replace('App Developer','APP').replace('Bot','').toUpperCase();
 
-let MODO = 'semana', SEL = hoje, D = { turmas: [], alunos: [], kits: [] }, EXP = [], LEADS = [], VAGAS = [], carregadoDe = null, carregadoAte = null;
+let BUSCA = '', MODO = 'semana', SEL = hoje, D = { turmas: [], alunos: [], kits: [] }, EXP = [], LEADS = [], VAGAS = [], carregadoDe = null, carregadoAte = null;
 
 const CACHE = new Map();
 async function api(acao, extra = {}, cacheMs) {
@@ -623,17 +626,29 @@ function vDia(d){
   // horas abertas sem turma
   const horasTurma = new Set();
   ts.forEach(t => { for (let x = hN(t.hora_inicio); x < hN(t.hora_fim); x++) horasTurma.add(x); });
-  const soltas = (VAGAS||[]).filter(v => v.data === d && !horasTurma.has(hN(v.hora_inicio)))
-    .sort((a,b) => String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
-  const extra = soltas.length && TIPO !== 'alunos' ? `<div class="bloco-dia">
-      <div class="bd-cab"><b>Horas livres</b><span class="bd-sub">a escola está aberta e não há turma</span></div>
+  // A visão dia montava as horas livres só a partir das vagas calculadas — e
+  // vaga só existe para hora futura dentro do funcionamento. Resultado: um
+  // encaixe fora da grade aparecia na semana e sumia no dia. Agora a lista de
+  // horas é a união das vagas com as horas que têm agendamento de verdade.
+  const horasComAg = [...new Set(EXP.filter(a => a.data === d && viva(a) && !horasTurma.has(hN(a.hora_inicio)))
+    .map(a => hN(a.hora_inicio)))];
+  const mapaVagas = {};
+  (VAGAS||[]).filter(v => v.data === d && !horasTurma.has(hN(v.hora_inicio))).forEach(v => { mapaVagas[hN(v.hora_inicio)] = v; });
+  horasComAg.forEach(h => { if (!mapaVagas[h]) mapaVagas[h] = { hora_inicio: `${String(h).padStart(2,'0')}:00:00`, vagas: null, capacidade: 8, turma_id: '' }; });
+  const soltas = Object.keys(mapaVagas).map(Number).sort((a,b) => a-b).map(h => mapaVagas[h]);
+  const extra = soltas.length ? `<div class="bloco-dia">
+      <div class="bd-cab"><b>Fora da grade</b><span class="bd-sub">horas sem turma — encaixes e aulas avulsas</span></div>
       <div class="hcols">${soltas.map(v => { const h = hN(v.hora_inicio); const total = v.capacidade ?? 8, livres = v.vagas;
-        const doH = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) === h && ehExp(a));
+        const semInfo = livres === null || livres === undefined;
+        // tudo o que existe nesta hora, inclusive reposição e encaixe de aluno
+        const doH = EXP.filter(a => a.data === d && viva(a) && hN(a.hora_inicio) === h);
         return `<div class="hcol" ondragover="event.preventDefault()" ondrop="dropExp(event,'${d}',${h})">
           <div class="hcol-t"><b>${hh(v.hora_inicio)}</b><span>–${String(h+1).padStart(2,'0')}:00</span>
-            <span class="cap ${livres<=0?'cheio':livres<=2?'alerta':''}">${livres}/${total}</span></div>
+            <span class="cap ${semInfo?'':livres<=0?'cheio':livres<=2?'alerta':''}">${semInfo?'—':`${livres}/${total}`}</span></div>
           ${doH.map(mini).join('')}
-          ${livres > 0 ? `<div class="hcol-mais" onclick="novoAgendamento('${d}','${v.turma_id||''}',${h})"><b>+ Marcar aula experimental</b><span>vagas restantes: ${livres}/${total}</span></div>`
+          ${semInfo
+            ? `<div class="hcol-mais" onclick="novoAgendamento('${d}','${v.turma_id||''}',${h})"><b>+ Marcar aula experimental</b><span>fora da grade — entra como encaixe</span></div>`
+            : livres > 0 ? `<div class="hcol-mais" onclick="novoAgendamento('${d}','${v.turma_id||''}',${h})"><b>+ Marcar aula experimental</b><span>vagas restantes: ${livres}/${total}</span></div>`
             : `<div class="hcol-mais cheia"><b>Sem kit livre</b><span>${total}/${total} ocupados</span></div>`}
         </div>`; }).join('')}</div></div>` : '';
 
@@ -1002,7 +1017,17 @@ const PAGTOS = ['Pix','cartão','boleto','recorrente'];
 const KITS = ['First','OneBot','TechBot','Autobot','App Developer','GameBot'];
 let ESC = {}, ABERTO = null, VAGAS3 = null, SEMDATA = [];
 const turmaDe = a => (D.turmas || []).find(t => t.id === a.turma_id) || {};
-const viva = a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para;
+// Busca da agenda: procura na criança, no responsável e no telefone.
+function achaBusca(a){
+  const q = (typeof BUSCA === 'string' ? BUSCA : '').trim().toLowerCase();
+  if (!q) return true;
+  const dig = q.replace(/\D/g, '');
+  const fone = String(a.lead?.contato || a.contato || '');
+  const alvo = [a.crianca_nome, a.lead?.nome, a.nome, a.nome_curto].filter(Boolean).join(' ').toLowerCase();
+  return alvo.includes(q) || (dig.length >= 4 && fone.includes(dig));
+}
+// "viva" já era o filtro de agendamento válido; agora respeita a busca também
+const viva = a => !['cancelado','remarcado'].includes(a.status) && !a.remarcado_para && achaBusca(a);
 function desfechoDe(a){ const m = /desfecho:\s*(matriculou|nao|andamento|faltou)(?:\s*·\s*(.*))?/i.exec(a.observacao||''); return m ? { t: m[1].toLowerCase(), obs: (m[2]||'').trim() } : null; }
 const ROT = { quente: ['Quer fechar','q'], morno: ['Considerando','m'], frio: ['Só conhecendo','f'] };
 function origemTag(l){
@@ -1204,6 +1229,8 @@ function barraTipo(nAl, nEx, nRe){
     ${b('experimental','Aulas experimentais','Quem vem conhecer a escola — trabalho do comercial', nEx)}
     ${b('alunos','Alunos e reposições','Quem já estuda aqui — trabalho da secretaria', nAl + nRe)}
   </div>
+  <input id="ag-busca" class="ag-busca" placeholder="Buscar criança, responsável ou telefone" value="${esc(BUSCA)}"
+    oninput="BUSCA=this.value; clearTimeout(window._tb); window._tb=setTimeout(()=>{desenhar();const el=document.getElementById('ag-busca');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}},250)">
   <div class="sep-visao"></div>
   <button class="btn ${TIPO==='fechamento'?'':'g'}" onclick="mudarTipo('${TIPO==='fechamento'?'todos':'fechamento'}')" title="Resultado de cada aula experimental, leads sem data e descobrir agendas">${TIPO==='fechamento'?'← voltar ao calendário':'Fechamento das aulas'}</button>
   ${TIPO==='fechamento'?'':`<button class="btn g" style="margin-left:auto" onclick="listaAlunos()">Lista de matriculados</button>`}`;
