@@ -119,7 +119,12 @@ module.exports = async function handler(req, res) {
         case 'lgpd':            return await acaoLgpd(tenant, body, res);
         case 'lembretes_agora': return await acaoLembretesAgora(tenant, body, res);
         case 'metas':           return await acaoMetas(tenant, body, res);
-        case 'casar_lid':       return await acaoCasarLid(tenant, body, res);
+        case 'casar_lid': {
+          const [canal] = await sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&status=eq.conectado&select=*&limit=1`).catch(() => []);
+          if (!canal) return res.status(400).json({ erro: 'WhatsApp não está conectado.' });
+          if (body.lote && !body.limite) body.limite = body.lote;
+          return await acaoCasarLid(tenant, canal, body, res);
+        }
         case 'lgpd_config':     return await acaoLgpdConfig(tenant, body, res);
         case 'expurgar':        return await acaoExpurgar(tenant, body, res);
         case 'pedido_titular':  return await acaoPedidoTitular(tenant, body, res);
@@ -2284,43 +2289,6 @@ async function contarFalarEfetivo(tenantId, desde) {
 // o @lid de cada lead que já temos e ligamos as conversas por ele.
 // Roda em lotes: GET não serve, a chamada é por ação, com &lote=.
 // =====================================================================
-async function acaoCasarLid(tenant, body, res) {
-  const [canal] = await sb(`capta_canais?tenant_id=eq.${tenant.id}&tipo=eq.whatsapp&status=eq.conectado&select=*&limit=1`).catch(() => []);
-  if (!canal) return res.status(400).json({ erro: 'WhatsApp não está conectado.' });
-
-  const lote = Math.min(Math.max(Number(body.lote) || 25, 1), 60);
-  const pausa = ms => new Promise(r => setTimeout(r, ms));
-
-  // leads com telefone de verdade e ainda sem @lid conhecido
-  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&lid=is.null&contato=not.is.null` +
-    `&select=id,nome,contato&order=criado_em.desc&limit=${lote}`).catch(() => []);
-  const faltam = await sbCount(`capta_leads?tenant_id=eq.${tenant.id}&lid=is.null&contato=not.is.null&select=id`);
-
-  let consultados = 0, achados = 0, ligadas = 0;
-  for (const l of leads || []) {
-    const fone = String(l.contato || '').replace(/\D/g, '');
-    if (fone.length < 10 || fone.length > 13) continue;      // @lid antigo ou lixo
-    consultados++;
-    let lid = null;
-    try { lid = await prov.lidDoTelefone(canal, fone); } catch (e) { /* segue */ }
-    await pausa(350);
-    if (!lid) continue;
-    achados++;
-
-    await sb(`capta_leads?id=eq.${l.id}&tenant_id=eq.${tenant.id}`, {
-      method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ lid })
-    }).catch(() => null);
-
-    // conversa órfã com esse @lid passa a ter dono
-    const r = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=is.null&or=(lid.eq.${lid},telefone.eq.${lid})`, {
-      method: 'PATCH', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ lead_id: l.id, telefone: fone })
-    }).catch(() => []);
-    ligadas += (r || []).length;
-  }
-  return res.status(200).json({ consultados, lid_encontrado: achados, conversas_ligadas: ligadas, faltam: Math.max(0, (faltam || 0) - consultados) });
-}
-
 // conta linhas sem trazer tudo
 async function sbCount(path) {
   try {
