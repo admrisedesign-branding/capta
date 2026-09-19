@@ -1089,8 +1089,9 @@ async function acaoDesfecho(tenant, body, res) {
   // Perdido: "não matriculou" com o lead encerrado de vez, em vez de Remarketing
   const vaiPerdido = desfecho === 'nao' && body.perdido === true;
   if (desfecho === 'compareceu') { Object.assign(patchAg, { status: 'compareceu', compareceu_em: agora }); }
-  // Em andamento: continua em Aula agendada, ganha a tag "em andamento" e a observação vira nota no Kommo
-  if (desfecho === 'andamento') { Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora }); }
+  // Em andamento: fez a aula e está decidindo → Matrícula em andamento (sem evento na Meta),
+  // com a tag "em andamento" e a observação como nota no Kommo
+  if (desfecho === 'andamento') { Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora }); etapaNome = 'Matrícula em andamento'; }
   // Não fechou: vai pra Remarketing com a tag "motivo: …"
   if (desfecho === 'nao') {
     Object.assign(patchAg, { status: 'compareceu', compareceu_em: a.status === 'compareceu' ? undefined : agora });
@@ -2726,34 +2727,42 @@ async function acaoTriagem(tenant, body, res) {
   const limite = Math.min(Number(body.limite) || 8, 15);
 
   const etapas = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome,tipo&order=ordem.asc`);
-  // conversas com mensagem do cliente, do lead mais parado para o mais recente
-  // so_sem_etapa: só os leads da coluna "Sem etapa" do Pipeline
-  let filtroLead = '';
-  let semConversa = [];
-  if (body.so_sem_etapa) {
-    const se = await sb(`capta_leads?tenant_id=eq.${tenant.id}&etapa_id=is.null&select=id&limit=300`).catch(() => []);
-    if (!se?.length) return res.status(200).json({ sugestoes: [], restantes: 0 });
-    const pular = new Set((body.pular || []).map(String));
-    const ids = se.map(x => x.id).filter(id => !pular.has(String(id)));
-    if (!ids.length) return res.status(200).json({ sugestoes: [], restantes: 0 });
-    filtroLead = `&lead_id=in.(${ids.join(',')})`;
-    const cs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}${filtroLead}&select=lead_id`).catch(() => []);
-    const comConv = new Set((cs || []).map(c => c.lead_id));
-    semConversa = ids.filter(id => !comConv.has(id));
+  // Varredura por COLUNA do Pipeline: body.etapa_id = uma etapa; so_sem_etapa
+  // (ou etapa_id 'sem') = a coluna "Sem etapa"; nada = o funil todo.
+  // body.pular = leads já lidos nesta varredura (a tela manda de volta), para
+  // o "ler mais" trazer os próximos e não os mesmos.
+  const pular = new Set((body.pular || []).map(String));
+  const col = (body.so_sem_etapa || body.etapa_id === 'sem') ? 'sem' : (body.etapa_id || null);
+  let semConversa = [], convs = [];
+  if (col) {
+    const f = col === 'sem' ? 'lead.etapa_id=is.null' : `lead.etapa_id=eq.${col}`;
+    convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&select=id,lead_id,ultima_mensagem_em,lead:lead_id!inner(etapa_id)&${f}&order=ultima_mensagem_em.desc.nullslast&limit=500`).catch(() => []);
+    if (col === 'sem') {
+      const se = await sb(`capta_leads?tenant_id=eq.${tenant.id}&etapa_id=is.null&select=id&limit=300`).catch(() => []);
+      const comConv = new Set((convs || []).map(c => c.lead_id));
+      semConversa = (se || []).map(x => x.id).filter(id => !comConv.has(id) && !pular.has(String(id)));
+    }
+  } else {
+    convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=not.is.null&select=id,lead_id,ultima_mensagem_em&order=ultima_mensagem_em.desc&limit=200`).catch(() => []);
   }
-  const convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=not.is.null${filtroLead}&select=id,lead_id,ultima_mensagem_em&order=ultima_mensagem_em.desc&limit=120`);
-  const vistos = new Set(); const alvo = [];
+  const vistos = new Set(); const alvo = []; let totalCol = 0;
   for (const c of convs || []) {
     if (vistos.has(c.lead_id)) continue; vistos.add(c.lead_id);
-    alvo.push(c); if (alvo.length >= limite * 3) break;
+    if (pular.has(String(c.lead_id))) continue;
+    totalCol++;
+    if (alvo.length < limite) alvo.push(c);
   }
-  const leads = await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${alvo.map(c => c.lead_id).join(',')})&select=id,nome,contato,temperatura,crianca,idade,etapa_id,etapa_em,notas,data_aula`);
+  if (!alvo.length && !semConversa.length) return res.status(200).json({ sugestoes: [], lidos: [], restantes: 0 });
+  const leads = alvo.length ? await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${alvo.map(c => c.lead_id).join(',')})&select=id,nome,contato,temperatura,crianca,idade,etapa_id,etapa_em,notas,data_aula`) : [];
+  const lidos = [];
+  const ordemDe = id => (etapas || []).findIndex(e => e.id === id);
   const porId = Object.fromEntries((leads || []).map(l => [l.id, l]));
 
   const saida = [];
   for (const c of alvo) {
-    if (saida.length >= limite) break;
+    if (lidos.length >= limite) break;      // 8 leituras por clique: cabe no tempo da função
     const lead = porId[c.lead_id]; if (!lead) continue;
+    lidos.push(lead.id);
     const etapaAtual = (etapas || []).find(e => e.id === lead.etapa_id);
     // não mexe em quem já é aluno ou já foi perdido de propósito
     if (etapaAtual && ['ganha', 'perdida'].includes(etapaAtual.tipo)) continue;
@@ -2763,25 +2772,25 @@ async function acaoTriagem(tenant, body, res) {
     const pend = (msgs || []).filter(m => m.tipo === 'audio' && !m.transcricao && m.midia_url).slice(0, 4);
     for (const m of pend) { const t = await transcreverAudio(tenant, m.id).catch(() => null); if (t) m.transcricao = t; }
     const hist = (msgs || []).reverse()
-      .map(m => `${m.direcao === 'entrada' ? 'CLIENTE' : 'ESCOLA'}: ${(m.texto || m.transcricao || '[' + (m.tipo || 'mídia') + ']').slice(0, 300)}`).join('\n');
+      .map(m => `${m.direcao === 'entrada' ? 'CLIENTE' : (['bot', 'sistema'].includes(m.autor) ? 'ESCOLA (robô/automática)' : 'ESCOLA (pessoa)')}: ${(m.texto || m.transcricao || '[' + (m.tipo || 'mídia') + ']').slice(0, 300)}`).join('\n');
     if (!hist || hist.length < 30) {            // conversa vazia não dá para julgar
-      if (body.so_sem_etapa) semConversa.push(lead.id);
+      if (col === 'sem') semConversa.push(lead.id);
       continue;
     }
 
     const sistema = `Você organiza o funil de uma escola de robótica infantil em Manaus, lendo conversas de WhatsApp com pais.
 Classifique em UMA etapa, seguindo exatamente estes critérios:
-- "Novo lead": ninguém da escola respondeu ainda.
-- "Em contato": a escola já respondeu, mas ainda não se sabe nome e idade da criança nem houve conversa sobre horário/valor.
-- "Qualificado": sabe-se NOME e IDADE da criança E a família falou sobre horário ou valor. Interesse real, falta marcar a aula.
-- "Aula agendada": há dia e hora combinados na conversa.
+- "Novo lead": nenhuma PESSOA da escola escreveu ainda. Mensagem de robô, resposta automática ou resumo do formulário ("ESCOLA (robô/automática)") NÃO conta como contato.
+- "Em contato": uma PESSOA da escola ("ESCOLA (pessoa)") já mandou mensagem, mas a família ainda não deu o nome da criança nem mostrou interesse claro.
+- "Qualificado": a família informou o NOME e a IDADE da criança E partiu DELA um sinal de interesse (uma pergunta ou pedido sobre horário, valor, como funciona, quer conhecer). Responder só "oi", "sim" ou "ok" NÃO é interesse. Falta marcar a aula.
+- "Aula agendada": a FAMÍLIA aceitou um dia e uma hora ("pode ser sábado às 11h", "fechado", "combinado"). Horário só OFERECIDO pela escola, sem aceite da família, NÃO é aula agendada.
 - "Matrícula em andamento": já fez a aula experimental e falou em fechar/pagar.
-- "Remarketing": disse que não pode agora, vai pensar, achou caro, horário não bate — mas pode voltar.
-- "Perdido": sem interesse, idade fora da faixa, pediu para não receber mais, ou sumiu há muito tempo depois de várias tentativas.
+- "Remarketing": a família disse EXPLICITAMENTE que não pode agora, vai pensar, achou caro, o horário não bate — e NÃO voltou a demonstrar interesse em mensagem posterior. Se depois disso ela retomou o assunto, vale a etapa dessa retomada.
+- NUNCA use "Perdido": essa etapa é só para o fechamento manual da equipe. Desinteresse claro = "Remarketing".
 Na dúvida entre duas, escolha a MENOS avançada.
 Se na conversa a família COMBINOU um dia e hora para a aula experimental, extraia: "aula_data" (AAAA-MM-DD) e "aula_hora" (HH:MM). Use a data de hoje informada para resolver "sábado", "amanhã", "dia 20". Se a aula combinada JÁ PASSOU, a etapa não pode ser "Aula agendada": use "Matrícula em andamento" se a família demonstrou querer fechar, ou "Remarketing" se sumiu depois da aula.
 Responda SOMENTE com JSON:
-{"etapa":"<nome exato>","motivo":"<até 15 palavras citando o que na conversa indica isso>","confianca":"alta|media|baixa","crianca":"<nome ou null>","idade":<número ou null>,"aula_data":"<AAAA-MM-DD ou null>","aula_hora":"<HH:MM ou null>"}`;
+{"etapa":"<nome exato>","motivo":"<até 15 palavras citando o que na conversa indica isso>","confianca":"alta|media|baixa","crianca":"<nome ou null>","idade":<número ou null>,"aula_data":"<AAAA-MM-DD ou null>","aula_hora":"<HH:MM ou null>","familia_confirmou_aula":<true se a FAMÍLIA aceitou dia e hora, senão false>}`;
 
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -2795,6 +2804,14 @@ Responda SOMENTE com JSON:
       const p = JSON.parse(txt.replace(/```json|```/g, '').trim());
       const destino = (etapas || []).find(e => e.nome.toLowerCase().trim() === String(p.etapa || '').toLowerCase().trim());
       if (!destino || destino.id === lead.etapa_id) continue;   // já está certo
+      // travas que não dependem da IA acertar o prompt
+      const nomeDest = destino.nome.toLowerCase().trim();
+      if (destino.tipo === 'perdida' || /perdid/.test(nomeDest)) continue;                 // Perdido é só manual
+      if (nomeDest === 'qualificado' && !((p.crianca || lead.crianca) && (p.idade || lead.idade))) continue;   // sem nome + idade não qualifica
+      if (nomeDest === 'aula agendada' && (p.familia_confirmou_aula !== true || !p.aula_data || !p.aula_hora)) continue;
+      // não faz o lead voltar no funil (as etapas de trás são avançadas por
+      // ações reais: agendar, desfecho da aula). Remarketing/Perdido valem sempre.
+      if (etapaAtual && !/remarketing|perdid/i.test(destino.nome) && ordemDe(destino.id) < ordemDe(etapaAtual.id)) continue;
       saida.push({
         lead_id: lead.id, nome: lead.nome, contato: lead.contato,
         etapa_atual: etapaAtual?.nome || null, etapa_atual_id: lead.etapa_id || null,
@@ -2810,16 +2827,14 @@ Responda SOMENTE com JSON:
     } catch (e) { /* uma conversa que falha não derruba a triagem */ }
   }
   // lead sem etapa e sem conversa que dê para ler: o lugar dele é "Novo lead"
-  if (body.so_sem_etapa && semConversa.length && saida.length < limite) {
+  if (col === 'sem' && semConversa.length && saida.length < limite) {
     const novo = (etapas || []).find(e => /^novo lead$/i.test(e.nome.trim()));
     const ls = novo ? await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${semConversa.slice(0, limite - saida.length).join(',')})&select=id,nome,contato`).catch(() => []) : [];
-    for (const l of ls || []) saida.push({ lead_id: l.id, nome: l.nome, contato: l.contato, etapa_atual: null, etapa_atual_id: null,
+    for (const l of ls || []) lidos.push(l.id), saida.push({ lead_id: l.id, nome: l.nome, contato: l.contato, etapa_atual: null, etapa_atual_id: null,
       etapa_nova: novo.nome, etapa_nova_id: novo.id, motivo: 'sem conversa para ler — entra como lead novo', confianca: 'media', avisa_meta: false });
   }
-  const restantes = body.so_sem_etapa
-    ? Math.max(0, ((await sb(`capta_leads?tenant_id=eq.${tenant.id}&etapa_id=is.null&select=id&limit=300`).catch(() => [])) || []).length - saida.length)
-    : Math.max(0, vistos.size - saida.length);
-  return res.status(200).json({ sugestoes: saida, restantes });
+  const restantes = Math.max(0, totalCol + semConversa.length - lidos.length);
+  return res.status(200).json({ sugestoes: saida, lidos, restantes });
 }
 
 async function acaoTriagemAplicar(tenant, body, res) {
