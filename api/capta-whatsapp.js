@@ -199,7 +199,6 @@ module.exports = async function handler(req, res) {
       case 'desconectar': return await acaoDesconectar(canal, res);
       case 'webhooks':    return await acaoWebhooks(canal, res);
       case 'enviar':      return await acaoEnviar(tenant, canal, body, res);
-      case 'casar_lid':   return await acaoCasarLid(tenant, canal, body, res);
       case 'enviar_midia': return await acaoEnviarMidia(tenant, canal, body, res);
       case 'conversas':   return await acaoConversas(tenant, res);
       case 'mensagens':   return await acaoMensagens(tenant, body, res);
