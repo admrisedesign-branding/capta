@@ -475,7 +475,7 @@ function desenharLista(){
 async function casarLid(){
   const aviso = toast('<span class="mini-pt-esc"></span>consultando a Z-API…', { ms: 120000 });
   try { await api('casar_conversas').catch(()=>{});      // primeiro quem tem número de verdade
-    const r = await api('casar_lid', { limite: 60 }); aviso.remove();
+    const r = await api('casar_lid', { limite: 20 }); aviso.remove();
     toast(`${r.fundidas||0} duplicada${(r.fundidas||0)===1?'':'s'} unida${(r.fundidas||0)===1?'':'s'} · ${r.ligadas} ligada${r.ligadas===1?'':'s'} ao lead · ${r.conversas_pendentes} ainda sem lead · ${r.leads_por_consultar} leads por consultar`, { ms: 9000, tipo: (r.ligadas||r.fundidas) ? 'ok' : undefined });
     carregarLista(); }
   catch(e){ aviso.remove(); toast(e.message, { tipo:'erro' }); }
