@@ -2727,7 +2727,21 @@ async function acaoTriagem(tenant, body, res) {
 
   const etapas = await sb(`capta_etapas?tenant_id=eq.${tenant.id}&select=id,nome,tipo&order=ordem.asc`);
   // conversas com mensagem do cliente, do lead mais parado para o mais recente
-  const convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=not.is.null&select=id,lead_id,ultima_mensagem_em&order=ultima_mensagem_em.desc&limit=120`);
+  // so_sem_etapa: só os leads da coluna "Sem etapa" do Pipeline
+  let filtroLead = '';
+  let semConversa = [];
+  if (body.so_sem_etapa) {
+    const se = await sb(`capta_leads?tenant_id=eq.${tenant.id}&etapa_id=is.null&select=id&limit=300`).catch(() => []);
+    if (!se?.length) return res.status(200).json({ sugestoes: [], restantes: 0 });
+    const pular = new Set((body.pular || []).map(String));
+    const ids = se.map(x => x.id).filter(id => !pular.has(String(id)));
+    if (!ids.length) return res.status(200).json({ sugestoes: [], restantes: 0 });
+    filtroLead = `&lead_id=in.(${ids.join(',')})`;
+    const cs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}${filtroLead}&select=lead_id`).catch(() => []);
+    const comConv = new Set((cs || []).map(c => c.lead_id));
+    semConversa = ids.filter(id => !comConv.has(id));
+  }
+  const convs = await sb(`capta_conversas?tenant_id=eq.${tenant.id}&lead_id=not.is.null${filtroLead}&select=id,lead_id,ultima_mensagem_em&order=ultima_mensagem_em.desc&limit=120`);
   const vistos = new Set(); const alvo = [];
   for (const c of convs || []) {
     if (vistos.has(c.lead_id)) continue; vistos.add(c.lead_id);
@@ -2750,7 +2764,10 @@ async function acaoTriagem(tenant, body, res) {
     for (const m of pend) { const t = await transcreverAudio(tenant, m.id).catch(() => null); if (t) m.transcricao = t; }
     const hist = (msgs || []).reverse()
       .map(m => `${m.direcao === 'entrada' ? 'CLIENTE' : 'ESCOLA'}: ${(m.texto || m.transcricao || '[' + (m.tipo || 'mídia') + ']').slice(0, 300)}`).join('\n');
-    if (!hist || hist.length < 30) continue;    // conversa vazia não dá para julgar
+    if (!hist || hist.length < 30) {            // conversa vazia não dá para julgar
+      if (body.so_sem_etapa) semConversa.push(lead.id);
+      continue;
+    }
 
     const sistema = `Você organiza o funil de uma escola de robótica infantil em Manaus, lendo conversas de WhatsApp com pais.
 Classifique em UMA etapa, seguindo exatamente estes critérios:
@@ -2792,7 +2809,17 @@ Responda SOMENTE com JSON:
       });
     } catch (e) { /* uma conversa que falha não derruba a triagem */ }
   }
-  return res.status(200).json({ sugestoes: saida, restantes: Math.max(0, vistos.size - saida.length) });
+  // lead sem etapa e sem conversa que dê para ler: o lugar dele é "Novo lead"
+  if (body.so_sem_etapa && semConversa.length && saida.length < limite) {
+    const novo = (etapas || []).find(e => /^novo lead$/i.test(e.nome.trim()));
+    const ls = novo ? await sb(`capta_leads?tenant_id=eq.${tenant.id}&id=in.(${semConversa.slice(0, limite - saida.length).join(',')})&select=id,nome,contato`).catch(() => []) : [];
+    for (const l of ls || []) saida.push({ lead_id: l.id, nome: l.nome, contato: l.contato, etapa_atual: null, etapa_atual_id: null,
+      etapa_nova: novo.nome, etapa_nova_id: novo.id, motivo: 'sem conversa para ler — entra como lead novo', confianca: 'media', avisa_meta: false });
+  }
+  const restantes = body.so_sem_etapa
+    ? Math.max(0, ((await sb(`capta_leads?tenant_id=eq.${tenant.id}&etapa_id=is.null&select=id&limit=300`).catch(() => [])) || []).length - saida.length)
+    : Math.max(0, vistos.size - saida.length);
+  return res.status(200).json({ sugestoes: saida, restantes });
 }
 
 async function acaoTriagemAplicar(tenant, body, res) {

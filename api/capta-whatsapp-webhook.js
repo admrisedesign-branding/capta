@@ -310,11 +310,25 @@ async function acharOuCriarConversa(tenant, canalId, evento) {
   // operação encontrou em 19/set/2026. Se o telefone não bate com ninguém,
   // o lead nasce aqui, e o restante do fluxo (anúncio, bot, etapa) preenche
   // o que souber depois.
+  // Antes de criar, tenta de novo por DDD + 8 últimos dígitos: o WhatsApp
+  // manda número antigo de Manaus SEM o 9 (5592 8434-2287) e o Kommo guarda
+  // COM o 9 — a RPC não casa os dois e nascia um lead duplicado.
   if (!leadId && fone) {
+    const d = String(fone).replace(/\D/g, '').replace(/^55/, '');
+    if (d.length >= 10) {
+      const ls = await sb(`capta_leads?tenant_id=eq.${tenant}&contato=like.*${d.slice(-8)}&select=id,contato,etapa_id&order=etapa_id.nullslast&limit=5`).catch(() => []);
+      const l = (ls || []).find(x => String(x.contato || '').replace(/\D/g, '').replace(/^55/, '').startsWith(d.slice(0, 2)));
+      if (l) leadId = l.id;
+    }
+  }
+  if (!leadId && fone) {
+    // lead novo nasce em "Novo lead": sem etapa ele cai numa coluna solta
+    // no Pipeline ("Sem etapa") e ninguém enxerga
+    const etapaNovo = (await sb(`capta_etapas?tenant_id=eq.${tenant}&nome=ilike.novo%20lead&select=id&limit=1`).catch(() => []))?.[0]?.id || null;
     const criado = await sb('capta_leads', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
       tenant_id: tenant, nome: evento?.nome || null, contato: fone,
       origem: 'whatsapp', fonte: 'whatsapp', porta: 'whatsapp',
-      status: 'novo', temperatura: 'Morno'
+      status: 'novo', temperatura: 'Morno', etapa_id: etapaNovo, etapa_em: new Date().toISOString()
     }) }).catch(() => null);
     if (criado?.[0]?.id) leadId = criado[0].id;
   }
