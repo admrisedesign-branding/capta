@@ -78,7 +78,7 @@ tr:hover td{background:var(--brand-softer);cursor:pointer}
 #ficha .av{width:44px;height:44px;border-radius:12px;background:var(--brand-soft);color:var(--brand);font-weight:800;display:grid;place-items:center;flex:0 0 44px;font-size:15px}
 #ficha h3{font-size:17px;font-weight:800;line-height:1.2}#ficha .sub{font-size:12.5px;color:var(--muted);margin-top:3px}
 #ficha .x{margin-left:auto;border:0;background:transparent;color:var(--faint);font-size:20px;cursor:pointer}
-#ficha .corpo{flex:1;overflow-y:auto;padding:16px 20px}
+#ficha .corpo{display:block;flex:1;overflow-y:auto;padding:16px 20px}   /* a .corpo da página é grid de 2 colunas: sem isto a ficha quebrava em duas */
 #ficha .sec{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 8px}
 #ficha .sec:first-child{margin-top:0}
 .freq{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end}
@@ -90,6 +90,12 @@ tr:hover td{background:var(--brand-softer);cursor:pointer}
 .pontos{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
 .pt{width:22px;height:22px;border-radius:7px;background:var(--line-2);display:grid;place-items:center;font-size:9.5px;font-weight:800;color:var(--faint)}
 .pt.ok{background:var(--verde-bg);color:var(--verde)}
+.pt.falta{background:var(--quente-bg);color:var(--quente)}
+#ficha .sub-sec{font-size:11.5px;font-weight:700;color:var(--muted);margin:12px 0 2px}
+.chamada-f{display:inline-flex;gap:6px}
+.chamada-f button{border:1px solid var(--campo-borda,#C4CBDA);background:#fff;border-radius:8px;padding:4px 9px;font-size:12px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
+.chamada-f .cf-p:hover{background:var(--verde-bg);border-color:var(--verde);color:var(--verde)}
+.chamada-f .cf-f:hover{background:var(--quente-bg);border-color:var(--quente);color:var(--quente)}
 .linha-f{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid var(--line-2)}
 .linha-f:last-child{border:0}.linha-f b{font-weight:700}
 .nota-f{background:var(--line-2);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-top:6px;line-height:1.5}
@@ -389,7 +395,7 @@ async function abrirFicha(id){
   const ini = (a.nome||'?').trim().split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
   const freq = f.frequencia;
   const clsF = freq === null ? '' : freq >= 80 ? '' : freq >= 60 ? 'baixo' : 'critico';
-  const ult = (f.presencas||[]).slice(0, 12).reverse();
+  const aulasF = f.aulas || [];
   const media = f.notas?.length ? (f.notas.reduce((s,n)=>s+n.nota,0)/f.notas.length).toFixed(1) : null;
   const origem = l ? [l.fonte, l.porta].filter(Boolean).join(' / ') || l.origem : null;
   document.getElementById('ficha').innerHTML = `
@@ -408,12 +414,16 @@ async function abrirFicha(id){
       <div class="obs" style="color:var(--faint);font-size:11.5px;margin-top:4px">Mudança definitiva do dia e horário. Para uma aula só em outro dia, use reposição na Agenda.</div>
 
       <div class="sec">Frequência</div>
-      ${freq === null ? '<div class="obs" style="color:var(--faint);font-size:13px">Ainda sem aulas registradas pelo tablet.</div>' : `
-      <div class="freq"><div><b>${freq}%</b><small>presença</small></div><div><b>${f.presentes}</b><small>de ${f.previstas} aulas</small></div>
-        ${f.previstas - f.presentes > 0 ? `<div><b>${f.previstas - f.presentes}</b><small>faltas</small></div>` : ''}</div>
-      <div class="barra-f"><i class="${clsF}" style="width:${freq}%"></i></div>
-      <div class="pontos">${ult.map(p => `<span class="pt ${p.entrada_em?'ok':''}" title="${new Date(p.data+'T12:00').toLocaleDateString('pt-BR')}">${new Date(p.data+'T12:00').getDate()}</span>`).join('')}</div>
-      <div class="obs" style="color:var(--faint);font-size:11.5px;margin-top:6px">últimas aulas — verde é presença</div>`}
+      ${freq === null ? '<div class="obs" style="color:var(--muted);font-size:13px">Nenhuma chamada registrada ainda. Marque abaixo ou na Agenda (visão Dia).</div>' : `
+      <div class="freq"><div><b>${freq}%</b><small>presença</small></div><div><b>${f.presentes}</b><small>presente${f.presentes===1?'':'s'}</small></div>
+        <div><b>${f.faltas||0}</b><small>falta${f.faltas===1?'':'s'}</small></div>
+        ${f.sem_chamada_total ? `<div><b style="color:var(--faint)">${f.sem_chamada_total}</b><small>sem chamada</small></div>` : ''}</div>
+      <div class="barra-f"><i class="${clsF}" style="width:${freq}%"></i></div>`}
+      ${aulasF.length ? `<div class="pontos">${aulasF.map(p => `<span class="pt ${p.status==='presente'?'ok':p.status==='faltou'?'falta':''}" title="${new Date(p.data+'T12:00').toLocaleDateString('pt-BR')} · ${p.status==='presente'?'presente':p.status==='faltou'?'faltou':'sem chamada'}">${new Date(p.data+'T12:00').getDate()}</span>`).join('')}</div>
+      <div class="obs" style="color:var(--muted);font-size:11.5px;margin-top:6px">últimas aulas — verde: veio · vermelho: faltou · cinza: sem chamada</div>` : ''}
+      ${(f.sem_chamada||[]).length ? `<div class="sub-sec">Aulas sem chamada</div>
+        ${f.sem_chamada.map(d => `<div class="linha-f"><span>${new Date(d+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</span>
+          <b class="chamada-f"><button class="cf-p" onclick="chamadaFicha('${a.id}','${d}','presente')" title="veio">✓ veio</button><button class="cf-f" onclick="chamadaFicha('${a.id}','${d}','faltou')" title="faltou">F faltou</button></b></div>`).join('')}` : ''}
 
       ${f.notas?.length ? `<div class="sec">Satisfação ${media?`· média ${media} ⭐`:''}</div>
         ${f.notas.slice(0,4).map(n => `<div class="nota-f"><b>${'⭐'.repeat(n.nota)} <span style="font-weight:600;color:var(--muted)">${new Date(n.data+'T12:00').toLocaleDateString('pt-BR')}</span></b>${n.comentario?esc(n.comentario):''}</div>`).join('')}` : ''}
@@ -436,6 +446,10 @@ async function abrirFicha(id){
         ${a.status === 'ativo' ? `<button onclick="trancar('${a.id}')">Trancar</button>` : `<button onclick="reativar('${a.id}')">Reativar</button>`}
       </div>
     </div>`;
+}
+async function chamadaFicha(alunoId, data, status){
+  try { await api('chamada', { aluno_id: alunoId, data, status }); await abrirFicha(alunoId); }
+  catch(e){ toast(e.message, { tipo:'erro' }); }
 }
 function fecharFicha(){ document.getElementById('ficha').classList.remove('aberto'); document.getElementById('ficha-scrim').classList.remove('on'); }
 async function trancar(id){

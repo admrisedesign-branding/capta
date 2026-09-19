@@ -128,3 +128,23 @@ body.embed .wrap{padding-top:16px}
 
 @media print{.topbar,.barra,.nota{display:none}body{background:#fff}.card,.bloco,.tally{box-shadow:none;break-inside:avoid}}
 
+
+
+/* ---------------------------------------------------------------------
+   CAMPOS — padrão de legibilidade de TODAS as telas.
+   O --line (#E9ECF3) é bom para divisória, mas some como borda de campo:
+   campo branco sobre fundo claro ficava invisível. Aqui todo input, select
+   e textarea ganha fundo branco, borda visível, texto escuro e foco azul.
+   --------------------------------------------------------------------- */
+:root{ --campo-bg:#FFFFFF; --campo-borda:#C4CBDA; --campo-borda-hover:#99A2B7; --campo-txt:#1B2233; --campo-ph:#737D94; --campo-off:#F1F3F8; }
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=hidden]):not([type=submit]):not([type=button]),
+select, textarea{
+  background-color:var(--campo-bg)!important; border-color:var(--campo-borda)!important; color:var(--campo-txt)!important;
+}
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=hidden]):not([type=submit]):not([type=button]):hover,
+select:hover, textarea:hover{ border-color:var(--campo-borda-hover)!important; }
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=hidden]):not([type=submit]):not([type=button]):focus,
+select:focus, textarea:focus{ outline:0; border-color:var(--brand,#2E5BFF)!important; box-shadow:0 0 0 3px rgba(46,91,255,.16)!important; }
+input::placeholder, textarea::placeholder{ color:var(--campo-ph)!important; opacity:1; }
+input[readonly], input:disabled, select:disabled, textarea[readonly], textarea:disabled{ background-color:var(--campo-off)!important; color:#4A5368!important; }
+select option{ color:var(--campo-txt); background:#fff; }
