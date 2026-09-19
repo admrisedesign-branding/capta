@@ -2185,6 +2185,8 @@ async function acaoChamada(tenant, body, res) {
   return res.status(200).json({ ok: true, status });
 }
 
+const hhmm = t => { const [h, m] = String(t || '00:00').split(':').map(Number); return h * 60 + (m || 0); };
+const agoraMinManaus = () => { const d = new Date(Date.now() - 4 * 3600e3); return d.getUTCHours() * 60 + d.getUTCMinutes(); };
 async function acaoFaltasAluno(tenant, body, res) {
   const id = body.aluno_id; if (!id) return res.status(400).json({ erro: 'Informe o aluno.' });
   const [al] = await sb(`capta_alunos?id=eq.${id}&tenant_id=eq.${tenant.id}&select=id,nome,kit,turma_id&limit=1`);
@@ -2192,22 +2194,27 @@ async function acaoFaltasAluno(tenant, body, res) {
   const [turma] = al.turma_id ? await sb(`capta_turmas?id=eq.${al.turma_id}&select=dia_semana,hora_inicio,hora_fim,nome&limit=1`) : [];
   const de = new Date(Date.now() - 21 * 864e5 - 4 * 3600e3).toISOString().slice(0, 10);
   const [presencas, reposicoes] = await Promise.all([
-    sb(`capta_presencas?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&data=gte.${de}&select=data,entrada_em`).catch(() => []),
+    sb(`capta_presencas?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&data=gte.${de}&select=data,entrada_em,motivo`).catch(() => []),
     sb(`capta_agendamentos?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&tipo=eq.reposicao&select=id,data,hora_inicio,status,repoe_data&order=data.desc&limit=10`).catch(() => [])
   ]);
+  // Falta é só o que alguém MARCOU (chamada da Agenda). Dia sem registro não é
+  // falta: antes da chamada existir, toda aula sem check-in no tablet virava
+  // "falta" — o Joaquim aparecia com 3 faltas que não aconteceram.
   const veio = new Set((presencas || []).filter(p => p.entrada_em).map(p => p.data));
+  const faltou = new Set((presencas || []).filter(p => !p.entrada_em && p.motivo === 'falta').map(p => p.data));
   const reposto = new Set((reposicoes || []).map(r => r.repoe_data).filter(Boolean));
-  const faltas = [];
+  const faltas = [], semChamada = [];
   if (turma) {
     const hoje = hojeManaus();
     for (let d = new Date(de + 'T12:00:00'); d.toISOString().slice(0, 10) <= hoje; d.setDate(d.getDate() + 1)) {
       const dia = d.toISOString().slice(0, 10);
       if (d.getDay() !== turma.dia_semana) continue;
       if (veio.has(dia) || reposto.has(dia)) continue;
-      faltas.push({ data: dia, hora_inicio: turma.hora_inicio });
+      if (faltou.has(dia)) faltas.push({ data: dia, hora_inicio: turma.hora_inicio });
+      else if (dia < hoje || hhmm(turma.hora_fim) <= agoraMinManaus()) semChamada.push({ data: dia, hora_inicio: turma.hora_inicio });
     }
   }
-  return res.status(200).json({ aluno: al, turma: turma || null, faltas: faltas.reverse(), reposicoes: reposicoes || [] });
+  return res.status(200).json({ aluno: al, turma: turma || null, faltas: faltas.reverse(), sem_chamada: semChamada.reverse(), reposicoes: reposicoes || [] });
 }
 
 // NOTAS — cada anotação é uma linha com autor e data, em vez de um campo
