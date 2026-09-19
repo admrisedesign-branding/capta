@@ -245,13 +245,18 @@ function normalizarWebhook(payload) {
 async function lidDoTelefone(canal, telefone) {
   const fone = comDDI(telefone);
   if (!fone) return null;
+  // Retorno: '<digitos>' = achou · null = resposta clara de que não há @lid
+  // (número sem WhatsApp) · undefined = provedor fora/erro/formato inesperado.
+  // Só o null pode ser gravado como 'sem'; undefined tem de ficar para tentar de novo.
   let j;
   try { j = await zapiFetch(canal, `phone-exists/${fone}`, { method: 'GET' }); }
-  catch (e) { return null; }                       // número inexistente ou provedor fora
-  if (!j || j.exists === false) return null;
+  catch (e) { return undefined; }
+  if (!j || typeof j !== 'object') return undefined;
+  if (j.exists === false) return null;
   const bruto = j.lid || j.jid || j.chatLid || j.senderLid || '';
-  const lid = String(bruto).replace('@lid', '').replace(/\D/g, '');
-  return lid || null;
+  const lid = /@lid$/.test(String(bruto)) || String(bruto).replace(/\D/g, '').length > 13
+    ? String(bruto).replace('@lid', '').replace(/\D/g, '') : '';
+  return lid || undefined;
 }
 
 function extrairAnuncio(p) {
