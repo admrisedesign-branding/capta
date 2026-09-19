@@ -2032,23 +2032,38 @@ async function acaoFichaAluno(tenant, body, res) {
   if (!al) return res.status(404).json({ erro: 'Aluno não encontrado.' });
   const [turmas, presencas, lead, matriculas] = await Promise.all([
     sb(`capta_turmas?tenant_id=eq.${tenant.id}&select=id,nome,dia_semana,hora_inicio,hora_fim`).catch(() => []),
-    sb(`capta_presencas?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&select=data,entrada_em,saida_em,feedback,comentario&order=data.desc&limit=180`).catch(() => []),
+    sb(`capta_presencas?tenant_id=eq.${tenant.id}&aluno_id=eq.${id}&select=data,entrada_em,saida_em,feedback,comentario,motivo&order=data.desc&limit=180`).catch(() => []),
     al.lead_id ? sb(`capta_leads?id=eq.${al.lead_id}&select=id,nome,contato,email,fonte,porta,origem,criado_em,kommo_lead_id,evento_id,temperatura`).catch(() => []) : [],
     al.lead_id ? sb(`capta_matriculas?tenant_id=eq.${tenant.id}&lead_id=eq.${al.lead_id}&select=valor_bruto,fechada_em,fechada_por,status&order=fechada_em.desc`).catch(() => []) : []
   ]);
   // aulas previstas desde a matrícula (uma por semana, no dia da turma)
   const turma = (turmas || []).find(t => t.id === al.turma_id);
   const inicio = (matriculas?.[0]?.fechada_em) || String(al.criado_em || '').slice(0, 10);
-  let previstas = 0;
+  // Frequência só com o que foi REGISTRADO (chamada da Agenda ou check-in do
+  // tablet). Aula sem registro é "sem chamada", não falta — antes, todo aluno
+  // que não passava no tablet aparecia com 0% e várias faltas.
+  const porDia = {}; (presencas || []).forEach(p => { porDia[p.data] = p.entrada_em ? 'presente' : p.motivo === 'falta' ? 'faltou' : null; });
+  const hojeS = hojeManaus(), agoraMin = agoraMinManaus();
+  const datas = [];
   if (turma && inicio) {
-    const d = new Date(inicio + 'T12:00:00'), hoje = new Date();
-    while (d <= hoje) { if (d.getDay() === turma.dia_semana) previstas++; d.setDate(d.getDate() + 1); }
+    const d = new Date(inicio + 'T12:00:00');
+    for (; d.toISOString().slice(0, 10) <= hojeS; d.setDate(d.getDate() + 1)) {
+      const dia = d.toISOString().slice(0, 10);
+      if (d.getDay() !== turma.dia_semana) continue;
+      if (dia === hojeS && hhmm(turma.hora_fim) > agoraMin) continue;   // aula de hoje que ainda não acabou
+      datas.push(dia);
+    }
   }
-  const presentes = (presencas || []).filter(p => p.entrada_em).length;
+  const previstas = datas.length;
+  const presentes = datas.filter(d => porDia[d] === 'presente').length + (presencas || []).filter(p => p.entrada_em && !datas.includes(p.data)).length;
+  const faltas = datas.filter(d => porDia[d] === 'faltou').length;
+  const semChamada = datas.filter(d => !porDia[d]);
+  const aulas = datas.slice(-12).map(d => ({ data: d, status: porDia[d] || null }));
   const notas = (presencas || []).filter(p => p.feedback).map(p => ({ data: p.data, nota: p.feedback, comentario: p.comentario }));
   return res.status(200).json({
-    aluno: al, turma: turma || null, presencas: presencas || [], previstas, presentes,
-    frequencia: previstas ? Math.round(presentes / previstas * 100) : null,
+    aluno: al, turma: turma || null, presencas: presencas || [], previstas, presentes, faltas,
+    sem_chamada: semChamada.slice(-6).reverse(), sem_chamada_total: semChamada.length, aulas,
+    frequencia: presentes + faltas ? Math.round(presentes / (presentes + faltas) * 100) : null,
     notas, lead: lead?.[0] || null, matriculas: matriculas || []
   });
 }
